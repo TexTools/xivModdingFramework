@@ -357,10 +357,21 @@ namespace xivModdingFramework.Helpers
         }
 
 
-        public static Regex MtrlSuffixExtractionRegex = new Regex("\\/?mt_[a-z][0-9]{4}[a-z][0-9]{4}(?:_[a-z]{2,4})_([a-z]+)\\.mtrl");
+        private static Regex MtrlSuffixExtractionRegex = new Regex("\\/?mt_[a-z][0-9]{4}[a-z][0-9]{4}(?:_[a-z]{3})?_([a-z]+)\\.mtrl");
         public static string GetMaterialSuffix(string mtrlNameOrPath)
         {
             var match = MtrlSuffixExtractionRegex.Match(mtrlNameOrPath);
+            if (!match.Success)
+            {
+                return "";
+            }
+            return match.Groups[1].Value;
+        }
+
+        private static Regex MtrlSlotExtractionRegex = new Regex("_([a-z]{3})(?:_.*)?\\.mtrl");
+        public static string GetMaterialSlot(string mtrlNameOrPath)
+        {
+            var match = MtrlSlotExtractionRegex.Match(mtrlNameOrPath);
             if (!match.Success)
             {
                 return "";

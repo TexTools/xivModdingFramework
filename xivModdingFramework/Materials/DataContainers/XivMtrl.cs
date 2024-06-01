@@ -201,6 +201,11 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public string MTRLPath { get; set; }
 
+        public string GetSuffix()
+        {
+            return IOUtil.GetMaterialSuffix(MTRLPath);
+        }
+
 
         /// <summary>
         /// Gets a given shader Parameter by ID.
@@ -373,6 +378,17 @@ namespace xivModdingFramework.Materials.DataContainers
                 versionString += 'v' + (version.ToString().PadLeft(2, '0'));
             }
             return versionString;
+        }
+
+        /// <summary>
+        /// Retrieves the /STATED/ slot for this MTRL, based on its name.
+        /// This is not necessarily the slot it is actually used in, or a slot where a model exists at all.
+        /// To get the real slot, resolve the MTRL's root and check that.
+        /// </summary>
+        /// <returns></returns>
+        public string GetFakeSlot()
+        {
+            return IOUtil.GetMaterialSlot(MTRLPath);
         }
 
         /// <summary>
