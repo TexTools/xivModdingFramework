@@ -887,7 +887,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 return true;
 
             Int32.TryParse(version.Substring(0, 1), out var v);
-            return v >= 2;
+            return v < 2;
         }
 
 
