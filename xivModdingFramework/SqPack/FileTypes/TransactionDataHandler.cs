@@ -67,65 +67,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
-
-        private int _CompressedFileSize;
-        private int _UncompressedFileSize;
-
-        /// <summary>
-        /// Retrieves the compressed file size of this file.
-        /// NOTE: If the file is stored uncompressed, and has never been compressed, this function will compress the file in order to determine the resultant size.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<int> GetCompressedFileSize()
-        {
-            if (IsCompressed)
-            {
-                _CompressedFileSize = FileSize;
-            } else if(_CompressedFileSize == 0)
-            {
-                // Nothing to be done here but just compress the file and see how large it is.
-                // We can cache it though at least.
-                using (var fs = File.OpenRead(RealPath))
-                {
-                    using (var br = new BinaryReader(fs))
-                    {
-
-                        br.BaseStream.Seek(RealOffset, SeekOrigin.Begin);
-                        var data = br.ReadBytes(FileSize);
-
-                        // This is a bit clunky.  We have to ship this to the smart compressor.
-                        data = await SmartImport.CreateCompressedFile(data, false);
-                        _CompressedFileSize = data.Length;
-                    }
-                }
-            }
-            return _CompressedFileSize;
-        }
-
-        /// <summary>
-        /// Retrieves the uncompressed file size of this file.
-        /// </summary>
-        /// <returns></returns>
-        public int GetUncompressedFileSize()
-        {
-            if (!IsCompressed)
-            {
-                _UncompressedFileSize = FileSize;
-            }
-            else if (_UncompressedFileSize == 0)
-            {
-                // Compressed SqPack files have information on their uncompressed size, so we can just read that and cache it.
-                using (var fs = File.OpenRead(RealPath))
-                {
-                    using (var br = new BinaryReader(fs))
-                    {
-                        br.BaseStream.Seek(RealOffset + 12, SeekOrigin.Begin);
-                        _UncompressedFileSize = br.ReadInt32();
-                    }
-                }
-            }
-            return _UncompressedFileSize;
-        }
     }
 
     /// <summary>
@@ -209,6 +150,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             return await GetUncompressedFile(info);
         }
+
         public static async Task<byte[]> GetUncompressedFile(FileStorageInformation info)
         {
             using (var fs = File.OpenRead(info.RealPath))
@@ -437,6 +379,51 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
         }
 
+        public async Task<int> GetCompressedFileSize(XivDataFile dataFile, long offset8x, bool forceType2 = false)
+        {
+            if (!OffsetMapping.ContainsKey(dataFile))
+            {
+                throw new FileNotFoundException("Invalid Data File: " + dataFile.ToString());
+            }
+
+            FileStorageInformation info;
+            if (OffsetMapping[dataFile].ContainsKey(offset8x))
+            {
+                // Load info from mapping
+                info = OffsetMapping[dataFile][offset8x];
+            }
+            else
+            {
+                // Create standard Game DAT file request info.
+                info = IOUtil.MakeGameStorageInfo(dataFile, offset8x);
+            }
+
+            return await GetCompressedFileSize(info, forceType2);
+        }
+        public static async Task<int> GetCompressedFileSize(FileStorageInformation info, bool forceType2 = false)
+        {
+            if (info.IsCompressed)
+            {
+                if (info.IsBlob)
+                {
+                    return info.FileSize;
+                }
+                else
+                {
+                    if(info.FileSize != 0)
+                    {
+                        return info.FileSize;
+                    }
+                    return (int)new FileInfo(info.RealPath).Length;
+                }
+            }
+            else
+            {
+                var data = await GetCompressedFile(info, forceType2);
+                return data.Length;
+            }
+        }
+
         /// <summary>
         /// Writes a given file to the default data store, keyed to the datafile/offset pairing.
         /// </summary>
@@ -563,7 +550,38 @@ namespace xivModdingFramework.SqPack.FileTypes
                 // Create standard Game DAT file request info.
                 info = IOUtil.MakeGameStorageInfo(dataFile, offset8x);
             }
-            return info.GetUncompressedFileSize();
+            return GetUncompressedFileSize(info);
+        }
+
+        public static int GetUncompressedFileSize(FileStorageInformation info)
+        {
+            if (!info.IsCompressed)
+            {
+                if (info.IsBlob)
+                {
+                    return info.FileSize;
+                } else
+                {
+                    if(info.FileSize != 0)
+                    {
+                        return info.FileSize;
+                    }
+                    return (int)new FileInfo(info.RealPath).Length;
+                }
+
+            } else
+            {
+                // Compressed SqPack files have information on their uncompressed size, so we can just read that and cache it.
+                using (var fs = File.OpenRead(info.RealPath))
+                {
+                    using (var br = new BinaryReader(fs))
+                    {
+                        br.BaseStream.Seek(info.RealOffset + 12, SeekOrigin.Begin);
+                        return br.ReadInt32();
+                    }
+                }
+            }
+
         }
 
 

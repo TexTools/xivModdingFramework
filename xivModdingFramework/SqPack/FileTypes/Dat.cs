@@ -1869,7 +1869,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="bw"></param>
         /// <param name="offset"></param>
         /// <exception cref="Exception"></exception>
-        internal static int UpdateCompressedSize(FileStorageInformation info)
+        public static int UpdateCompressedSize(ref FileStorageInformation info)
         {
             if (info.StorageType == EFileStorageType.UncompressedIndividual || info.StorageType == EFileStorageType.UncompressedBlob)
             {
@@ -1888,6 +1888,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                 bw.BaseStream.Seek(info.RealOffset + 8, SeekOrigin.Begin);
                 bw.Write(BitConverter.GetBytes(realSize));
             }
+
+            info.FileSize = realSize;
 
             return realSize;
 

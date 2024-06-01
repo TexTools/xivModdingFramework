@@ -42,7 +42,7 @@ using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
-
+using xivModdingFramework.Textures.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Mods.FileTypes
@@ -468,21 +468,22 @@ namespace xivModdingFramework.Mods.FileTypes
 
         /// <summary>
         /// Basic TTMP Unzip.
-        /// If a custom MPD name is set, only the MPD is unzipped.
-        /// Returns the folder the files were unzipped to.
+        /// Returns the folder the data was unzipped to and the MPL
         /// </summary>
         /// <param name="path"></param>
         /// <param name="targetPath"></param>
         /// <param name="mpdName"></param>
         /// <returns></returns>
-        public static async Task<string> UnzipTtmp(string path, string targetPath = null, string mpdName = null)
+        public static async Task<(ModPackJson Mpl, string UnzipFolder)> UnzipTtmp(string path, string targetPath = null, string mpdName = null)
         {
-            return await Task.Run(() =>
+            return await Task.Run(async () =>
             {
                 if (targetPath == null)
                 {
                     targetPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
                 }
+
+                var mpl = await GetModpackList(path);
 
                 Directory.CreateDirectory(targetPath);
 
@@ -509,7 +510,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                 }
 
-                return targetPath;
+                return (mpl, targetPath);
             });
         }
 
@@ -564,6 +565,11 @@ namespace xivModdingFramework.Mods.FileTypes
         public static string GetVersion(DirectoryInfo modPackDirectory)
         {
             ModPackJson modPackJson = null;
+
+            if (modPackDirectory.FullName.ToLower().EndsWith(".ttmp"))
+            {
+                return "0.1s";
+            }
 
             using (var archive = System.IO.Compression.ZipFile.OpenRead(modPackDirectory.FullName))
             {
@@ -668,7 +674,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
 
 
-                    var needsTexFix = DoesModpackNeedTexFix(new DirectoryInfo(modpackPath));
+                    var needsTexFix = DoesModpackNeedTexFix(modpackMpl);
                     var count = 0;
                     var modList = await tx.GetModList();
 
@@ -705,11 +711,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         if (needsTexFix && modJson.FullPath.EndsWith(".tex"))
                         {
                             // Have to fix old busted textures.
-                            var size = Dat.UpdateCompressedSize(storeInfo);
-                            if(size >= 0)
-                            {
-                                storeInfo.FileSize = size;
-                            }
+                            storeInfo = await FixOldTexData(storeInfo);
                         }
 
 
@@ -867,41 +869,27 @@ namespace xivModdingFramework.Mods.FileTypes
         /// Parse the version out of this modpack to determine whether or not we need
         /// to recalculate and correct the compressed type 4 file sizes.
         /// </summary>
-        /// <param name="mpd">The path to the modpack.</param>
+        /// <param name="modpackPath">The path to the modpack.</param>
         /// <returns>True if we must modify tex header uncompressed sizes, false otherwise.</returns>
-        private static bool DoesModpackNeedTexFix(DirectoryInfo mpd) {
+        public static bool DoesModpackNeedTexFix(DirectoryInfo modpackPath) {
 
-	        var ver = GetVersion(mpd);
-	        if (string.IsNullOrEmpty(ver))
-		        return true;
+	        var ver = GetVersion(modpackPath);
 
-	        var newVer = ver;
+            return DoesModpackNeedTexFix(ver);
+        }
+        public static bool DoesModpackNeedTexFix(ModPackJson mpl)
+        {
+            return DoesModpackNeedTexFix(mpl.Version);
+        }
+        public static bool DoesModpackNeedTexFix(string version)
+        {
+            if (string.IsNullOrEmpty(version))
+                return true;
 
-	        var lastChar = ver.Substring(ver.Length - 1)[0];
-	        if (char.IsLetter(lastChar))
-		        newVer = ver.Substring(0, ver.Length - 1);
-
-	        double.TryParse(newVer, out var verDouble);
-
-	        return verDouble < 2.0;
+            Int32.TryParse(version.Substring(0, 1), out var v);
+            return v >= 2;
         }
 
-        /// <summary>
-        /// Fix xivModdingFramework TEX quirks.
-        /// </summary>
-        /// <param name="tex">The TEX data to be fixed up.</param>
-        public static void FixupTextoolsTex(byte[] tex) {
-
-	        // Read the uncompressed size from the file
-	        var size = BitConverter.ToInt32(tex, 8);
-	        var newSize = size + 80;
-	        
-	        byte[] buffer = BitConverter.GetBytes(newSize);
-	        tex[8] = buffer[0];
-	        tex[9] = buffer[1];
-	        tex[10] = buffer[2];
-	        tex[11] = buffer[3];
-        }
 
         public static async Task FixPreDawntrailImports(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
@@ -1019,7 +1007,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
         /// <summary>
-        /// Attempts to perform the most basic merge of modpack data.
+        /// Attempts to perform the most basic merge of file data into the system.
         /// Takes a collection of file storage informations, and applies them to the associated internal file paths.
         /// </summary>
         /// <param name="modpackPath"></param>
@@ -1069,6 +1057,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     var compSize = fileInfo.FileSize;
                     if (fileInfo.StorageType == EFileStorageType.UncompressedIndividual || fileInfo.StorageType == EFileStorageType.UncompressedBlob) {
                         compSize = await tx.GetCompressedFileSize(df, offset);
+                    } else if(compSize == 0 && fileInfo.StorageType == EFileStorageType.CompressedIndividual)
+                    {
+                        compSize = (int) new FileInfo(fileInfo.RealPath).Length;
                     }
 
                     // Resolve name and category for modlist.
@@ -1199,10 +1190,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
             if(modpackMpl.SimpleModsList != null && modpackMpl.SimpleModsList.Count > 0 && !modpackMpl.Version.EndsWith("b"))
             {
-                return await UnpackSimpleModlist(modpackPath, modpackMpl, includeData, tx);
+                return await UnpackSimpleModlist(modpackPath, includeData, tx);
             } else if(modpackMpl.ModPackPages != null && modpackMpl.ModPackPages.Count > 0)
             {
-                return await UnpackWizardModlist(modpackPath, modpackMpl, includeData, tx);
+                return await UnpackWizardModlist(modpackPath, includeData, tx);
             }
             else
             {
@@ -1210,14 +1201,14 @@ namespace xivModdingFramework.Mods.FileTypes
                 return null;
             }
         }
-        private static async Task<Dictionary<string, FileStorageInformation>> UnpackSimpleModlist(string modpackPath, ModPackJson mpl, bool includeData = true, ModTransaction tx = null)
+        private static async Task<Dictionary<string, FileStorageInformation>> UnpackSimpleModlist(string modpackPath, bool includeData = true, ModTransaction tx = null)
         {
             // Wrapped to task since we're going to be potentially unzipping a large file.
             return await Task.Run(async () =>
             {
 
                 var _tempMPD = "";
-                var needsTexFix = DoesModpackNeedTexFix(new DirectoryInfo(modpackPath));
+                ModPackJson mpl;
                 if (includeData)
                 {
                     string tempFolder;
@@ -1233,39 +1224,30 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // First, unzip the TTMP into our transaction data store folder.
                     var mpdName = Guid.NewGuid().ToString() + ".mpd";
-                    await UnzipTtmp(modpackPath, tempFolder, mpdName);
+                    var res = await UnzipTtmp(modpackPath, tempFolder, mpdName);
+                    mpl = res.Mpl;
                     _tempMPD = Path.Combine(tempFolder, mpdName);
+                } else
+                {
+                    mpl = await GetModpackList(modpackPath);
                 }
 
-                return MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, needsTexFix, includeData);
+                var needsTexFix = DoesModpackNeedTexFix(mpl);
+
+                return await MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, needsTexFix, includeData);
             });
         }
-        private static async Task<Dictionary<string, FileStorageInformation>> UnpackWizardModlist(string modpackPath, ModPackJson mpl, bool includeData = true, ModTransaction tx = null)
+        private static async Task<Dictionary<string, FileStorageInformation>> UnpackWizardModlist(string modpackPath, bool includeData = true, ModTransaction tx = null)
         {
             var ret = new Dictionary<string, FileStorageInformation>();
             
-            if(mpl.ModPackPages.Count > 1)
-            {
-                return null;
-            }
 
-            if (mpl.ModPackPages[0].ModGroups.Count > 1)
+            return await Task.Run(async () =>
             {
-                return null;
-            }
-
-            if (mpl.ModPackPages[0].ModGroups[0].OptionList.Count > 1)
-            {
-                return null;
-            }
-
-            return await Task.Run(() =>
-            {
-
-                var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
 
                 var _tempMPD = "";
-                var needsTexFix = DoesModpackNeedTexFix(new DirectoryInfo(modpackPath));
+
+                ModPackJson mpl;
                 if (includeData)
                 {
                     string tempFolder;
@@ -1279,27 +1261,40 @@ namespace xivModdingFramework.Mods.FileTypes
                         tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
                     }
 
-                    Directory.CreateDirectory(tempFolder);
-
-                    // First, unzip the TTMP into our transaction data store folder.
-                    using (var zf = ZipFile.Read(modpackPath))
-                    {
-                        var mpd = zf.Entries.First(x => x.FileName.EndsWith(".mpd"));
-                        _tempMPD = Path.Combine(tempFolder, Guid.NewGuid().ToString());
-
-                        using (var fs = new FileStream(_tempMPD, FileMode.Create))
-                        {
-                            mpd.Extract(fs);
-                        }
-                    }
+                    var mpdName = Guid.NewGuid().ToString() + ".mpd";
+                    var res = await UnzipTtmp(modpackPath, tempFolder, mpdName);
+                    _tempMPD = Path.Combine(res.UnzipFolder, mpdName);
+                    mpl = res.Mpl;
+                }
+                else
+                {
+                    mpl = await GetModpackList(modpackPath);
                 }
 
-                return MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, needsTexFix);
+                if (mpl.ModPackPages.Count > 1)
+                {
+                    return null;
+                }
+
+                if (mpl.ModPackPages[0].ModGroups.Count > 1)
+                {
+                    return null;
+                }
+
+                if (mpl.ModPackPages[0].ModGroups[0].OptionList.Count > 1)
+                {
+                    return null;
+                }
+
+                var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
+
+                var needsTexFix = DoesModpackNeedTexFix(mpl);
+                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, needsTexFix);
 
             });
         }
 
-        private static Dictionary<string, FileStorageInformation> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, bool needsTexFix, bool includeData = true)
+        private static async Task<Dictionary<string, FileStorageInformation>> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, bool needsTexFix, bool includeData = true)
         {
             var ret = new Dictionary<string, FileStorageInformation>();
             foreach (var file in mods)
@@ -1322,19 +1317,58 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                 // Ancient bug issues....
-                if (needsTexFix && file.FullPath.EndsWith(".tex"))
+                if (needsTexFix && file.FullPath.EndsWith(".tex") && includeData)
                 {
                     // Have to fix old busted textures.
-                    var size = Dat.UpdateCompressedSize(storeInfo);
-                    if (size >= 0)
-                    {
-                        storeInfo.FileSize = size;
-                    }
+                    storeInfo = await FixOldTexData(storeInfo);
                 }
 
                 ret.Add(file.FullPath, storeInfo);
             }
             return ret;
+        }
+
+
+        /// <summary>
+        /// Fixes up inconsistencies and errors with old TexTools texture files.
+        /// In particular, their compressed and uncompressed sizes are wrong.
+        /// </summary>
+        /// <param name="info"></param>
+        public static async Task<FileStorageInformation> FixOldTexData(FileStorageInformation info)
+        {
+            if(!info.IsCompressed)
+            {
+                // No issues if this is already being stored in unpacked format.
+                return info;
+            }
+
+            // There are three possible issues.
+            // 1. Uncompressed file size is wrong, which needs to be fixed in the file storage info.
+            // 2. The Uncompressed file size is wrong.  This can only be validated by unzipping the file.
+            // 3. The block sizes are incorrect.  This can only be fixed by unzipping and rewriting the blocks.
+
+            var data = await TransactionDataHandler.GetUncompressedFile(info);
+            var recomp = await Tex.CompressTexFile(data);
+
+            var originalSize = info.FileSize;
+            info.FileSize = recomp.Length;
+
+            var fpath = info.RealPath;
+            var offset = info.RealOffset;
+            if(info.FileSize > originalSize && info.IsBlob) {
+                // We can't do an in-place write here b/c we might bash something else's data.
+                fpath = Path.GetTempFileName();
+                offset = 0;
+                info.StorageType = EFileStorageType.CompressedIndividual;
+            }
+
+            using (var fs = File.OpenWrite(fpath))
+            {
+                fs.Seek(offset, SeekOrigin.Begin);
+                fs.Write(recomp, 0, recomp.Length);
+            }
+
+            return info;
         }
     }
 }
