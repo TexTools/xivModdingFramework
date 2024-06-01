@@ -23,8 +23,6 @@ namespace xivModdingFramework.Mods
     #region Enums and Structs
     public enum ETransactionTarget
     {
-        Invalid,
-
         // Write the modified files to the game .DATs on transaction commit.
         GameFiles,
 
@@ -470,7 +468,7 @@ namespace xivModdingFramework.Mods
                 Settings = new ModTransactionSettings()
                 {
                     StorageType = EFileStorageType.ReadOnly,
-                    Target = ETransactionTarget.Invalid,
+                    Target = ETransactionTarget.FolderTree,
                     TargetPath = null,
                     Unsafe = false,
                 };
@@ -486,11 +484,6 @@ namespace xivModdingFramework.Mods
                 // Unsafe is always explicitly assigned.
                 set.Unsafe = !safe;
                 Settings = set;
-
-                if (Settings.Target == ETransactionTarget.Invalid)
-                {
-                    throw new Exception("Invalid Transaction Target.");
-                }
 
                 if (Settings.Target == ETransactionTarget.GameFiles && Settings.TargetPath == null)
                 {
