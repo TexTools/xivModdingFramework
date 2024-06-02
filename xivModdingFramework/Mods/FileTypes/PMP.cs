@@ -967,6 +967,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var total = byRg.Count();
             foreach (var group in byRg)
             {
+                // TODO: This needs validation.
                 var rg = group.First().GetRaceGender();
                 RacialGenderScalingParameter cmp;
                 if (!seenRgsps.ContainsKey(group.Key))

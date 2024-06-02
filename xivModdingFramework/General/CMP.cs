@@ -102,22 +102,29 @@ namespace xivModdingFramework.General
             var match = RgspPathExtractFormat.Match(rgspPath);
             if (!match.Success) throw new InvalidDataException("Invalid .RGSP file path.");
 
-            var race = (XivSubRace) Int32.Parse(match.Groups[1].Value);
-            var gender = (XivGender) Int32.Parse(match.Groups[2].Value);
+            var rg = GetRaceGenderFromRgspPath(rgspPath);
 
-            await RestoreDefaultScaling(race, gender, tx);
+            await RestoreDefaultScaling(rg.Race, rg.Gender, tx);
         }
 
         internal static string GetModFileNameFromRgspPath(string path)
         {
+            
+            var rg = GetRaceGenderFromRgspPath(path);
+            if (!rg.Valid) return null;
+
+            var name = rg.Race.GetDisplayName() + " - " + rg.Gender.ToString();
+            return name;
+        }
+
+        public static (XivSubRace Race, XivGender Gender, bool Valid) GetRaceGenderFromRgspPath(string path)
+        {
             var match = RgspPathExtractFormat.Match(path);
-            if (!match.Success) return null;
+            if (!match.Success) return (XivSubRace.Hyur_Midlander, XivGender.Male, false);
 
             var race = (XivSubRace)Int32.Parse(match.Groups[1].Value);
             var gender = (XivGender)Int32.Parse(match.Groups[2].Value);
-
-            var name = race.GetDisplayName() + " - " + gender.ToString();
-            return name;
+            return (race, gender, true);
         }
 
         public static string GetRgspPath(RacialGenderScalingParameter rgsp)

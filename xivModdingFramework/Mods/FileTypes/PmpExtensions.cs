@@ -157,7 +157,7 @@ namespace xivModdingFramework.Mods.FileTypes
         All = 24, // Not officially existing
     }
     [JsonConverter(typeof(StringEnumConverter))]
-    public enum RspAttribute : byte
+    public enum PMPRspAttribute : byte
     {
         MaleMinSize,
         MaleMaxSize,
@@ -363,23 +363,23 @@ namespace xivModdingFramework.Mods.FileTypes
         };
 
 
-        public static PMPGender ToPMPGender(this RspAttribute attribute)
+        public static PMPGender ToPMPGender(this PMPRspAttribute attribute)
             => attribute switch
             {
-                RspAttribute.MaleMinSize => PMPGender.Male,
-                RspAttribute.MaleMaxSize => PMPGender.Male,
-                RspAttribute.MaleMinTail => PMPGender.Male,
-                RspAttribute.MaleMaxTail => PMPGender.Male,
-                RspAttribute.FemaleMinSize => PMPGender.Female,
-                RspAttribute.FemaleMaxSize => PMPGender.Female,
-                RspAttribute.FemaleMinTail => PMPGender.Female,
-                RspAttribute.FemaleMaxTail => PMPGender.Female,
-                RspAttribute.BustMinX => PMPGender.Female,
-                RspAttribute.BustMinY => PMPGender.Female,
-                RspAttribute.BustMinZ => PMPGender.Female,
-                RspAttribute.BustMaxX => PMPGender.Female,
-                RspAttribute.BustMaxY => PMPGender.Female,
-                RspAttribute.BustMaxZ => PMPGender.Female,
+                PMPRspAttribute.MaleMinSize => PMPGender.Male,
+                PMPRspAttribute.MaleMaxSize => PMPGender.Male,
+                PMPRspAttribute.MaleMinTail => PMPGender.Male,
+                PMPRspAttribute.MaleMaxTail => PMPGender.Male,
+                PMPRspAttribute.FemaleMinSize => PMPGender.Female,
+                PMPRspAttribute.FemaleMaxSize => PMPGender.Female,
+                PMPRspAttribute.FemaleMinTail => PMPGender.Female,
+                PMPRspAttribute.FemaleMaxTail => PMPGender.Female,
+                PMPRspAttribute.BustMinX => PMPGender.Female,
+                PMPRspAttribute.BustMinY => PMPGender.Female,
+                PMPRspAttribute.BustMinZ => PMPGender.Female,
+                PMPRspAttribute.BustMaxX => PMPGender.Female,
+                PMPRspAttribute.BustMaxY => PMPGender.Female,
+                PMPRspAttribute.BustMaxZ => PMPGender.Female,
                 _ => PMPGender.Unknown,
             };
 

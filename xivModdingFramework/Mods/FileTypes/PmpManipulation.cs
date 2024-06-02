@@ -554,7 +554,7 @@ namespace xivModdingFramework.Mods.FileTypes
     {
         public float Entry;
         public PMPSubRace SubRace;
-        public RspAttribute Attribute;
+        public PMPRspAttribute Attribute;
 
         /// <summary>
         /// Simple function to return a consistent race/gender hash for grouping.
@@ -575,7 +575,7 @@ namespace xivModdingFramework.Mods.FileTypes
             return hash;
         }
 
-        public (XivSubRace Race, XivGender Gender) GetRaceGender()
+        public (XivSubRace Race, XivGender Gender, bool valid) GetRaceGender()
         {
             var pmpGen = Attribute.ToPMPGender();
 
@@ -583,12 +583,12 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 // TexTools doesn't have handling/setup for NPC RGSP entries.
                 // Could be added, but seems not worth the effort for how niche it is.
-                return (XivSubRace.Invalid, XivGender.Male);
+                return (XivSubRace.Hyur_Midlander, XivGender.Male, false);
             }
 
             var xivRace = PMPExtensions.PMPSubraceToXivSubrace[SubRace];
             var xivGen = PMPExtensions.PMPGenderToXivGender[pmpGen];
-            return (xivRace, xivGen);
+            return (xivRace, xivGen, true);
         }
 
         /// <summary>
@@ -599,38 +599,38 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             switch (Attribute)
             {
-                case RspAttribute.BustMinX:
+                case PMPRspAttribute.BustMinX:
                     cmp.BustMinX = Entry;
                     break;
-                case RspAttribute.BustMaxX:
+                case PMPRspAttribute.BustMaxX:
                     cmp.BustMaxX = Entry;
                     break;
-                case RspAttribute.BustMinY:
+                case PMPRspAttribute.BustMinY:
                     cmp.BustMinY = Entry;
                     break;
-                case RspAttribute.BustMaxY:
+                case PMPRspAttribute.BustMaxY:
                     cmp.BustMaxY = Entry;
                     break;
-                case RspAttribute.BustMinZ:
+                case PMPRspAttribute.BustMinZ:
                     cmp.BustMinZ = Entry;
                     break;
-                case RspAttribute.BustMaxZ:
+                case PMPRspAttribute.BustMaxZ:
                     cmp.BustMaxZ = Entry;
                     break;
-                case RspAttribute.MaleMinTail:
-                case RspAttribute.FemaleMinTail:
+                case PMPRspAttribute.MaleMinTail:
+                case PMPRspAttribute.FemaleMinTail:
                     cmp.MinTail = Entry;
                     break;
-                case RspAttribute.MaleMaxTail:
-                case RspAttribute.FemaleMaxTail:
+                case PMPRspAttribute.MaleMaxTail:
+                case PMPRspAttribute.FemaleMaxTail:
                     cmp.MaxTail = Entry;
                     break;
-                case RspAttribute.MaleMinSize:
-                case RspAttribute.FemaleMinSize:
+                case PMPRspAttribute.MaleMinSize:
+                case PMPRspAttribute.FemaleMinSize:
                     cmp.MinSize = Entry;
                     break;
-                case RspAttribute.MaleMaxSize:
-                case RspAttribute.FemaleMaxSize:
+                case PMPRspAttribute.MaleMaxSize:
+                case PMPRspAttribute.FemaleMaxSize:
                     cmp.MaxSize = Entry;
                     break;
             }
@@ -638,7 +638,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
 
-        private static PMPRspManipulationJson GetManip(PMPSubRace sr, RspAttribute attribute, float value)
+        private static PMPRspManipulationJson GetManip(PMPSubRace sr, PMPRspAttribute attribute, float value)
         {
             return new PMPRspManipulationJson()
             {
@@ -657,23 +657,23 @@ namespace xivModdingFramework.Mods.FileTypes
 
             if (male)
             {
-                manips.Add(GetManip(sr, RspAttribute.MaleMinTail, fullEntry.MinTail));
-                manips.Add(GetManip(sr, RspAttribute.MaleMaxTail, fullEntry.MaxTail));
-                manips.Add(GetManip(sr, RspAttribute.MaleMinSize, fullEntry.MinSize));
-                manips.Add(GetManip(sr, RspAttribute.MaleMaxSize, fullEntry.MaxSize));
+                manips.Add(GetManip(sr, PMPRspAttribute.MaleMinTail, fullEntry.MinTail));
+                manips.Add(GetManip(sr, PMPRspAttribute.MaleMaxTail, fullEntry.MaxTail));
+                manips.Add(GetManip(sr, PMPRspAttribute.MaleMinSize, fullEntry.MinSize));
+                manips.Add(GetManip(sr, PMPRspAttribute.MaleMaxSize, fullEntry.MaxSize));
             }
             else
             {
-                manips.Add(GetManip(sr, RspAttribute.BustMinX, fullEntry.BustMinX));
-                manips.Add(GetManip(sr, RspAttribute.BustMaxX, fullEntry.BustMaxX));
-                manips.Add(GetManip(sr, RspAttribute.BustMinY, fullEntry.BustMinY));
-                manips.Add(GetManip(sr, RspAttribute.BustMaxY, fullEntry.BustMaxY));
-                manips.Add(GetManip(sr, RspAttribute.BustMinZ, fullEntry.BustMinZ));
-                manips.Add(GetManip(sr, RspAttribute.BustMaxY, fullEntry.BustMaxZ));
-                manips.Add(GetManip(sr, RspAttribute.FemaleMinTail, fullEntry.MinTail));
-                manips.Add(GetManip(sr, RspAttribute.FemaleMaxTail, fullEntry.MaxTail));
-                manips.Add(GetManip(sr, RspAttribute.FemaleMinSize, fullEntry.MinSize));
-                manips.Add(GetManip(sr, RspAttribute.FemaleMaxSize, fullEntry.MaxSize));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMinX, fullEntry.BustMinX));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMaxX, fullEntry.BustMaxX));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMinY, fullEntry.BustMinY));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMaxY, fullEntry.BustMaxY));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMinZ, fullEntry.BustMinZ));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMaxY, fullEntry.BustMaxZ));
+                manips.Add(GetManip(sr, PMPRspAttribute.FemaleMinTail, fullEntry.MinTail));
+                manips.Add(GetManip(sr, PMPRspAttribute.FemaleMaxTail, fullEntry.MaxTail));
+                manips.Add(GetManip(sr, PMPRspAttribute.FemaleMinSize, fullEntry.MinSize));
+                manips.Add(GetManip(sr, PMPRspAttribute.FemaleMaxSize, fullEntry.MaxSize));
             }
             return manips;
         }

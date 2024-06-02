@@ -41,7 +41,6 @@ namespace xivModdingFramework.General.Enums
 
     public enum XivSubRace : byte
     {
-        Invalid = 0,
         Hyur_Midlander,
         Hyur_Highlander,
         Elezen_Wildwood,
@@ -581,11 +580,11 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static int GetSubRaceId(this XivSubRace subrace)
         {
-            return (((int)subrace) -1) % 2;
+            return (((int)subrace)) % 2;
         }
         public static XivBaseRace GetBaseRace(this XivSubRace subrace)
         {
-            byte rId = (byte) (((int)subrace - 1) / 2);
+            byte rId = (byte) (((int)subrace) / 2);
             return (XivBaseRace) rId;
         }
 
