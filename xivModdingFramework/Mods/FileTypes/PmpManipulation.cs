@@ -39,7 +39,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public virtual string GetNiceName()
         {
-            return Type + " Manipulation";
+            return Type;
         }
     }
 
@@ -69,7 +69,8 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public override string GetNiceName()
         {
-            return base.GetNiceName() + " - " + Manipulation.ObjectType.ToString() + " #" + Manipulation.PrimaryId.ToString() + " " + Manipulation.EquipSlot + " v" + Manipulation.Variant;
+            var root = Manipulation.GetRoot();
+            return base.GetNiceName() + " - " + root.Info.GetBaseFileName() + " v" + Manipulation.Variant;
         }
     }
     public class PMPEstManipulationWrapperJson : PMPManipulationWrapperJson
@@ -85,7 +86,8 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public override string GetNiceName()
         {
-            return base.GetNiceName() + " - e" + Manipulation.SetId + " " + Manipulation.Slot + " " + Manipulation.Race + " " + Manipulation.Gender;
+            var root = Manipulation.GetRoot();
+            return base.GetNiceName() + " - " + root.Info.GetBaseFileName() + " " + Manipulation.Race.ToString() + " " + Manipulation.Gender.ToString();
         }
     }
     public class PMPEqpManipulationWrapperJson : PMPManipulationWrapperJson
@@ -101,7 +103,8 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public override string GetNiceName()
         {
-            return base.GetNiceName() + " - " + Manipulation.SetId + " " + Manipulation.Slot;
+            var root = Manipulation.GetRoot();
+            return base.GetNiceName() + " - " + root.Info.GetBaseFileName();
         }
     }
     public class PMPEqdpManipulationWrapperJson : PMPManipulationWrapperJson
@@ -117,7 +120,8 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public override string GetNiceName()
         {
-            return base.GetNiceName() + " - " + Manipulation.SetId + " " + Manipulation.Slot + " " + Manipulation.Race.ToString() + " " + Manipulation.Gender;
+            var root = Manipulation.GetRoot();
+            return base.GetNiceName() + " - " + root.Info.GetBaseFileName() + " " + Manipulation.Race.ToString() + " " + Manipulation.Gender.ToString();
         }
     }
     public class PMPGmpManipulationWrapperJson : PMPManipulationWrapperJson
@@ -133,7 +137,8 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public override string GetNiceName()
         {
-            return base.GetNiceName() + " - e" + Manipulation.SetId;
+            var root = Manipulation.GetRoot();
+            return base.GetNiceName() + " - " + root.Info.GetBaseFileName();
         }
     }
     public class PMPRspManipulationWrapperJson : PMPManipulationWrapperJson
@@ -165,7 +170,13 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public override string GetNiceName()
         {
-            return base.GetNiceName() + " - " + Manipulation.Type + " " + Manipulation.Condition;
+            if(Manipulation.Type == GlobalEqpType.DoNotHideVieraHats || 
+                Manipulation.Type == GlobalEqpType.DoNotHideHrothgarHats)
+            {
+                return base.GetNiceName() + " - " + Manipulation.Type;
+
+            }
+            return base.GetNiceName() + " - a" + Manipulation.Condition + " " + Manipulation.Type.ToString();
         }
     }
 
