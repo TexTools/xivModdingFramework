@@ -113,9 +113,12 @@ namespace xivModdingFramework.Items
             {
                 itemType = XivItemType.decal;
             }
-            else
+            else if(item.PrimaryCategory == XivStrings.Gear)
             {
                 itemType = XivItemType.equipment;
+            } else
+            {
+                itemType = XivItemType.unknown;
             }
 
             return itemType;

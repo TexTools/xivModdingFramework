@@ -1114,9 +1114,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PmpIdentifierJson
     {
         public PMPObjectType ObjectType;
-        public uint PrimaryId;
-        public uint SecondaryId;
-        public ushort Variant;
+        public ushort PrimaryId;
+        public ushort SecondaryId;
+        public byte Variant;
         public PMPEquipSlot EquipSlot;
         public PMPObjectType BodySlot;
 
@@ -1131,9 +1131,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var pEntry = new PmpIdentifierJson();
             pEntry.ObjectType = PMPExtensions.XivItemTypeToPenumbraObject[root.PrimaryType];
             pEntry.BodySlot = root.SecondaryType == null ? PMPObjectType.Unknown : PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
-            pEntry.PrimaryId = (uint)root.PrimaryId;
-            pEntry.SecondaryId = (uint)(root.SecondaryId == null ? 0 : root.SecondaryId);
-            pEntry.Variant = (ushort)variant;
+            pEntry.PrimaryId = (ushort)root.PrimaryId;
+            pEntry.SecondaryId = (ushort)(root.SecondaryId == null ? 0 : root.SecondaryId);
+            pEntry.Variant = (byte)variant;
             return pEntry;
         }
     }

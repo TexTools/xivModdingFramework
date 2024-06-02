@@ -402,8 +402,15 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class EquipmentDeformationParameter
     {
-        public bool bit0;
-        public bool bit1;
+        /// <summary>
+        /// As far as I'm aware this flag is never actually checked by the game.
+        /// </summary>
+        public bool HasMaterial;
+
+        /// <summary>
+        /// Determines if the race has a racial model.
+        /// </summary>
+        public bool HasModel;
 
         /// <summary>
         /// Gets a single byte representation of this entry.
@@ -412,8 +419,8 @@ namespace xivModdingFramework.Models.DataContainers
         public byte GetByte()
         {
             BitArray r = new BitArray(8);
-            r[0] = bit0;
-            r[1] = bit1;
+            r[0] = HasMaterial;
+            r[1] = HasModel;
             var arr = new byte[1];
             r.CopyTo(arr, 0);
 
@@ -428,8 +435,8 @@ namespace xivModdingFramework.Models.DataContainers
         {
             BitArray r = new BitArray(new byte[] { b });
             var def = new EquipmentDeformationParameter();
-            def.bit0 = r[0];
-            def.bit1 = r[1];
+            def.HasMaterial = r[0];
+            def.HasModel = r[1];
 
             return def;
         }

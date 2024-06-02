@@ -356,6 +356,35 @@ namespace xivModdingFramework.Mods.FileTypes
         public uint SetId;
         public PMPEquipSlot Slot;
 
+        public ushort ShiftedEntry
+        {
+            get
+            {
+                // Get the slot number.
+                var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+                var isAccessory = EquipmentDeformationParameterSet.IsAccessory(slot);
+                var slotNum = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot);
+
+                // Penumbra stores the data masked in-place.  We need to shift it over.
+                var shift = slotNum * 2;
+                var shifted = (Entry >> shift) & 0x3;
+                return (ushort) shifted;
+            } set
+            {
+                Entry = 0;
+                value = (ushort) (value & 0x3);
+
+                // Get the slot number.
+                var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+                var isAccessory = EquipmentDeformationParameterSet.IsAccessory(slot);
+                var slotNum = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot);
+
+                // Penumbra stores the data masked in-place.  We need to shift it over.
+                var shift = slotNum * 2;
+                Entry = (ushort) (value << shift);
+            }
+        }
+
         public XivDependencyRoot GetRoot()
         {
             var isAccessory = PMPExtensions.IsAccessory(Slot);
@@ -375,18 +404,9 @@ namespace xivModdingFramework.Mods.FileTypes
             // Get Race.
             var xivRace = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
 
-            // Get the slot number.
-            var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
-            var isAccessory = EquipmentDeformationParameterSet.IsAccessory(slot);
-            var slotNum = EquipmentDeformationParameterSet.SlotsAsList(isAccessory).IndexOf(slot);
-
-            // Penumbra stores the data masked in-place.  We need to shift it over.
-            var shift = slotNum * 2;
-            var shifted = Entry >> shift;
-
             // Tag bits.
-            metadata.EqdpEntries[xivRace].bit0 = (shifted & 0x01) != 0;
-            metadata.EqdpEntries[xivRace].bit1 = (shifted & 0x02) != 0;
+            metadata.EqdpEntries[xivRace].HasMaterial = (ShiftedEntry & 0x01) != 0;
+            metadata.EqdpEntries[xivRace].HasModel = (ShiftedEntry & 0x02) != 0;
         }
 
         public static PMPEqdpManipulationJson FromEqdpEntry(EquipmentDeformationParameter entry, XivDependencyRootInfo root, XivRace race)
@@ -397,11 +417,11 @@ namespace xivModdingFramework.Mods.FileTypes
             // Penumbra stores the data masked in-place.  We need to shift it over.
             var shift = slotNum * 2;
             var bits = (ushort)0;
-            if (entry.bit0)
+            if (entry.HasMaterial)
             {
                 bits |= 1;
             }
-            if (entry.bit1)
+            if (entry.HasModel)
             {
                 bits |= 2;
             }

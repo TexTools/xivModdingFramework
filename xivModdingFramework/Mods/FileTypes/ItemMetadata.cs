@@ -279,7 +279,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             foreach (var kv in EqdpEntries)
             {
-                if (kv.Value.bit1 == false) continue;
+                if (kv.Value.HasModel == false) continue;
                 // Here we have a new race, we need to create a model for it.
                 await Mdl.AddRacialModel(Root.Info.PrimaryId, Root.Info.Slot, kv.Key, source, tx);
             }

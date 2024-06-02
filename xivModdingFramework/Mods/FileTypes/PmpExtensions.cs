@@ -13,6 +13,7 @@ using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Mods.FileTypes.PMP;
 
 namespace xivModdingFramework.Mods.FileTypes
 {
@@ -209,6 +210,18 @@ namespace xivModdingFramework.Mods.FileTypes
             { XivItemType.monster, PMPObjectType.Monster },
         };
 
+        public static PmpIdentifierJson GetPenumbraIdentifierFromRoot(XivDependencyRoot root, int variant = 1)
+        {
+            return GetPenumbraIdentifierFromRoot(root.Info, variant);
+        }
+        public static PmpIdentifierJson GetPenumbraIdentifierFromRoot(XivDependencyRootInfo root, int variant = 1)
+        {
+            return PmpIdentifierJson.FromRoot(root, variant);
+        }
+        public static XivDependencyRootInfo GetRootFromPenumbraValues(PmpIdentifierJson identifier)
+        {
+            return identifier.GetRoot().Info;
+        }
         public static XivDependencyRootInfo GetRootFromPenumbraValues(PMPObjectType objectType, uint primaryId, PMPObjectType bodySlot, uint secondaryId, PMPEquipSlot slot)
         {
             var info = new XivDependencyRootInfo();

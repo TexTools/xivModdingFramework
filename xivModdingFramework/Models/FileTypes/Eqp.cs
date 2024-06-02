@@ -782,7 +782,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var byteToModify = data[offset + byteOffset];
 
 
-                    if (tuple.Entry.bit0)
+                    if (tuple.Entry.HasMaterial)
                     {
                         byteToModify = (byte)(byteToModify | (1 << bitOffset));
                     }
@@ -791,7 +791,7 @@ namespace xivModdingFramework.Models.FileTypes
                         byteToModify = (byte)(byteToModify & ~(1 << bitOffset));
                     }
 
-                    if (tuple.Entry.bit1)
+                    if (tuple.Entry.HasModel)
                     {
                         byteToModify = (byte)(byteToModify | (1 << (bitOffset + 1)));
                     }
@@ -856,7 +856,7 @@ namespace xivModdingFramework.Models.FileTypes
                     var byteToModify = data[offset + byteOffset];
 
 
-                    if (tuple.Entry.bit0)
+                    if (tuple.Entry.HasMaterial)
                     {
                         byteToModify = (byte)(byteToModify | (1 << bitOffset));
                     }
@@ -865,7 +865,7 @@ namespace xivModdingFramework.Models.FileTypes
                         byteToModify = (byte)(byteToModify & ~(1 << bitOffset));
                     }
 
-                    if (tuple.Entry.bit1)
+                    if (tuple.Entry.HasModel)
                     {
                         byteToModify = (byte)(byteToModify | (1 << (bitOffset + 1)));
                     }
@@ -945,7 +945,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var byteToModify = data[offset + byteOffset];
 
                 
-                if(entry.bit0)
+                if(entry.HasMaterial)
                 {
                     byteToModify = (byte)(byteToModify | (1 << bitOffset));
                 } else
@@ -953,7 +953,7 @@ namespace xivModdingFramework.Models.FileTypes
                     byteToModify = (byte)(byteToModify & ~(1 << bitOffset));
                 }
 
-                if (entry.bit1)
+                if (entry.HasModel)
                 {
                     byteToModify = (byte)(byteToModify | (1 << (bitOffset + 1)));
                 }
@@ -1032,7 +1032,7 @@ namespace xivModdingFramework.Models.FileTypes
             foreach(var kv in dict)
             {
                 // Bit 0 has unknown purpose currently.
-                if(kv.Value.bit1)
+                if(kv.Value.HasModel)
                 {
                     races.Add(kv.Key);
                 }
@@ -1194,9 +1194,9 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var entry = new EquipmentDeformationParameter();
 
-                entry.bit0 = (raw & 1) != 0;
+                entry.HasMaterial = (raw & 1) != 0;
                 raw = (ushort)(raw >> 1);
-                entry.bit1 = (raw & 1) != 0;
+                entry.HasModel = (raw & 1) != 0;
                 raw = (ushort)(raw >> 1);
 
                 var key = list[idx];

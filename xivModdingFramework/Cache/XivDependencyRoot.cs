@@ -669,7 +669,7 @@ namespace xivModdingFramework.Cache
                 if (tx != null)
                 {
                     var metadata = await ItemMetadata.GetMetadata(this, false, tx);
-                    races = metadata.EqdpEntries.Where(x => x.Value.bit1).Select(x => x.Key).ToList();
+                    races = metadata.EqdpEntries.Where(x => x.Value.HasModel).Select(x => x.Key).ToList();
                 }
                 else
                 {
