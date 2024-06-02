@@ -345,8 +345,8 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
 
                 // Names based on analyzing shader code.
-                UpdateConstantName(shKv.Key, 1659128399, "Skin Fresnel");
-                UpdateConstantName(shKv.Key, 778088561, "Skin Tile Multiplier");
+                UpdateConstantName(shKv.Key, 0x62E44A4F, "Skin Fresnel");
+                UpdateConstantName(shKv.Key, 0x2E60B071, "Skin Tile Multiplier");
                 UpdateConstantName(shKv.Key, 740963549, "Skin Color");
                 UpdateConstantName(shKv.Key, 2569562539, "Skin Wetness Lerp");
                 UpdateConstantName(shKv.Key, 1112929012, "Skin Tile Material");
@@ -371,6 +371,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 3497683557, "g_AlphaOffset", true);
                 UpdateConstantName(shKv.Key, 1648149758, "g_OutlineColor", true);
                 UpdateConstantName(shKv.Key, 2289092920, "g_OutlineWidth", true);
+                UpdateConstantName(shKv.Key, 0x39551220, "g_TextureMipBias", true);
             }
 
         }

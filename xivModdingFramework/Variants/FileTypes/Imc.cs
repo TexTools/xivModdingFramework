@@ -63,13 +63,17 @@ namespace xivModdingFramework.Variants.FileTypes
         }
         public static bool UsesImc(XivDependencyRootInfo root)
         {
-
+            if (!root.IsValid())
+            {
+                return false;
+            }
             if (root.PrimaryType == XivItemType.human)
             {
                 return false;
             }
             else if (root.PrimaryType == XivItemType.indoor || root.PrimaryType == XivItemType.outdoor
-                || root.PrimaryType == XivItemType.fish || root.PrimaryType == XivItemType.painting)
+                || root.PrimaryType == XivItemType.fish || root.PrimaryType == XivItemType.painting
+                || root.PrimaryType == XivItemType.ui)
             {
                 return false;
             }

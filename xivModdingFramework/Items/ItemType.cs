@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
@@ -51,21 +52,15 @@ namespace xivModdingFramework.Items
             {
                 itemType = XivItemType.weapon;
 
-                try
+                var asIm = item as IItemModel;
+                if (asIm != null)
                 {
-                    // Check to see if we're an equipment item masquerading as a weapon.
-                    var mi = (XivGearModelInfo)((IItemModel)item).ModelInfo;
-                    if (mi != null)
+                    var gearinfo = asIm.ModelInfo as XivGearModelInfo;
+                    if(gearinfo != null && !gearinfo.IsWeapon)
                     {
-                        if (!mi.IsWeapon)
-                        {
-                            itemType = XivItemType.equipment;
-                        }
+                        itemType = XivItemType.equipment;
+
                     }
-                }
-                catch
-                {
-                    //No-op.
                 }
             }
             else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Earring) || item.SecondaryCategory.Equals(XivStrings.Neck) ||
