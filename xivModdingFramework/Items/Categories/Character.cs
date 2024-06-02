@@ -52,6 +52,7 @@ namespace xivModdingFramework.Items.Categories
         /// <returns>A list containing XivCharacter data</returns>
         public Task<List<XivCharacter>> GetUnCachedCharacterList(ModTransaction tx = null)
         {
+            // This should be made into discrete tasks at some point probably.
             return Task.Run(async () =>
             {
                 var races = Eqp.PlayableRacesWithNPCs;
