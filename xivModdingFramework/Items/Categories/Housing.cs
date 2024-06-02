@@ -64,10 +64,19 @@ namespace xivModdingFramework.Items.Categories
         {
             var furnitureList = new List<IItemModel>();
 
-            furnitureList.AddRange(await GetIndoorFurniture(tx));
-            furnitureList.AddRange(await GetOutdoorFurniture(tx));
-            furnitureList.AddRange(await GetPaintings(tx));
-            furnitureList.AddRange(await GetFish(tx));
+            var tasks = new List<Task<List<IItemModel>>>();
+
+            tasks.Add(GetIndoorFurniture(tx));
+            tasks.Add(GetOutdoorFurniture(tx));
+            tasks.Add(GetPaintings(tx));
+            tasks.Add(GetFish(tx));
+
+            await Task.WhenAll(tasks);
+
+            foreach(var t in tasks)
+            {
+                furnitureList.AddRange(t.Result);
+            }
 
             return furnitureList;
         }
@@ -83,14 +92,14 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option one
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetIndoorFurniture(ModTransaction tx = null)
+        private async Task<List<IItemModel>> GetIndoorFurniture(ModTransaction tx = null)
         {
             var indoorLock = new object();
             var ex = new Ex();
             var housingDictionary = await ex.ReadExData(XivEx.housingfurniture, tx);
             var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
-            var furnitureList = new List<XivFurniture>();
+            var furnitureList = new List<IItemModel>();
 
 
             await Task.Run(() => Parallel.ForEach(housingDictionary.Values, (housingRow) =>
@@ -136,10 +145,10 @@ namespace xivModdingFramework.Items.Categories
             furnishing.Name = (string)itemRow.GetColumnByName("Name");
         }
 
-        private async Task<List<XivFramePicture>> GetPaintings(ModTransaction tx = null)
+        private async Task<List<IItemModel>> GetPaintings(ModTransaction tx = null)
         {
             var paintingsLock = new object();
-            var furnitureList = new List<XivFramePicture>(300);
+            var furnitureList = new List<IItemModel>(300);
 
             var root = new XivDependencyRootInfo()
             {
@@ -185,10 +194,10 @@ namespace xivModdingFramework.Items.Categories
 
             return furnitureList;
         }
-        private async Task<List<XivFish>> GetFish(ModTransaction tx = null)
+        private async Task<List<IItemModel>> GetFish(ModTransaction tx = null)
         {
             var paintingsLock = new object();
-            var fishList = new List<XivFish>(1000);
+            var fishList = new List<IItemModel>(1000);
 
             if (tx == null)
             {
@@ -227,7 +236,7 @@ namespace xivModdingFramework.Items.Categories
             return fishList;
         }
 
-        private void AddFish(List<XivFish> list, List<Task<List<int>>> tasks, int size, string sizeName)
+        private void AddFish(List<IItemModel> list, List<Task<List<int>>> tasks, int size, string sizeName)
         {
             foreach (var task in tasks)
             {
@@ -253,7 +262,7 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of outdoor furniture
         /// </summary>
         /// <returns>A list of XivFurniture objects containing outdoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetOutdoorFurniture(ModTransaction tx = null)
+        private async Task<List<IItemModel>> GetOutdoorFurniture(ModTransaction tx = null)
         {
             var outdoorLock = new object();
             // These are the offsets to relevant data
@@ -264,7 +273,7 @@ namespace xivModdingFramework.Items.Categories
             var housingEx = await ex.ReadExData(XivEx.housingyardobject, tx);
             var itemsEx = await ex.ReadExData(XivEx.item, tx);
 
-            var furnitureList = new List<XivFurniture>();
+            var furnitureList = new List<IItemModel>();
 
             await Task.Run(() => Parallel.ForEach(housingEx.Values, (row) =>
             {
