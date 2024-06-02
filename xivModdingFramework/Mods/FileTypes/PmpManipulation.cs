@@ -266,6 +266,17 @@ namespace xivModdingFramework.Mods.FileTypes
                 imc.Vfx = VfxId;
                 return imc;
             }
+            public static PMPImcEntry FromXivImc(XivImc imc)
+            {
+                var entry = new PMPImcEntry();
+                entry.MaterialAnimationId = imc.Animation;
+                entry.AttributeMask  = imc.AttributeMask;
+                entry.SoundId = imc.SoundId;
+                entry.MaterialId = imc.MaterialSet;
+                entry.DecalId = imc.Decal;
+                entry.VfxId = imc.Vfx;
+                return entry;
+            }
         }
         public PMPImcEntry Entry;
         public uint PrimaryId;

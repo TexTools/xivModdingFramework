@@ -31,6 +31,8 @@ using System.Runtime.CompilerServices;
 using static xivModdingFramework.Mods.TTMPWriter;
 using System.Security.Cryptography;
 using JsonSubTypes;
+using SharpDX.Win32;
+using static HelixToolkit.SharpDX.Core.Model.Metadata;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -288,7 +290,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             {
                                 var root = imcGroup.GetRoot();
                                 var metaData = await GetImportMetadata(imported, root, tx);
-
                                 if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
                                 {
                                     while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
@@ -300,6 +301,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 {
                                     metaData.ImcEntries[(int)imcGroup.Identifier.Variant] = xivImc;
                                 }
+
+                                if (imcGroup.AllVariants)
+                                {
+                                    for (int i = 0; i < metaData.ImcEntries.Count; i++)
+                                    {
+                                        metaData.ImcEntries[i] = (XivImc)xivImc.Clone();
+                                    }
+                                }
+
                                 await ItemMetadata.SaveMetadata(metaData, _Source, tx);
                                 await ItemMetadata.ApplyMetadata(metaData, tx);
 
@@ -1114,6 +1124,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         {
             var root = PMPExtensions.GetRootFromPenumbraValues(ObjectType, PrimaryId, BodySlot, SecondaryId, EquipSlot);
             return new XivDependencyRoot(root);
+        }
+
+        public static PmpIdentifierJson FromRoot(XivDependencyRootInfo root, int variant = 1)
+        {
+            var pEntry = new PmpIdentifierJson();
+            pEntry.ObjectType = PMPExtensions.XivItemTypeToPenumbraObject[root.PrimaryType];
+            pEntry.BodySlot = root.SecondaryType == null ? PMPObjectType.Unknown : PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
+            pEntry.PrimaryId = (uint)root.PrimaryId;
+            pEntry.SecondaryId = (uint)(root.SecondaryId == null ? 0 : root.SecondaryId);
+            pEntry.Variant = (ushort)variant;
+            return pEntry;
         }
     }
 
