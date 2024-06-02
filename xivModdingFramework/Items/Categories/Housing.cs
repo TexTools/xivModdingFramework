@@ -43,12 +43,8 @@ namespace xivModdingFramework.Items.Categories
 {
     public class Housing
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _xivLanguage;
-        public Housing(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
+        public Housing()
         {
-            _gameDirectory = gameDirectory;
-            _xivLanguage = xivLanguage;
         }
 
         /// <summary>
@@ -90,7 +86,7 @@ namespace xivModdingFramework.Items.Categories
         private async Task<List<XivFurniture>> GetIndoorFurniture(ModTransaction tx = null)
         {
             var indoorLock = new object();
-            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var ex = new Ex();
             var housingDictionary = await ex.ReadExData(XivEx.housingfurniture, tx);
             var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
@@ -264,7 +260,7 @@ namespace xivModdingFramework.Items.Categories
             // These will need to be changed if data gets added or removed with a patch
 
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var ex = new Ex();
             var housingEx = await ex.ReadExData(XivEx.housingyardobject, tx);
             var itemsEx = await ex.ReadExData(XivEx.item, tx);
 

@@ -34,13 +34,9 @@ namespace xivModdingFramework.Items.Categories
     public class Character
     {
 
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _language;
 
-        public Character(DirectoryInfo gameDirectory, XivLanguage lang)
+        public Character()
         {
-            _gameDirectory = gameDirectory;
-            _language = lang;
 
         }
 

@@ -41,7 +41,7 @@ namespace xivModdingFramework.General
         /// <returns>Dictionary with modelchara data</returns>
         public static async Task<Dictionary<int, Ex.ExdRow>> GetModelCharaData(ModTransaction tx = null)
         {
-            var ex = new Ex(XivCache.GameInfo.GameDirectory);
+            var ex = new Ex();
             var exData = await ex.ReadExData(XivEx.modelchara, tx);
             return exData;
         }
@@ -54,7 +54,7 @@ namespace xivModdingFramework.General
         /// <returns>The XivModelInfo data</returns>
         public static async Task<XivModelInfo> GetModelInfo(int index, ModTransaction tx = null)
         {
-            var ex = new Ex(XivCache.GameInfo.GameDirectory);
+            var ex = new Ex();
             var modelCharaEx = await ex.ReadExData(XivEx.modelchara, tx);
             return GetModelInfo(modelCharaEx[index]);
         }

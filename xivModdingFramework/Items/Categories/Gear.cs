@@ -48,14 +48,10 @@ namespace xivModdingFramework.Items.Categories
     /// </summary>
     public class Gear
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _xivLanguage;
         private static object _gearLock = new object();
 
-        public Gear(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
+        public Gear()
         {
-            _gameDirectory = gameDirectory;
-            _xivLanguage = xivLanguage;
         }
         public async Task<List<XivGear>> GetGearList(string substring = null)
         {
@@ -69,7 +65,7 @@ namespace xivModdingFramework.Items.Categories
         /// <returns>A list containing XivGear data</returns>
         public async Task<List<XivGear>> GetUnCachedGearList(ModTransaction tx = null)
         {
-            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var ex = new Ex();
             var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
 

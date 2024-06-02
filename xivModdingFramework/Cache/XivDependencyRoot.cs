@@ -685,7 +685,7 @@ namespace xivModdingFramework.Cache
             }
             else if (Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor || Info.PrimaryType == XivItemType.fish)
             {
-                var _housing = new Housing(XivCache.GameInfo.GameDirectory, XivCache.GameInfo.GameLanguage);
+                var _housing = new Housing();
                 var housingAssets = await _housing.GetFurnitureModelParts(Info.PrimaryId, Info.SecondaryId, Info.PrimaryType, tx);
                 return housingAssets.Select(x => x.Value).ToList();
             }

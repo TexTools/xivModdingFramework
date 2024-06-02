@@ -523,16 +523,27 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
-                var _ui = new UI(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _ui.GetActionList(tx);
-                list.AddRange(await _ui.GetLoadingImageList(tx));
-                list.AddRange(await _ui.GetMapList(tx));
-                list.AddRange(await _ui.GetMapSymbolList(tx));
-                list.AddRange(await _ui.GetOnlineStatusList(tx));
-                list.AddRange(await _ui.GetStatusList(tx));
-                list.AddRange(await _ui.GetWeatherList(tx));
-                list.AddRange(await _ui.GetUldList(tx));
-                list.AddRange(await _ui.GetPaintingUiImages(tx));
+                var _ui = new UI();
+                List<XivUi> list = new List<XivUi>();
+                List<Task<List<XivUi>>> tasks = new List<Task<List<XivUi>>>();
+                tasks.Add(_ui.GetActionList(tx));
+                tasks.Add(_ui.GetLoadingImageList(tx));
+                tasks.Add(_ui.GetMapList(tx));
+                tasks.Add(_ui.GetMapSymbolList(tx));
+                tasks.Add(_ui.GetOnlineStatusList(tx));
+                tasks.Add(_ui.GetStatusList(tx));
+                tasks.Add(_ui.GetWeatherList(tx));
+                tasks.Add(_ui.GetUldList(tx));
+                tasks.Add(_ui.GetPaintingUiImages(tx));
+                await Task.WhenAll(tasks);
+
+                var sum = tasks.Sum(x => x.Result.Count);
+                list.Capacity = sum;
+
+                foreach(var t in tasks)
+                {
+                    list.AddRange(t.Result);
+                }
 
                 db.Open();
                 using (var transaction = db.BeginTransaction())
@@ -568,9 +579,12 @@ namespace xivModdingFramework.Cache
         private static async Task RebuildMonstersCache(ModTransaction tx)
         {
             // Mounts, Minions, etc. are really just monsters.
-            await RebuildMinionsCache(tx);
-            await RebuildMountsCache(tx);
-            await RebuildPetsCache(tx);
+            var tasks = new List<Task>();
+            tasks.Add(RebuildMinionsCache(tx));
+            tasks.Add(RebuildMountsCache(tx));
+            tasks.Add(RebuildPetsCache(tx));
+
+            await Task.WhenAll(tasks);
         }
 
         /// <summary>
@@ -582,7 +596,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _housing = new Housing(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+                var _housing = new Housing();
                 var list = await _housing.GetUncachedFurnitureList(tx);
 
                 db.Open();
@@ -628,7 +642,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+                var _companions = new Companions();
                 var list = await _companions.GetUncachedMountList(tx);
 
                 // Don't get the ornament list for the Chinese or Korean clients as they don't have them yet
@@ -687,7 +701,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+                var _companions = new Companions();
                 var list = await _companions.GetUncachedPetList(tx);
 
                 db.Open();
@@ -741,7 +755,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+                var _companions = new Companions();
                 var list = await _companions.GetUncachedMinionList(tx);
 
                 db.Open();
@@ -786,7 +800,7 @@ namespace xivModdingFramework.Cache
 
         private static async Task RebuildCharactersCache(ModTransaction tx)
         {
-            var _character = new Character(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+            var _character = new Character();
             var items = await _character.GetUnCachedCharacterList(tx);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
@@ -842,7 +856,7 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 Gear gear = null;
-                gear = new Gear(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
+                gear = new Gear();
                 var items = await gear.GetUnCachedGearList(tx);
 
                 db.Open();
@@ -1295,14 +1309,11 @@ namespace xivModdingFramework.Cache
         {
             var items = new List<IItem>();
 
-            var gameDir = GameInfo.GameDirectory;
-            var language = GameInfo.GameLanguage;
-
-            var gear = new Gear(gameDir, language);
-            var companions = new Companions(gameDir, language);
-            var housing = new Housing(gameDir, language);
-            var ui = new UI(gameDir, language);
-            var character = new Character(gameDir, language);
+            var gear = new Gear();
+            var companions = new Companions();
+            var housing = new Housing();
+            var ui = new UI();
+            var character = new Character();
 
 
             items.AddRange(await gear.GetGearList());

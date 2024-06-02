@@ -37,15 +37,8 @@ namespace xivModdingFramework.Items.Categories
     /// </summary>
     public class UI
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _xivLanguage;
-        private readonly Ex _ex;
-
-        public UI(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
+        public UI()
         {
-            _gameDirectory = gameDirectory;
-            _xivLanguage = xivLanguage;
-            _ex = new Ex(_gameDirectory, _xivLanguage);
         }
 
 
@@ -67,7 +60,8 @@ namespace xivModdingFramework.Items.Categories
             var uldLock = new object();
             var uldList = new List<XivUi>();
 
-            var uld = new Uld(_gameDirectory);
+            var _ex = new Ex();
+            var uld = new Uld(XivCache.GameInfo.GameDirectory);
             var uldPaths = await uld.GetTexFromUld(tx);
 
             await Task.Run(() => Parallel.ForEach(uldPaths, (uldPath) =>
@@ -119,6 +113,7 @@ namespace xivModdingFramework.Items.Categories
             var mapLock = new object();
             var mapList = new List<XivUi>();
 
+            var _ex = new Ex();
             var placeNameData = await _ex.ReadExData(XivEx.placename, tx);
             var mapData = await _ex.ReadExData(XivEx.map, tx);
 
@@ -182,6 +177,7 @@ namespace xivModdingFramework.Items.Categories
             var actionLock = new object();
 
             // Data from the action_0 exd
+            var _ex = new Ex();
             var actionExData = await _ex.ReadExData(XivEx.action, tx);
             var actionCategoryExData = await _ex.ReadExData(XivEx.actioncategory, tx);
 
@@ -456,7 +452,8 @@ namespace xivModdingFramework.Items.Categories
         {
             var statusLock = new object();
             var statusList = new List<XivUi>();
-            
+
+            var _ex = new Ex();
             var statusExData = await _ex.ReadExData(XivEx.status, tx);
 
             await Task.Run(() => Parallel.ForEach(statusExData.Values, (status) =>
@@ -512,6 +509,7 @@ namespace xivModdingFramework.Items.Categories
             var mapSymbolLock = new object();
             var mapSymbolList = new List<XivUi>();
 
+            var _ex = new Ex();
             var mapSymbolExData = await _ex.ReadExData(XivEx.mapsymbol, tx);
             var placeNameData = await _ex.ReadExData(XivEx.placename, tx);
 
@@ -551,6 +549,7 @@ namespace xivModdingFramework.Items.Categories
             var onlineStatusList = new List<XivUi>();
 
 
+            var _ex = new Ex();
             var onlineStatusExData = await _ex.ReadExData(XivEx.onlinestatus, tx);
 
             await Task.Run(() => Parallel.ForEach(onlineStatusExData.Values, (onlineStatus) =>
@@ -588,6 +587,7 @@ namespace xivModdingFramework.Items.Categories
             var weatherLock = new object();
             var weatherList = new List<XivUi>();
 
+            var _ex = new Ex();
             var weatherExData = await _ex.ReadExData(XivEx.weather, tx);
 
             var weatherNames = new List<string>();
@@ -628,6 +628,7 @@ namespace xivModdingFramework.Items.Categories
             var loadingImageLock = new object();
             var loadingImageList = new List<XivUi>();
 
+            var _ex = new Ex();
             var loadingImageExData = await _ex.ReadExData(XivEx.loadingimage, tx);
 
             await Task.Run(() => Parallel.ForEach(loadingImageExData.Values, (loadingImage) =>
@@ -655,7 +656,7 @@ namespace xivModdingFramework.Items.Categories
         {
             var paintingsLock = new object();
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
+            var ex = new Ex();
             var pictureDictionary = await ex.ReadExData(XivEx.picture, tx);
             var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 

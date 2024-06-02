@@ -45,15 +45,9 @@ namespace xivModdingFramework.Items.Categories
     /// </summary>
     public class Companions
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _xivLanguage;
-        private readonly Ex _ex;
 
-        public Companions(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
+        public Companions()
         {
-            _gameDirectory = gameDirectory;
-            _xivLanguage = xivLanguage;
-            _ex = new Ex(_gameDirectory, _xivLanguage);
         }
         public async Task<List<XivMinion>> GetMinionList(string substring = null)
         {
@@ -73,6 +67,7 @@ namespace xivModdingFramework.Items.Categories
             var minionLock = new object();
             var minionList = new List<XivMinion>();
 
+            var _ex = new Ex();
             var minionEx = await _ex.ReadExData(XivEx.companion, tx);
             var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 
@@ -131,6 +126,7 @@ namespace xivModdingFramework.Items.Categories
             var mountLock = new object();
             var mountList = new List<XivMount>();
 
+            var _ex = new Ex();
             var mountEx = await _ex.ReadExData(XivEx.mount, tx);
             var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 
@@ -186,6 +182,7 @@ namespace xivModdingFramework.Items.Categories
             var mountLock = new object();
             var ornamentList = new List<XivMount>();
 
+            var _ex = new Ex();
             var ornamentEx = await _ex.ReadExData(XivEx.ornament, tx);
             var modelCharaEx = await XivModelChara.GetModelCharaData(tx);
 

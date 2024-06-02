@@ -21,6 +21,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -72,8 +73,6 @@ namespace xivModdingFramework.Exd.FileTypes
         private readonly string _langCode;
         private readonly XivLanguage _language;
 
-        private readonly DirectoryInfo _gameDirectory;
-
 
         /// <summary>
         /// Columns, keyed by data offset.
@@ -93,24 +92,11 @@ namespace xivModdingFramework.Exd.FileTypes
         /// </summary>
         /// <param name="gameDirectory">The install directory for the game.</param>
         /// <param name="lang">The language in which to read the data.</param>
-        public Ex(DirectoryInfo gameDirectory, XivLanguage lang)
+        public Ex()
         {
-            _gameDirectory = gameDirectory;
+            var lang = XivCache.GameInfo.GameLanguage;
             _langCode = lang.GetLanguageCode();
             _language = lang;
-        }
-
-        /// <summary>
-        /// Reads and parses Ex Header files, uses english as default language.
-        /// </summary>
-        /// <remarks>
-        /// Used for ex files that do not have language data
-        /// </remarks>
-        /// <param name="gameDirectory">The install directory for the game.</param>
-        public Ex(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-            _langCode = XivLanguage.English.GetLanguageCode();
         }
 
         /// <summary>

@@ -103,15 +103,9 @@ namespace xivModdingFramework.Materials.FileTypes
         public static async Task<Dictionary<int, string>> GetDyeNames(ModTransaction tx = null)
         {
 
-            var lang = XivCache.GameInfo.GameLanguage;
-            if (lang == General.Enums.XivLanguage.None)
-            {
-                lang = General.Enums.XivLanguage.English;
-            }
-
             Dictionary<int, string> Dyes = new Dictionary<int, string>();
 
-            var ex = new Ex(XivCache.GameInfo.GameDirectory, lang);
+            var ex = new Ex();
             var exData = await ex.ReadExData(XivEx.stain, tx);
 
 

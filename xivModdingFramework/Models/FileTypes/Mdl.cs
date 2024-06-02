@@ -251,7 +251,7 @@ namespace xivModdingFramework.Models.FileTypes
                 case XivItemType.outdoor:
                 case XivItemType.fish:
                     // Language doesn't matter for this call.
-                    var housing = new Housing(XivCache.GameInfo.GameDirectory, XivLanguage.None);
+                    var housing = new Housing();
                     var mdlPath = "";
                     var assetDict = await housing.GetFurnitureModelParts(itemModel, tx);
 
