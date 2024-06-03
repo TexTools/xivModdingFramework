@@ -4826,7 +4826,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             mtrl.MTRLPath = path;
                             allFiles.Add(mtrl.MTRLPath);
-                            await Mtrl.ImportMtrl(mtrl, item, source, false, tx);
+                            await Mtrl.ImportMtrl(mtrl, item, source, true, tx);
 
                             if (!validNewMaterials.ContainsKey(newMatName))
                             {
@@ -4884,6 +4884,7 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
+                model.Source = newPath;
                 if (copyTextures != false)
                 {
                     // Fill in anything missing with at least stubs always.

@@ -751,9 +751,6 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 var mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
 
-                // Create the actual raw MTRL first. - Files should always be created top down.
-                long offset = await Dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, tx);
-
                 if (validateTextures)
                 {
                     // The MTRL file is now ready to go, but we need to validate the texture paths and create them if needed.
@@ -769,6 +766,7 @@ namespace xivModdingFramework.Materials.FileTypes
                                 unchecked
                                 {
                                     tex.Flags &= (ushort)~0x8000;
+                                    mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
                                 }
                             }
                         }
@@ -801,6 +799,8 @@ namespace xivModdingFramework.Materials.FileTypes
                         }
                     }
                 }
+
+                long offset = await Dat.ImportType2Data(mtrlBytes.ToArray(), xivMtrl.MTRLPath, source, item, tx);
 
                 await boiler.Commit();
 
@@ -1481,16 +1481,17 @@ namespace xivModdingFramework.Materials.FileTypes
             var row = new Half[32];
 
             // Diffuse pixel base
-            row[0] = 1.0f;
-            row[1] = 1.0f;
-            row[2] = 1.0f;
             for(int i =0 ; i < 8; i++)
             {
                 row[i] = 1.0f;
             }
 
             row[11] = 1.0f;
-            row[14] = 2.0f;
+            row[12] = 0.09997559f;
+            row[13] = 0.1999512f;
+            row[14] = 5.0f;
+
+
             row[16] = 0.5f;
             row[25] = 0.0078125f;
             row[26] = 1.0f;
