@@ -895,7 +895,7 @@ namespace xivModdingFramework.Mods
                 XivCache.CacheWorkerEnabled = _WorkerStatus;
             }
         }
-        private void CancelTransaction(bool graceful = false)
+        private async void CancelTransaction(bool graceful = false)
         {
             if (!_ReadOnly && State != ETransactionState.Closed)
             {
@@ -912,8 +912,8 @@ namespace xivModdingFramework.Mods
                 // We have to queue all of the touched files up as possibly changed in the Mod Cache.
                 HashSet<string> files = new HashSet<string>();
 
-                files.Union(_PrePrepStates.Keys);
-                files.Union(_OriginalStates.Keys);
+                files.UnionWith(_PrePrepStates.Keys);
+                files.UnionWith(_OriginalStates.Keys);
                 XivCache.QueueDependencyUpdate(files);
 
 
@@ -924,6 +924,23 @@ namespace xivModdingFramework.Mods
 
                     // Reset our DAT sizes back to what they were before we started the Transaction.
                     TruncateDats();
+                }
+
+                if (files.Count > 0)
+                {
+                    try
+                    {
+                        // Awkwardly, we need a readonly TX for this, as we're restoring to the live system state.
+                        var rtx = ModTransaction.BeginTransaction();
+                        foreach (var file in files)
+                        {
+                            FileChanged?.Invoke(file, await rtx.Get8xDataOffset(file));
+                        }
+                    } catch(Exception ex)
+                    {
+                        //If this broke, we're already in a bad enough state.
+                        Trace.WriteLine(ex);
+                    }
                 }
             }
         }
