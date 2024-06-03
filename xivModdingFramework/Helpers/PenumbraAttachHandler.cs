@@ -69,7 +69,7 @@ namespace xivModdingFramework.Helpers
         /// <param name="penumbraModFolder"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public static async Task<ModTransaction> Attach(string penumbraModFolder)
+        public static async Task<ModTransaction> Attach(string penumbraModFolder, ModTransaction tx = null)
         {
             if(Transaction != null)
             {
@@ -97,7 +97,19 @@ namespace xivModdingFramework.Helpers
             }
             ModFolder = penumbraModFolder;
 
-            Transaction = ModTransaction.BeginTransaction(true, null, settings);
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction(true, null, settings);
+            } else if(tx.State == ETransactionState.Preparing)
+            {
+                tx.Settings = settings;
+                tx.Start();
+            } else
+            {
+                throw new Exception("Transaction must be null or preparing to use with Penumbra attach.");
+            }
+
+            Transaction = tx;
             try
             {
                 await ReloadPenumbraModpack();

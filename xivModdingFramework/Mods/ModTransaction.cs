@@ -273,7 +273,10 @@ namespace xivModdingFramework.Mods
                 var prepFiles = PrepFiles;
                 foreach(var file in prepFiles)
                 {
-                    files.Remove(file);
+                    if (!_OriginalStates.ContainsKey(file))
+                    {
+                        files.Remove(file);
+                    }
                 }
 
                 return files.ToList();
@@ -1253,6 +1256,12 @@ namespace xivModdingFramework.Mods
         {
             var state = await GetPreTransactionState(file, prePrep);
             await RestoreFileState(state);
+
+            _OriginalStates.Remove(file);
+            if (prePrep)
+            {
+                _PrePrepStates.Remove(file);
+            }
         }
         public async Task<TxFileState> GetPreTransactionState(string file, bool prePrep = false)
         {
@@ -1483,6 +1492,13 @@ namespace xivModdingFramework.Mods
             if (!_TemporaryOffsetMapping[df].ContainsKey(offset))
                 return new HashSet<string>();
             return _TemporaryOffsetMapping[df][offset];
+        }
+
+        internal bool IsModifiedFile(string path)
+        {
+            var inLive = _OriginalStates.ContainsKey(path);
+
+            return inLive;
         }
 
         internal bool IsPrepFile(string path)

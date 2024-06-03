@@ -805,7 +805,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (tx != null && !tx.ReadOnly && unzipPath == null)
                 {
                     // Use TX data store if we have one.
-                    unzipPath = tx.UNSAFE_GetTransactionStore();
+                    unzipPath = Path.Combine(tx.UNSAFE_GetTransactionStore(), Guid.NewGuid().ToString());
                 } else
                 {
                     // Make our own temp path.

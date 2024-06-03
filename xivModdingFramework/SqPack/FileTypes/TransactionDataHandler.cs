@@ -885,6 +885,12 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var paths = tx.GetFilePathsFromTempOffset(df, tempOffset);
                     foreach (var path in paths)
                     {
+                        if (!tx.IsModifiedFile(path))
+                        {
+                            // If the file doesn't exist in the original states array,
+                            // it's either a prep file or was reset at some point.
+                        }
+
                         if (tx.IsPrepFile(path))
                         {
                             // Prep files don't get written to final product.
