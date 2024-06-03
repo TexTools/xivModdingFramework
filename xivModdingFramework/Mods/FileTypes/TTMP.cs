@@ -904,7 +904,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
 
-            await Mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
+            await Mtrl.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress);
 
             var idx = 0;
             var total = fixableMdls.Count;

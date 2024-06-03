@@ -1113,7 +1113,7 @@ namespace xivModdingFramework.Materials.FileTypes
 #endregion
 
         #region Endwalker => Dawntrail Material Conversion
-        public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress)
+        public static async Task UpdateEndwalkerMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress)
         {
 #if ENDWALKER
             return;
@@ -1144,6 +1144,7 @@ namespace xivModdingFramework.Materials.FileTypes
             foreach (var mtrl in materials)
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
+                await FixPreDawntrailMaterial(mtrl, source, true, tx);
                 i++;
             }
 
@@ -1170,9 +1171,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
                 if(mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant1)
-                    && mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant2)
-                    && !mtrl.ShaderConstants.Any(x => x.ConstantId == SSAOMask)
-                    && !mtrl.ShaderConstants.Any(x => x.ConstantId == sheenRate))
+                    && mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant2))
                 {
                     return true;
                 }
@@ -1205,6 +1204,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
+                await UpdateEndwalkerMaterial(mtrl, source, tx);
                 await boiler.Commit();
             }
             catch
@@ -1231,7 +1231,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
                 await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
-            } else if(mtrl.ShaderPack == EShaderPack.Character)
+            } else if(mtrl.ShaderPack == EShaderPack.Skin)
             {
                 await UpdateEndwalkerSkinMaterial(mtrl, source, tx);
             }
@@ -1425,6 +1425,10 @@ namespace xivModdingFramework.Materials.FileTypes
 
         private static async Task UpdateEndwalkerSkinMaterial(XivMtrl mtrl, string source, ModTransaction tx)
         {
+            // Disabled for now.  SkinLegacy causes the Benchmark to crash in Benchmark 1.1
+            return;
+
+
             // ShaderPack update is all we have for this one for now.
             mtrl.ShaderPack = EShaderPack.SkinLegacy;
             var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
