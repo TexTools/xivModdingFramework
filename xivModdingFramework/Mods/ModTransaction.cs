@@ -876,19 +876,17 @@ namespace xivModdingFramework.Mods
         /// <param name="tx"></param>
         public static void CancelTransaction(ModTransaction tx, bool graceful = false)
         {
-
+            if (tx.State == ETransactionState.Closed)
+            {
+                // TX has already been completed/cancelled.
+                return;
+            }
             // Readonly transactions don't really have a true cancel, or need to be cancelled, but we can at least mark them done.
             if (tx._ReadOnly)
             {
                 tx.CancelTransaction();
                 tx.State = ETransactionState.Closed;
                 _CANCEL_BLOCKED_TX = false;
-                return;
-            }
-
-            if (tx.State == ETransactionState.Closed)
-            {
-                // TX has already been completed/cancelled.
                 return;
             }
 
