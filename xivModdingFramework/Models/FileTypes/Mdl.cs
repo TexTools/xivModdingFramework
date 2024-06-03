@@ -5117,7 +5117,7 @@ namespace xivModdingFramework.Models.FileTypes
         #endregion
 
         #region Dawntrail Model Fix
-        public static async Task FixPreDawntrailMdl(string path, string source, ModTransaction tx)
+        public static async Task UpdateEndwalkerModels(string path, string source, ModTransaction tx)
         {
             using (var br = await tx.GetFileStream(path))
             {
@@ -5131,6 +5131,7 @@ namespace xivModdingFramework.Models.FileTypes
             // HACKHACK: This is going to be extremely inefficient, but works for the moment.
             var ttMdl = await GetTTModel(path, false, tx);
             var xivMdl = await GetXivMdl(path, false, tx);
+            ttMdl.MdlVersion = 6;
 
             var bytes = await MakeCompressedMdlFile(ttMdl, xivMdl);
             await Dat.WriteModFile(bytes, path, source, null, tx);

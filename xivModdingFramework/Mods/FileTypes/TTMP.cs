@@ -912,7 +912,7 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 progress?.Report((idx, total, "Updating Endwalker Models..."));
                 idx++;
-                await Mdl.FixPreDawntrailMdl(path, source, tx);
+                await Mdl.UpdateEndwalkerModels(path, source, tx);
             }
         }
 
