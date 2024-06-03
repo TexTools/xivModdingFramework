@@ -45,7 +45,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
     public class PMPUnknownManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public object Manipulation;
+        public object Manipulation = new object();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -58,7 +58,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
     public class PMPImcManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPImcManipulationJson Manipulation;
+        public PMPImcManipulationJson Manipulation = new PMPImcManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -75,7 +75,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPEstManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPEstManipulationJson Manipulation;
+        public PMPEstManipulationJson Manipulation = new PMPEstManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -92,7 +92,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPEqpManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPEqpManipulationJson Manipulation;
+        public PMPEqpManipulationJson Manipulation = new PMPEqpManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -109,7 +109,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPEqdpManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPEqdpManipulationJson Manipulation;
+        public PMPEqdpManipulationJson Manipulation = new PMPEqdpManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -126,7 +126,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPGmpManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPGmpManipulationJson Manipulation;
+        public PMPGmpManipulationJson Manipulation = new PMPGmpManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -143,7 +143,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPRspManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPRspManipulationJson Manipulation;
+        public PMPRspManipulationJson Manipulation = new PMPRspManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -159,7 +159,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPGlobalEqpManipulationWrapperJson : PMPManipulationWrapperJson
     {
-        public PMPGlobalEqpManipulationJson Manipulation;
+        public PMPGlobalEqpManipulationJson Manipulation = new PMPGlobalEqpManipulationJson();
         public override object GetManipulation()
         {
             return Manipulation;
@@ -371,6 +371,11 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             get
             {
+                if (!PMPExtensions.PenumbraSlotToGameSlot.ContainsKey(Slot))
+                {
+                    return 0;
+                }
+
                 // Get the slot number.
                 var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
                 var isAccessory = EquipmentDeformationParameterSet.IsAccessory(slot);
@@ -382,6 +387,11 @@ namespace xivModdingFramework.Mods.FileTypes
                 return (ushort) shifted;
             } set
             {
+                if (!PMPExtensions.PenumbraSlotToGameSlot.ContainsKey(Slot))
+                {
+                    return;
+                }
+
                 Entry = 0;
                 value = (ushort) (value & 0x3);
 
@@ -395,6 +405,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 Entry = (ushort) (value << shift);
             }
         }
+
 
         public XivDependencyRoot GetRoot()
         {
@@ -597,8 +608,16 @@ namespace xivModdingFramework.Mods.FileTypes
                 return (XivSubRace.Hyur_Midlander, XivGender.Male, false);
             }
 
-            var xivRace = PMPExtensions.PMPSubraceToXivSubrace[SubRace];
-            var xivGen = PMPExtensions.PMPGenderToXivGender[pmpGen];
+            var xivRace = XivSubRace.Hyur_Midlander;
+            if (PMPExtensions.PMPSubraceToXivSubrace.ContainsKey(SubRace))
+            {
+                xivRace = PMPExtensions.PMPSubraceToXivSubrace[SubRace];
+            }
+            var xivGen = XivGender.Male;
+            if (PMPExtensions.PMPGenderToXivGender.ContainsKey(pmpGen))
+            {
+                xivGen = PMPExtensions.PMPGenderToXivGender[pmpGen];
+            }
             return (xivRace, xivGen, true);
         }
 

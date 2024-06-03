@@ -1129,11 +1129,23 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public static PmpIdentifierJson FromRoot(XivDependencyRootInfo root, int variant = 1)
         {
             var pEntry = new PmpIdentifierJson();
-            pEntry.ObjectType = PMPExtensions.XivItemTypeToPenumbraObject[root.PrimaryType];
-            pEntry.BodySlot = root.SecondaryType == null ? PMPObjectType.Unknown : PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
-            pEntry.PrimaryId = (ushort)root.PrimaryId;
-            pEntry.SecondaryId = (ushort)(root.SecondaryId == null ? 0 : root.SecondaryId);
-            pEntry.Variant = (byte)variant;
+            if (PMPExtensions.XivItemTypeToPenumbraObject.ContainsKey(root.PrimaryType))
+            {
+                pEntry.ObjectType = PMPExtensions.XivItemTypeToPenumbraObject[root.PrimaryType];
+                pEntry.BodySlot = root.SecondaryType == null ? PMPObjectType.Unknown : PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
+                pEntry.PrimaryId = (ushort)root.PrimaryId;
+                pEntry.SecondaryId = (ushort)(root.SecondaryId == null ? 0 : root.SecondaryId);
+                pEntry.Variant = (byte)variant;
+            }
+
+            if (root.Slot != null)
+            {
+                pEntry.EquipSlot = PMPExtensions.PenumbraSlotToGameSlot.FirstOrDefault(x => x.Value == root.Slot).Key;
+            } else
+            {
+                pEntry.EquipSlot = PMPEquipSlot.Unknown;
+            }
+
             return pEntry;
         }
     }

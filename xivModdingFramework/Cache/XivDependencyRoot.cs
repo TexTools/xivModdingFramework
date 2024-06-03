@@ -574,7 +574,7 @@ namespace xivModdingFramework.Cache
         {
             try
             {
-                XivDependencyRoot other = (XivDependencyRoot)obj;
+                XivDependencyRoot other = obj as XivDependencyRoot;
                 return this == other;
             }
             catch
