@@ -118,6 +118,12 @@ namespace xivModdingFramework.Helpers
                 Transaction.TransactionStateChanged += Transaction_TransactionStateChanged;
 
                 // Set up file system watch.
+                if(Watcher != null)
+                {
+                    DetatchWatch();
+                    Watcher.Dispose();
+                }
+
                 Watcher = new FileSystemWatcher(ModFolder);
                 Watcher.IncludeSubdirectories = true;
                 Watcher.EnableRaisingEvents = true;
@@ -473,6 +479,20 @@ namespace xivModdingFramework.Helpers
         }
 
         #endregion
+
+        public static void Pause()
+        {
+            Transaction.FileChanged -= Transaction_FileChanged;
+            Transaction.TransactionStateChanged -= Transaction_TransactionStateChanged;
+            DetatchWatch();
+        }
+
+        public static void Resume()
+        {
+            Transaction.FileChanged += Transaction_FileChanged;
+            Transaction.TransactionStateChanged += Transaction_TransactionStateChanged;
+            AttachWatch();
+        }
 
         private static void ParsePmpInfo()
         {

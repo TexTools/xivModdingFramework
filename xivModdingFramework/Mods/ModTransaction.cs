@@ -1,5 +1,7 @@
 ﻿using HelixToolkit.SharpDX.Core;
 using HelixToolkit.SharpDX.Core.Utilities;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -64,7 +66,10 @@ namespace xivModdingFramework.Mods
 
     public struct ModTransactionSettings
     {
+        [JsonConverter(typeof(StringEnumConverter))]
         public EFileStorageType StorageType { get; set; }
+
+        [JsonConverter(typeof(StringEnumConverter))]
         public ETransactionTarget Target { get; set; }
         public string TargetPath { get; set; }
         public bool Unsafe { get; set; }

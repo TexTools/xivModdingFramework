@@ -589,6 +589,10 @@ namespace xivModdingFramework.Helpers
 
         public static bool IsDirectory(string path)
         {
+            if (!File.Exists(path))
+            {
+                return false;
+            }
             FileAttributes attr = File.GetAttributes(path);
 
             //detect whether its a directory or file
