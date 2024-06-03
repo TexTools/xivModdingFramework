@@ -327,7 +327,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     rootDuration = await TTMP.HandleRootConversion(files, imported, tx, settings, modPack);
                     if (rootDuration < 0)
                     {
-                        await boiler.Cancel(true, imported);
+                        await boiler.Cancel(true);
                         return (null, null, -1);
                     }
                 }
@@ -359,7 +359,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
             catch
             {
-                await boiler.Catch(imported);
+                await boiler.Catch();
                 throw;
             }
             finally

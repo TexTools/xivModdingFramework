@@ -1155,7 +1155,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             catch
             {
-                boiler.Catch();
+                await boiler.Catch();
                 throw;
             }
         }
@@ -1914,7 +1914,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 if (reportedSize == realSize)
                 {
-                    boiler.Cancel(true);
+                    await boiler.Cancel(true);
                     return false;
                 }
 
@@ -1927,7 +1927,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
             catch (Exception ex)
             {
-                boiler.Catch();
+                await boiler.Catch();
                 throw;
             }
         }

@@ -88,7 +88,7 @@ namespace xivModdingFramework.Mods
             }
             catch
             {
-                boiler.Catch();
+                await boiler.Catch();
                 throw;
             }
         }

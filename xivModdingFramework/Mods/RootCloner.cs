@@ -61,7 +61,6 @@ namespace xivModdingFramework.Mods
             }
 
             var boiler = TxBoiler.BeginWrite(ref tx);
-            var states = new List<TxFileState>();
             try
             {
                 var destItem = Destination.GetFirstItem();
@@ -218,11 +217,9 @@ namespace xivModdingFramework.Mods
                 foreach (var f in files)
                 {
                     allFiles.Add(f);
-                    states.Add(await tx.SaveFileState(f));
                 }
 
                 allFiles.Add(Destination.Info.GetRootFile());
-                states.Add(await tx.SaveFileState(Destination.Info.GetRootFile()));
 
                 if (ProgressReporter != null)
                 {
@@ -475,7 +472,6 @@ namespace xivModdingFramework.Mods
                             if (!allFiles.Contains(destPath))
                             {
                                 allFiles.Add(destPath);
-                                states.Add(await tx.SaveFileState(destPath));
                             }
 
                             // Copy the material over.
@@ -575,7 +571,7 @@ namespace xivModdingFramework.Mods
 
             } catch (Exception ex)
             {
-                await boiler.Catch(states);
+                await boiler.Catch();
                 throw;
             }
         }

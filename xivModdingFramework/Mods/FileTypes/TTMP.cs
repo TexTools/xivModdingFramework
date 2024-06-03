@@ -837,7 +837,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if(cancelled)
                 {
-                    await boiler.Cancel(true, originalStates);
+                    await boiler.Cancel(true);
                     return (null, null, -1);
                 }
 
@@ -860,7 +860,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 return (filePaths.ToList(), new List<string>(), seconds);
             } catch(Exception ex)
             {
-                await boiler.Catch(originalStates);
+                await boiler.Catch();
                 throw;
             }
         }
@@ -904,7 +904,7 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
 
-            await Mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress, states);
+            await Mtrl.FixPreDawntrailMaterials(fixableMtrls, source, tx, progress);
 
             var idx = 0;
             var total = fixableMdls.Count;
@@ -1105,7 +1105,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 var res = await HandleRootConversion(paths, originalStates, tx, settings, modpack);
                 if (res < 0)
                 {
-                    await boiler.Cancel(true, originalStates);
+                    await boiler.Cancel(true);
                     return false;
                 }
 
@@ -1147,7 +1147,7 @@ namespace xivModdingFramework.Mods.FileTypes
             }
             catch
             {
-                await boiler.Catch(originalStates);
+                await boiler.Catch();
                 throw;
             }
         }

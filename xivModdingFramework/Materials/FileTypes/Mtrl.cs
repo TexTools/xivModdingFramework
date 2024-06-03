@@ -747,10 +747,8 @@ namespace xivModdingFramework.Materials.FileTypes
         public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item = null, string source = "Unknown", bool validateTextures = true, ModTransaction tx = null)
         {
             var boiler = TxBoiler.BeginWrite(ref tx);
-            List<TxFileState> states = new List<TxFileState>();
             try
             {
-                states.Add(await tx.SaveFileState(xivMtrl.MTRLPath));
                 var mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
 
                 // Create the actual raw MTRL first. - Files should always be created top down.
@@ -795,11 +793,9 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         var di = Tex.GetDefaultTexturePath(tex.Usage);
 
-                        states.Add(await tx.SaveFileState(path));
                         await Tex.ImportTex(path, di.FullName, item, source, tx);
                         if(tex.Dx9Path != null)
                         {
-                            states.Add(await tx.SaveFileState(tex.Dx11Path));
                             // Create a fresh DX11 texture as well if we're in split DX9/11 tex mode.
                             await Tex.ImportTex(tex.Dx11Path, di.FullName, item, source, tx);
                         }
@@ -812,7 +808,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             catch(Exception ex)
             {
-                await boiler.Catch(states);
+                await boiler.Catch();
 
                 throw ex;
             }
@@ -821,7 +817,6 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static async Task ImportMtrlToAllVersions(XivMtrl mtrl, IItemModel item = null, string source = "Unknown", ModTransaction tx = null)
         {
-            var originalStates = new List<TxFileState>();
             var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
@@ -836,7 +831,6 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     // No valid item, so no shared versions.
                     // So just save the base material and call it a day.
-                    originalStates.Add(await tx.SaveFileState(mtrl.MTRLPath));
                     await ImportMtrl(mtrl, item, source, true, tx);
                     await boiler.Commit();
                     return;
@@ -932,7 +926,6 @@ namespace xivModdingFramework.Materials.FileTypes
                         tex.TexturePath = itemXivMtrl.DetokenizePath(tex.TexturePath, mtrl.ResolveFullUsage(tex));
                     }
 
-                    originalStates.Add(await tx.SaveFileState(itemXivMtrl.MTRLPath));
                     // Write the new Material
                     await Mtrl.ImportMtrl(itemXivMtrl, saveItem, source, true, tx);
                 }
@@ -940,7 +933,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             catch
             {
-                await boiler.Catch(originalStates);
+                await boiler.Catch();
                 throw;
             }
         }
@@ -1120,7 +1113,7 @@ namespace xivModdingFramework.Materials.FileTypes
 #endregion
 
         #region Endwalker => Dawntrail Material Conversion
-        public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress, Dictionary<string, TxFileState> states)
+        public static async Task FixPreDawntrailMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress)
         {
 #if ENDWALKER
             return;
@@ -1152,7 +1145,6 @@ namespace xivModdingFramework.Materials.FileTypes
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
                 i++;
-                await UpdateEndwalkerMaterial(mtrl, states, source, tx);
             }
 
         }
@@ -1211,26 +1203,15 @@ namespace xivModdingFramework.Materials.FileTypes
             }
 
             var boiler = TxBoiler.BeginWrite(ref tx);
-            var states = new Dictionary<string, TxFileState>();
             try
             {
-                await UpdateEndwalkerMaterial(mtrl, states, source, tx);
                 await boiler.Commit();
             }
             catch
             {
-                await boiler.Catch(states);
+                await boiler.Catch();
                 throw;
             }
-        }
-
-        private static async Task ConditionalSaveState(Dictionary<string, TxFileState> states, ModTransaction tx, string path)
-        {
-            if(states == null || states.ContainsKey(path))
-            {
-                return;
-            }
-            states.Add(path, await tx.SaveFileState(path));
         }
 
         /// <summary>
@@ -1241,24 +1222,22 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, ModTransaction tx)
         {
-            await ConditionalSaveState(states, tx, mtrl.MTRLPath);
 
             if (mtrl.ColorSetDataSize > 0)
             {
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx);
-                await ConditionalSaveState(states, tx, texInfo.indexTextureToCreate);
 
                 var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
                 await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
             } else if(mtrl.ShaderPack == EShaderPack.Character)
             {
-                await UpdateEndwalkerSkinMaterial(mtrl, states, source, tx);
+                await UpdateEndwalkerSkinMaterial(mtrl, source, tx);
             }
             else if(mtrl.ShaderPack == EShaderPack.Hair)
             {
-                await UpdateEndwalkerHairMaterial(mtrl, states, source, tx);
+                await UpdateEndwalkerHairMaterial(mtrl, source, tx);
             }
         }
 
@@ -1444,16 +1423,15 @@ namespace xivModdingFramework.Materials.FileTypes
             return (indexPath, indexData);
         }
 
-        private static async Task UpdateEndwalkerSkinMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerSkinMaterial(XivMtrl mtrl, string source, ModTransaction tx)
         {
             // ShaderPack update is all we have for this one for now.
             mtrl.ShaderPack = EShaderPack.SkinLegacy;
-            await ConditionalSaveState(states, tx, mtrl.MTRLPath);
             var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
             await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
 
         }
-        private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, Dictionary<string, TxFileState> states, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx)
         {
 
             var normalTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
@@ -1488,11 +1466,6 @@ namespace xivModdingFramework.Materials.FileTypes
             // Convert DDS to uncompressed Tex
             normalData = Tex.DDSToUncompressedTex(normalData);
             maskData = Tex.DDSToUncompressedTex(maskData);
-
-            // Save states...
-            await ConditionalSaveState(states, tx, normalTexSampler.Dx11Path);
-            await ConditionalSaveState(states, tx, maskTexSampler.Dx11Path);
-            await ConditionalSaveState(states, tx, mtrl.MTRLPath);
 
             // Write final files.
             await Dat.WriteModFile(normalData, normalTexSampler.Dx11Path, source, null, tx, false);

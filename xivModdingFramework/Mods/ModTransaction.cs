@@ -143,6 +143,9 @@ namespace xivModdingFramework.Mods
         public delegate void TransactionStateChangedEventHandler(ModTransaction sender, ETransactionState oldState, ETransactionState newState);
         public delegate void TransactionSettingsChangedEventHandler(ModTransaction sender, ModTransactionSettings settings);
 
+        internal delegate void IndexChanging(string internalFilePath, long previousOffset);
+        internal delegate void ModChanging(string internalFilePath, Mod? previousMod);
+
         public event TransactionEventHandler TransactionCommitted;
         public event TransactionCancelledEventHandler TransactionCancelled;
         public event TransactionEventHandler TransactionClosed;
@@ -151,6 +154,9 @@ namespace xivModdingFramework.Mods
 
         // Called during TX when a file is changed internally.
         public event FileChangedEventHandler FileChanged;
+
+        internal event IndexChanging INTERNAL_IndexChanging;
+        internal event ModChanging INTERNAL_ModChanging;
 
         public static event TransactionEventHandler ActiveTransactionCreated;
         public static event TransactionEventHandler ActiveTransactionCommitted;
@@ -1368,6 +1374,8 @@ namespace xivModdingFramework.Mods
             {
                 data.OriginalMod = originalMod;
             }
+
+            INTERNAL_ModChanging?.Invoke(path, originalMod);
         }
 
         /// <summary>
@@ -1435,6 +1443,9 @@ namespace xivModdingFramework.Mods
             {
                 _TemporaryOffsetMapping[dataFile][originalOffset].Remove(path);
             }
+
+
+            INTERNAL_IndexChanging?.Invoke(path, originalOffset);
 
         }
 

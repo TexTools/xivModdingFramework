@@ -262,7 +262,7 @@ namespace xivModdingFramework.Mods.FileTypes
             }
             catch
             {
-                boiler.Catch();
+                await boiler.Catch();
             }
         }
 
@@ -432,13 +432,7 @@ namespace xivModdingFramework.Mods.FileTypes
             dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
 
-            // Beep boop
-            bool doSave = false;
-            if (tx == null)
-            {
-                doSave = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
                 var index = await tx.GetIndexFile(df);
@@ -476,17 +470,11 @@ namespace xivModdingFramework.Mods.FileTypes
                     await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, tx);
                 }
 
-                if (doSave)
-                {
-                    await ModTransaction.CommitTransaction(tx);
-                }
+                await boiler.Commit();
             }
             catch
             {
-                if (doSave)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Cancel();
                 throw;
             }
         }

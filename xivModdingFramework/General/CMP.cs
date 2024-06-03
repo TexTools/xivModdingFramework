@@ -91,7 +91,7 @@ namespace xivModdingFramework.General
                 await boiler.Commit();
             } catch(Exception ex)
             {
-                boiler.Cancel();
+                await boiler.Cancel();
                 throw;
             }
 

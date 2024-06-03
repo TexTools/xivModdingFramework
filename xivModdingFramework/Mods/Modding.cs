@@ -278,7 +278,7 @@ namespace xivModdingFramework.Mods
 
                 if (state == curState)
                 {
-                    boiler.Cancel(true);
+                    await boiler.Cancel(true);
                     return false;
                 }
 
@@ -295,7 +295,7 @@ namespace xivModdingFramework.Mods
                 if(mod.IsInternal() && !allowInternal)
                 {
                     // Don't allow toggling internal mods unless we were specifically told to.
-                    boiler.Cancel(true);
+                    await boiler.Cancel(true);
                     return false;
                 }
 
@@ -347,7 +347,7 @@ namespace xivModdingFramework.Mods
             }
             catch(Exception ex)
             {
-                boiler.Catch();
+                await boiler.Catch();
                 throw;
             }
 
@@ -404,7 +404,7 @@ namespace xivModdingFramework.Mods
             }
             catch
             {
-                boiler.Catch();
+                await boiler.Catch();
                 throw;
             }
         }
@@ -458,7 +458,7 @@ namespace xivModdingFramework.Mods
             }
             catch
             {
-                boiler.Catch();
+                await boiler.Catch();
                 throw;
             }
 
@@ -496,7 +496,6 @@ namespace xivModdingFramework.Mods
             }
 
             var boiler = TxBoiler.BeginWrite(ref tx);
-            var states = new List<TxFileState>();
             try
             {
                 var modList = await tx.GetModList();
@@ -510,7 +509,6 @@ namespace xivModdingFramework.Mods
                 if(state == EModState.UnModded || state == EModState.Disabled)
                 {
                     foreach (var mod in toRemove) {
-                        states.Add(await tx.SaveFileState(mod));
                         await INTERNAL_DeleteMod(mod, true, tx);
                     }
                 }
@@ -520,7 +518,7 @@ namespace xivModdingFramework.Mods
             }
             catch
             {
-                await boiler.Catch(states);
+                await boiler.Catch();
                 throw;
             }
         }
@@ -572,7 +570,7 @@ namespace xivModdingFramework.Mods
             }
             catch
             {
-                boiler.Catch();
+                await boiler.Catch();
             }
 
         }
@@ -651,12 +649,7 @@ namespace xivModdingFramework.Mods
 
             progressReporter?.Report((0, 0, "Loading Modlist file..."));
 
-            var ownTransaction = false;
-            if (tx == null)
-            {
-                ownTransaction = true;
-                tx = ModTransaction.BeginTransaction(true);
-            }
+            var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
                 var modlist = await tx.GetModList();
@@ -668,7 +661,6 @@ namespace xivModdingFramework.Mods
 
 
                 var count = 0;
-                List<Mod> toRemove = new List<Mod>();
                 var mods = modlist.GetMods();
                 var newMods = new List<Mod>();
                 foreach (var baseMod in mods)
@@ -753,24 +745,16 @@ namespace xivModdingFramework.Mods
                 modlist.AddOrUpdateMods(newMods);
 
 
-                progressReporter?.Report((0, 0, "Removing empty mod slots..."));
-
-                // Remove all empty mod frames.
-                modlist.RemoveMods(toRemove);
-
-                progressReporter?.Report((0, 0, "Saving Modlist file..."));
-
-                if (ownTransaction)
+                if (boiler.OwnTx)
                 {
-                    await ModTransaction.CommitTransaction(tx);
+                    progressReporter?.Report((0, 0, "Saving Modlist file..."));
                 }
+
+                await boiler.Commit();
             }
             catch
             {
-                if (ownTransaction)
-                {
-                    ModTransaction.CancelTransaction(tx);
-                }
+                await boiler.Cancel();
             }
         }
 

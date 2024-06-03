@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpDX.Direct2D1.Effects;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
@@ -46,6 +47,7 @@ namespace xivModdingFramework.Mods
             }
         }
 
+        private Dictionary<string, TxFileState> OriginalStates = new Dictionary<string, TxFileState>();
         private TxBoiler() { 
         }
 
@@ -66,44 +68,12 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        public async Task Catch(TxFileState restoreState)
+        public async Task Catch()
         {
-            await Cancel(false, restoreState);
-        }
-        public async Task Catch(Dictionary<string, TxFileState> restoreStates)
-        {
-            await Cancel(false, restoreStates);
-        }
-        public async Task Catch(IEnumerable<TxFileState> restoreStates)
-        {
-            await Cancel(false, restoreStates);
-        }
-        public void Catch()
-        {
-            Cancel(false);
+            await Cancel(false);
         }
 
-        public async Task Cancel(bool graceful, TxFileState restoreState)
-        {
-            await Cancel(graceful, new List<TxFileState>() { restoreState });
-        }
-        public async Task Cancel(bool graceful, Dictionary<string, TxFileState> restoreStates)
-        {
-            await Cancel(graceful, restoreStates.Values);
-        }
-        public async Task Cancel(bool graceful, IEnumerable<TxFileState> restoreStates)
-        {
-            Cancel(graceful);
-            if (!ownTx && tx.State == ETransactionState.Open || tx.State == ETransactionState.Preparing)
-            {
-                foreach(var state in restoreStates)
-                {
-                    await tx.RestoreFileState(state);
-                }
-            }
-        }
-
-        public void Cancel(bool graceful = false)
+        public async Task Cancel(bool graceful = false)
         {
             if (ownTx)
             {
@@ -114,32 +84,64 @@ namespace xivModdingFramework.Mods
                 tx.ModPack = originalModpack;
             }
 
-            if(ownBatch && tx.IsBatchingNotifications)
+            if (!ownTx && tx.State == ETransactionState.Open || tx.State == ETransactionState.Preparing)
+            {
+                foreach (var state in OriginalStates)
+                {
+                    await tx.RestoreFileState(state.Value);
+                }
+            }
+
+            if (ownBatch && tx.IsBatchingNotifications)
             {
                 tx.INTERNAL_EndBatchingNotifications();
             }
+            UnbindEvents();
         }
 
-        public void Finally()
+        private void BindEvents()
         {
-            if (tx != null)
-            {
-                tx.ModPack = originalModpack;
-
-                if (ownTx)
-                {
-                    if (tx.State != ETransactionState.Closed)
-                    {
-                        Cancel(true);
-                    }
-                }
-
-                if (ownBatch && tx.IsBatchingNotifications)
-                {
-                    tx.INTERNAL_EndBatchingNotifications();
-                }
-            }
+            tx.INTERNAL_IndexChanging += Tx_INTERNAL_IndexChanging;
+            tx.INTERNAL_ModChanging += Tx_INTERNAL_ModChanging;
         }
+        private void UnbindEvents()
+        {
+            if (tx == null) return;
+            tx.INTERNAL_IndexChanging -= Tx_INTERNAL_IndexChanging;
+            tx.INTERNAL_ModChanging -= Tx_INTERNAL_ModChanging;
+        }
+
+        private void Tx_INTERNAL_ModChanging(string internalFilePath, Mod? previousMod)
+        {
+            var exists = OriginalStates.ContainsKey(internalFilePath);
+            if (exists && OriginalStates[internalFilePath].OriginalMod_Set)
+            {
+                return;
+            }
+
+            if (!exists)
+            {
+                OriginalStates.Add(internalFilePath, new TxFileState(internalFilePath));  
+            }
+
+            OriginalStates[internalFilePath].OriginalMod = previousMod;
+        }
+
+        private void Tx_INTERNAL_IndexChanging(string internalFilePath, long previousOffset)
+        {
+            var exists = OriginalStates.ContainsKey(internalFilePath);
+            if (exists && OriginalStates[internalFilePath].OriginalOffset_Set)
+            {
+                return;
+            }
+
+            if (!exists)
+            {
+                OriginalStates.Add(internalFilePath, new TxFileState(internalFilePath));
+            }
+            OriginalStates[internalFilePath].OriginalOffset = previousOffset;
+        }
+
 
         public static TxBoiler BeginWrite(ref ModTransaction tx, bool doBatch = true, ModPack? modpack = null)
         {
@@ -175,6 +177,8 @@ namespace xivModdingFramework.Mods
                 ownModpack = ownModpack,
                 originalModpack = originalModpack,
             };
+            boiler.BindEvents();
+
             return boiler;
         }
     }

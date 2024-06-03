@@ -4207,10 +4207,10 @@ namespace xivModdingFramework.Models.FileTypes
         /// everything was successful.
         /// </summary>
         /// <returns></returns>
-        public static async Task<int> CheckAllModsSkinAssignments()
+        public static async Task<int> CheckAllModsSkinAssignments(ModTransaction tx = null)
         {
-            using (var tx = ModTransaction.BeginTransaction(true))
-            { 
+            var boiler = TxBoiler.BeginWrite(ref tx);
+            try {  
                 var modList = await tx.GetModList();
                 var mods = modList.GetMods();
 
@@ -4226,9 +4226,17 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (count > 0)
                 {
-                    await ModTransaction.CommitTransaction(tx);
+                    await boiler.Commit();
+                } else
+                {
+                    await boiler.Cancel(true);
                 }
                 return count;
+            }
+            catch
+            {
+                await boiler.Catch();
+                throw;
             }
         }
         private static bool SkinCheckGen2()
@@ -4655,7 +4663,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             catch
             {
-                boiler.Cancel();
+                await boiler.Cancel();
                 throw;
             }
         }
@@ -4698,22 +4706,17 @@ namespace xivModdingFramework.Models.FileTypes
 
 
             var boiler = TxBoiler.BeginWrite(ref tx);
-            var originalStates = new List<TxFileState>();
             try
             {
                 foreach(var path in missingPaths)
                 {
-                    originalStates.Add(await tx.SaveFileState(path));
                     await Mtrl.CreateMissingMaterial(allRootMaterials, path, referenceItem, sourceApplication, tx);
                 }
-
-
-
                 await boiler.Commit();
             }
             catch
             {
-                await boiler.Catch(originalStates);
+                await boiler.Catch();
                 throw;
             }
         }
@@ -4739,7 +4742,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(originalPath);
 
-            var states = new List<TxFileState>();
             var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
@@ -4756,7 +4758,6 @@ namespace xivModdingFramework.Models.FileTypes
                     throw new InvalidDataException("Source model file does not exist.");
                 }
                 var allFiles = new HashSet<string>() { newPath };
-                states.Add(await tx.SaveFileState(newPath));
 
                 var originalRace = IOUtil.GetRaceFromPath(originalPath);
                 var newRace = IOUtil.GetRaceFromPath(newPath);
@@ -4819,13 +4820,11 @@ namespace xivModdingFramework.Models.FileTypes
                                 mtrl.Textures[i].TexturePath = ntex;
 
                                 allFiles.Add(ntex);
-                                states.Add(await tx.SaveFileState(ntex));
                                 await Dat.CopyFile(tex, ntex, source, true, item, tx);
                             }
 
                             mtrl.MTRLPath = path;
                             allFiles.Add(mtrl.MTRLPath);
-                            states.Add(await tx.SaveFileState(mtrl.MTRLPath));
                             await Mtrl.ImportMtrl(mtrl, item, source, false, tx);
 
                             if (!validNewMaterials.ContainsKey(newMatName))
@@ -4877,7 +4876,6 @@ namespace xivModdingFramework.Models.FileTypes
                                 if (!copied)
                                 {
                                     allFiles.Add(testPath);
-                                    states.Add(await tx.SaveFileState(testPath));
                                     await Dat.CopyFile(validPath, testPath, source, true, item, tx);
                                 }
                             }
@@ -4901,7 +4899,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             catch
             {
-                await boiler.Catch(states);
+                await boiler.Catch();
                 throw;
             }
         }
@@ -4932,7 +4930,6 @@ namespace xivModdingFramework.Models.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(primaryModel);
 
-            var states = new List<TxFileState>();
             var boiler = TxBoiler.BeginWrite(ref tx);
             try
             {
@@ -4967,7 +4964,6 @@ namespace xivModdingFramework.Models.FileTypes
 
 
                 var allFiles = new HashSet<string>() { primaryModel };
-                states.Add(await tx.SaveFileState(primaryModel));
 
                 var mainRace = IOUtil.GetRaceFromPath(primaryModel);
                 var mergeInRace = IOUtil.GetRaceFromPath(mergeIn);
@@ -5017,14 +5013,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                                 mtrl.Textures[i].TexturePath = ntex;
 
-                                states.Add(await tx.SaveFileState(ntex));
                                 allFiles.Add(ntex);
                                 await Dat.CopyFile(tex, ntex, primaryModel, true, item, tx);
                             }
 
                             mtrl.MTRLPath = newMtrlPath;
                             allFiles.Add(mtrl.MTRLPath);
-                            states.Add(await tx.SaveFileState(mtrl.MTRLPath));
                             await Mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
 
                             if (!validNewMaterials.ContainsKey(newMatName))
@@ -5076,7 +5070,6 @@ namespace xivModdingFramework.Models.FileTypes
                                     if (!copied)
                                     {
                                         allFiles.Add(testPath);
-                                        states.Add(await tx.SaveFileState(testPath));
                                         await Dat.CopyFile(validPath, testPath, primaryModel, true, item, tx);
                                     }
                                 }
@@ -5115,7 +5108,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
             catch
             {
-                await boiler.Catch(states);
+                await boiler.Catch();
                 throw;
             }
         }
