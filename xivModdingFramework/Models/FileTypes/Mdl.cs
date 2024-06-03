@@ -5021,7 +5021,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                             mtrl.MTRLPath = newMtrlPath;
                             allFiles.Add(mtrl.MTRLPath);
-                            await Mtrl.ImportMtrl(mtrl, item, primaryModel, false, tx);
+                            await Mtrl.ImportMtrl(mtrl, item, primaryModel, true, tx);
 
                             if (!validNewMaterials.ContainsKey(newMatName))
                             {
