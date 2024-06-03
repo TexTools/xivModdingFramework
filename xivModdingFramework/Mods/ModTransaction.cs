@@ -674,7 +674,10 @@ namespace xivModdingFramework.Mods
             }
             catch(Exception ex)
             {
-                tx.State = ETransactionState.Open;
+                if (tx.State != ETransactionState.Closed)
+                {
+                    tx.State = ETransactionState.Open;
+                }
                 Debug.WriteLine(ex);
                 throw;
             }
@@ -881,6 +884,12 @@ namespace xivModdingFramework.Mods
                 // TX has already been completed/cancelled.
                 return;
             }
+
+            if (tx != _ActiveTransaction)
+            {
+                throw new Exception("Attempted to cancel transaction other than the current open mod transation.");
+            }
+
             // Readonly transactions don't really have a true cancel, or need to be cancelled, but we can at least mark them done.
             if (tx._ReadOnly)
             {
@@ -888,11 +897,6 @@ namespace xivModdingFramework.Mods
                 tx.State = ETransactionState.Closed;
                 _CANCEL_BLOCKED_TX = false;
                 return;
-            }
-
-            if (tx != _ActiveTransaction)
-            {
-                throw new Exception("Attempted to cancel transaction other than the current open mod transation.");
             }
 
             try

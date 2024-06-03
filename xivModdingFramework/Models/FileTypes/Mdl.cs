@@ -4805,6 +4805,7 @@ namespace xivModdingFramework.Models.FileTypes
                     try
                     {
                         var mtrl = await Mtrl.GetXivMtrl(material, false, tx);
+                        if (mtrl == null) continue;
 
                         if (copyTextures == true)
                         {

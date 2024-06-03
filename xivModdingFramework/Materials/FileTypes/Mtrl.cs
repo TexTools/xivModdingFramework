@@ -1437,7 +1437,6 @@ namespace xivModdingFramework.Materials.FileTypes
         }
         private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx)
         {
-
             var normalTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
             var maskTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
 
@@ -1464,8 +1463,8 @@ namespace xivModdingFramework.Materials.FileTypes
             await TextureHelpers.CreateHairMaps(data.TexA, data.TexB, data.Width, data.Height);
 
             // Create MipMaps (And DDS header that we don't really need)
-            var normalData = await Tex.ConvertToDDS(data.TexA, XivTexFormat.A8R8G8B8, true, data.Width, data.Height, true);
-            var maskData = await Tex.ConvertToDDS(data.TexB, XivTexFormat.A8R8G8B8, true, data.Width, data.Height, true);
+            var normalData = await Tex.ConvertToDDS(data.TexA, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
+            var maskData = await Tex.ConvertToDDS(data.TexB, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
 
             // Convert DDS to uncompressed Tex
             normalData = Tex.DDSToUncompressedTex(normalData);

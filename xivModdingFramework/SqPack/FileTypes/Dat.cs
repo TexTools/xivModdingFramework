@@ -36,6 +36,7 @@ using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
+using static xivModdingFramework.Cache.FrameworkExceptions;
 using Constants = xivModdingFramework.Helpers.Constants;
 
 namespace xivModdingFramework.SqPack.FileTypes
@@ -1185,7 +1186,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (!AllowDatAlteration)
                 {
-                    throw new Exception("Cannot write file while DAT Writing is disabled.");
+                    throw new ModdingFrameworkException("Cannot write file while DAT Writing is disabled.");
                 }
 
                 doDatSave = true;

@@ -130,7 +130,7 @@ namespace xivModdingFramework.Textures
         internal static async Task<(byte[] TexA, byte[] TexB, int Width, int Height)> ResizeImages(XivTex texA, XivTex texB)
         {
             var maxW = Math.Max(texA.Width, texB.Width);
-            var maxH = Math.Max(texA.Width, texB.Width);
+            var maxH = Math.Max(texA.Height, texB.Height);
 
             var timgA = ResizeImage(texA, maxW, maxH);
             var timgB = ResizeImage(texB, maxW, maxH);
