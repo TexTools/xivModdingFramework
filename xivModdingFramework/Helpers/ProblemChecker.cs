@@ -59,7 +59,7 @@ namespace xivModdingFramework.Helpers
                 XivCache.CacheWorkerEnabled = false;
                 try
                 {
-                    return Task.Run(async () =>
+                    await Task.Run(async () =>
                     {
                         progress?.Report("Restoring index file backups...");
                         try
@@ -78,6 +78,9 @@ namespace xivModdingFramework.Helpers
                                     progress?.Report("Index restore failed, attempting to delete all mods instead...");
                                     await Modding.SetAllModStates(EModState.UnModded, null, tx);
                                     await ModTransaction.CommitTransaction(tx);
+
+                                    // Wait for anything listening to the TX events to do its thing.
+                                    await Task.Delay(3000);
                                 }
                             }
                             catch (Exception ex2)
