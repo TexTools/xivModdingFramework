@@ -234,7 +234,7 @@ namespace xivModdingFramework.Helpers
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static float[] RowsFromColumns(float[] data)
+        public static float[] TransposeMatrix(float[] data)
         {
             var formatted = new float[16];
 

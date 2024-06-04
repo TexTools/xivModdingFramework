@@ -2540,7 +2540,6 @@ namespace xivModdingFramework.Models.DataContainers
             Task.Run(async () =>
             {
                 bool parsedBase = false;
-                var baseSkeletonPath = "";
                 var extraSkeletonPath = "";
 
                 foreach (var root in roots)
@@ -2551,22 +2550,19 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         try
                         {
-                            baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race);
-                            skeletonData = File.ReadAllLines(baseSkeletonPath);
+                            var bones = await Sklb.GetBones(root, race);
 
                             // Parse both skeleton files, starting with the base file.
-                            foreach (var b in skeletonData)
+                            foreach (var b in bones)
                             {
-                                if (b == "") continue;
-                                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
-                                fullSkel.Add(j.BoneName, j);
+                                b.PoseMatrix = IOUtil.TransposeMatrix(b.PoseMatrix);
+                                fullSkel.Add(b.BoneName, b);
                             }
 
                         } catch(Exception ex)
                         {
                             // If we failed to resolve the bones for some reason, log the error message and use a blank skel.
-                            loggingFunction(true, "Error Parsing Skeleton ("+ baseSkeletonPath.ToString() +"):" + ex.Message);
+                            loggingFunction(true, "Error Parsing Base Skeleton: " + ex.Message);
                         }
                         parsedBase = true;
                     }
@@ -2585,7 +2581,7 @@ namespace xivModdingFramework.Models.DataContainers
                             {
                                 if (b == "") continue;
                                 var j = JsonConvert.DeserializeObject<SkeletonData>(b);
-                                j.PoseMatrix = IOUtil.RowsFromColumns(j.PoseMatrix);
+                                j.PoseMatrix = IOUtil.TransposeMatrix(j.PoseMatrix);
 
                                 if (fullSkel.ContainsKey(j.BoneName))
                                 {

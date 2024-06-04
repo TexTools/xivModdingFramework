@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 using SharpDX;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
@@ -87,6 +88,35 @@ namespace xivModdingFramework.Models.FileTypes
             await ExtractAndParseSkel(file, tx);
             return parsedFile;
 
+        }
+
+
+        public static async Task<List<SkeletonData>> GetBones(XivDependencyRootInfo root, XivRace race, ModTransaction tx = null)
+        {
+            var baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race, tx);
+            var skeletonData = File.ReadAllLines(baseSkeletonPath);
+
+            var list = new List<SkeletonData>();
+            foreach (var b in skeletonData)
+            {
+                if (b == "") continue;
+                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                list.Add(j);
+            }
+            return list;
+        }
+
+        public static List<SkeletonData> GetParents(SkeletonData bone, List<SkeletonData> fullSkel)
+        {
+            var list = new List<SkeletonData>();
+            var parent = fullSkel.FirstOrDefault(x => x.BoneNumber == bone.BoneParent);
+            while(parent != null)
+            {
+                list.Add(parent);
+                bone = parent;
+                parent = fullSkel.FirstOrDefault(x => x.BoneNumber == bone.BoneParent);
+            }
+            return list;
         }
 
         /// <summary>
@@ -166,10 +196,9 @@ namespace xivModdingFramework.Models.FileTypes
 
         private static async Task ExtractAndParseSkel(string file, ModTransaction tx = null)
         {
-
-            var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var parsedFile = Path.Combine(cwd, SkeletonsFolder, skelName + ".skel");
+            //var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
+            //var parsedFile = Path.Combine(cwd, SkeletonsFolder, skelName + ".skel");
 
             // Create skel folder if needed.
             Directory.CreateDirectory(Path.Combine(cwd, SkeletonsFolder));
@@ -441,8 +470,21 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xmlFile">The location of the skeleton file</param>
         private static void ParseSkeleton(string xmlFile)
         {
-            var skelData = new SkeletonData();
+
             var jsonBones = new List<string>();
+            var bones = ParseBones(xmlFile);
+
+            foreach(var bone in bones)
+            {
+                jsonBones.Add(JsonConvert.SerializeObject(bone));
+            }
+
+            File.WriteAllLines(Path.ChangeExtension(xmlFile, ".skel"), jsonBones.ToArray());
+        }
+
+        private static List<SkeletonData> ParseBones(string xmlFile)
+        {
+            var bones = new List<SkeletonData>();
 
             var parentIndices = new List<int>();
             var boneNames = new List<string>();
@@ -467,7 +509,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (!name.Equals("bones")) continue;
 
-                
+
                     boneCount = int.Parse(reader["numelements"]);
 
                     while (reader.Read())
@@ -529,6 +571,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < boneCount; i++)
             {
+                var skelData = new SkeletonData();
                 skelData.BoneNumber = i;
                 skelData.BoneName = boneNames[i];
                 skelData.BoneParent = parentIndices[i];
@@ -586,15 +629,12 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 skelData.InversePoseMatrix = iposeMatrix.ToArray();
-
-                jsonBones.Add(JsonConvert.SerializeObject(skelData));
+                bones.Add(skelData);
             }
 
+            return bones;
 
-
-            File.WriteAllLines(Path.ChangeExtension(xmlFile, ".skel"), jsonBones.ToArray());
         }
-
         private static bool IsWeapon(string fullMdlPath)
         {
             return fullMdlPath.Contains("chara/weapon/");

@@ -2323,6 +2323,13 @@ namespace xivModdingFramework.Models.FileTypes
             mdlVersion = 5;
 #endif
 
+            // Debug Code
+            /*
+            var root = XivCache.GetFilePathRoot(ogMdl.MdlPath);
+            var race = IOUtil.GetRaceFromPath(ogMdl.MdlPath);
+            var skel = Sklb.GetBones(root.Info, race).Result;
+            */
+
             ttModel.MdlVersion = mdlVersion;
 
             byte _LoDCount = 1;
@@ -3246,15 +3253,38 @@ namespace xivModdingFramework.Models.FileTypes
                             }
 
                             // This is the array size... Which seems to need to be +1'd in Dawntrail for some reason.
-                            if (mi == 0 || ttModel.MeshGroups[mi].Bones.Count >= 64)
+                            if (ttModel.MeshGroups[mi].Bones.Count > 64)
                             {
-                                data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
+                                throw new InvalidDataException("Bone count on v5 Mesh Groups cannot exceed 64.");
                             }
                             else
                             {
 #if DAWNTRAIL
-                            // DAWNTRAIL BENCHMARK HACKHACK - Add +1 to the bone count here to work around MDL v5 -> v6 in engine off-by-one error.
-                            data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count + 1));
+                                /*
+                                // Debug Code
+                                HashSet<string> bonesAndParents = new HashSet<string>();
+                                foreach(var bone in ttModel.MeshGroups[mi].Bones)
+                                {
+                                    var b = skel.First(x => x.BoneName == bone);
+                                    var parents = Sklb.GetParents(b, skel);
+
+                                    var pNames = parents.Select(x => x.BoneName);
+                                    bonesAndParents.UnionWith(pNames);
+                                }
+
+                                bonesAndParents.UnionWith(ttModel.MeshGroups[mi].Bones);
+                                var missingBones = new List<string>();
+
+                                foreach(var b in bonesAndParents)
+                                {
+                                    if(ttModel.MeshGroups[mi].Bones.IndexOf(b) < 0)
+                                    {
+                                        missingBones.Add(b);
+                                    }
+                                }*/
+
+                                // DAWNTRAIL BENCHMARK HACKHACK - Force this to 64.
+                                data.AddRange(BitConverter.GetBytes(64));
 #else
                                 data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
 #endif
