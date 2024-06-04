@@ -7,6 +7,7 @@ using System.Text;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods.FileTypes.PMP;
 using xivModdingFramework.Variants.DataContainers;
@@ -205,7 +206,31 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public XivDependencyRoot GetRoot()
         {
-            var root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, Slot);
+            XivDependencyRootInfo root;
+            if(Slot == PMPEquipSlot.Hair)
+            {
+                var race = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
+                root = new XivDependencyRootInfo()
+                {
+                    PrimaryType = XivItemType.human,
+                    PrimaryId = race.GetRaceCodeInt(),
+                    SecondaryType = XivItemType.hair,
+                    SecondaryId = SetId,
+                };
+            } else if(Slot == PMPEquipSlot.Face)
+            {
+                var race = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
+                root = new XivDependencyRootInfo()
+                {
+                    PrimaryType = XivItemType.human,
+                    PrimaryId = race.GetRaceCodeInt(),
+                    SecondaryType = XivItemType.face,
+                    SecondaryId = SetId,
+                };
+            } else
+            {
+                root = PMPExtensions.GetRootFromPenumbraValues(PMPObjectType.Equipment, SetId, PMPObjectType.Unknown, 0, Slot);
+            }
             return new XivDependencyRoot(root);
         }
         public void ApplyToMetadata(ItemMetadata metadata)
@@ -237,7 +262,7 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
             var rg = PMPExtensions.GetPMPRaceGenderFromXivRace(entry.Race);
-            var slot = PMPExtensions.PenumbraSlotToGameSlot.First(x => x.Value == gameSlot).Key;
+            var slot = PMPExtensions.PenumbraSlotToGameSlot.FirstOrDefault(x => x.Value == gameSlot).Key;
             var setId = (uint)entry.SetId;
 
             var est = new PMPEstManipulationJson()

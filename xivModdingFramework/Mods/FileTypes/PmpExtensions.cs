@@ -155,6 +155,10 @@ namespace xivModdingFramework.Mods.FileTypes
         ChestHands = 22,
         Nothing = 23,
         All = 24, // Not officially existing
+
+        // Penumbra writes these as some other Enum internally I think, but they're still functionally valid.
+        Face = 200,
+        Hair = 201,
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum PMPRspAttribute : byte
@@ -266,7 +270,11 @@ namespace xivModdingFramework.Mods.FileTypes
             { PMPEquipSlot.Wrists, "wrs" },
             { PMPEquipSlot.RFinger, "rir" },
             { PMPEquipSlot.LFinger, "ril" },
+
+            { PMPEquipSlot.Face, "fac" },
+            { PMPEquipSlot.Hair, "hir" },
         };
+
         // We only really care about the ones used in IMC entries here.
         public static bool IsAccessory(PMPEquipSlot slot)
         {
