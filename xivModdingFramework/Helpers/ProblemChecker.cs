@@ -47,7 +47,7 @@ namespace xivModdingFramework.Helpers
         /// <exception cref="Exception"></exception>
         public static async Task ResetAllGameFiles(DirectoryInfo backupsDirectory, IProgress<string> progress = null)
         {
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 if (!Dat.AllowDatAlteration)
                 {
@@ -59,69 +59,66 @@ namespace xivModdingFramework.Helpers
                 XivCache.CacheWorkerEnabled = false;
                 try
                 {
-                    await Task.Run(async () =>
+                    progress?.Report("Restoring index file backups...");
+                    try
                     {
-                        progress?.Report("Restoring index file backups...");
+                        // Try restoring the indexes FIRST.
+                        RestoreIndexBackups(backupsDirectory.FullName);
+                    }
+                    catch (Exception ex)
+                    {
                         try
                         {
-                            // Try restoring the indexes FIRST.
-                            RestoreIndexBackups(backupsDirectory.FullName);
-                        }
-                        catch (Exception ex)
-                        {
-                            try
+                            // Index backup failed for some reason.
+                            // Try at least deleting all existing mods.
+                            using (var tx = ModTransaction.BeginTransaction(true))
                             {
-                                // Index backup failed for some reason.
-                                // Try at least deleting all existing mods.
-                                using (var tx = ModTransaction.BeginTransaction(true))
-                                {
-                                    progress?.Report("Index restore failed, attempting to delete all mods instead...");
-                                    await Modding.SetAllModStates(EModState.UnModded, null, tx);
-                                    await ModTransaction.CommitTransaction(tx);
+                                progress?.Report("Index restore failed, attempting to delete all mods instead...");
+                                await Modding.SetAllModStates(EModState.UnModded, null, tx);
+                                await ModTransaction.CommitTransaction(tx);
 
-                                    // Wait for anything listening to the TX events to do its thing.
-                                    await Task.Delay(3000);
-                                }
-                            }
-                            catch (Exception ex2)
-                            {
-                                // Hard failure.
-                                throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Delete all mods.");
+                                // Wait for anything listening to the TX events to do its thing.
+                                await Task.Delay(3000);
                             }
                         }
-
-                        progress?.Report("Deleting modded dat files...");
-
-
-                        // Delete modded dat files
-                        foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
+                        catch (Exception ex2)
                         {
-                            var datFiles = Dat.GetModdedDatList(xivDataFile);
-
-                            foreach (var datFile in datFiles)
-                            {
-                                File.Delete(datFile);
-                            }
+                            // Hard failure.
+                            throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Delete all mods.");
                         }
+                    }
 
-                        // If for some reason our DAT counts don't match up, update them.
-                        Index.UNSAFE_NormalizeAllIndexDatCounts();
+                    progress?.Report("Deleting modded dat files...");
 
-                        progress?.Report("Cleaning up mod list...");
 
-                        var modListDirectory = new DirectoryInfo(Path.Combine(XivCache.GameInfo.GameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+                    // Delete modded dat files
+                    foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
+                    {
+                        var datFiles = Dat.GetModdedDatList(xivDataFile);
 
-                        // Delete mod list
-                        File.Delete(modListDirectory.FullName);
-
-                        Modding.CreateModlist();
-
-                        progress?.Report("Rebuilding Cache...");
-
-                        await Task.Run(async () =>
+                        foreach (var datFile in datFiles)
                         {
-                            XivCache.RebuildCache(XivCache.CacheVersion);
-                        });
+                            File.Delete(datFile);
+                        }
+                    }
+
+                    // If for some reason our DAT counts don't match up, update them.
+                    Index.UNSAFE_NormalizeAllIndexDatCounts();
+
+                    progress?.Report("Cleaning up mod list...");
+
+                    var modListDirectory = new DirectoryInfo(Path.Combine(XivCache.GameInfo.GameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+
+                    // Delete mod list
+                    File.Delete(modListDirectory.FullName);
+
+                    Modding.CreateModlist();
+
+                    progress?.Report("Rebuilding Cache...");
+
+                    await Task.Run(async () =>
+                    {
+                        XivCache.RebuildCache(XivCache.CacheVersion);
                     });
                 }
                 finally
