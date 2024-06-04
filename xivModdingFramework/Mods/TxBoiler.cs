@@ -1,6 +1,8 @@
 ﻿using SharpDX.Direct2D1.Effects;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Mods.DataContainers;
@@ -143,7 +145,7 @@ namespace xivModdingFramework.Mods
         }
 
 
-        public static TxBoiler BeginWrite(ref ModTransaction tx, bool doBatch = true, ModPack? modpack = null)
+        public static TxBoiler BeginWrite(ref ModTransaction tx, bool doBatch = true, ModPack? modpack = null, bool throwawayTx = false)
         {
             var ownTx = false;
             ModPack? originalModpack = null;
@@ -151,7 +153,20 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 ownTx = true;
-                tx = ModTransaction.BeginTransaction(true, modpack);
+                ModTransactionSettings? settings = null;
+                if (throwawayTx)
+                {
+                    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    Directory.CreateDirectory(tempPath);
+                    settings = new ModTransactionSettings()
+                    {
+                        StorageType = SqPack.FileTypes.EFileStorageType.UncompressedIndividual,
+                        Target = ETransactionTarget.FolderTree,
+                        TargetPath = tempPath,
+                        Unsafe = false,
+                    };
+                }
+                tx = ModTransaction.BeginTransaction(true, modpack, settings);
             }
             else
             {

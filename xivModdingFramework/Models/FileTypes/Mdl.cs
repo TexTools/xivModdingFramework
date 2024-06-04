@@ -1847,21 +1847,22 @@ namespace xivModdingFramework.Models.FileTypes
             // Resolve the current (and possibly modded) Mdl.
             XivMdl currentMdl = null;
             XivMdl originalMdl = null;
-            try
+
+            if (await tx.FileExists(internalPath, true))
             {
-                // Load the base game model.
-                // This is used for some model modifier options and the like.
-                // Some paths may not actually use this(?)
-                originalMdl = await GetXivMdl(internalPath, true, tx);
-            }
-            catch
-            {
-                throw new Exception("Unable to load base MDL file.");
+                try
+                {
+                    originalMdl = await GetXivMdl(internalPath, false, tx);
+                }
+                catch
+                {
+                    originalMdl = null;
+                }
             }
 
             try
             {
-                if (mod != null)
+                if (mod != null && await tx.FileExists(internalPath, false))
                 {
                     // If we have a modded base, we need to load that as well.
                     currentMdl = await GetXivMdl(internalPath, false, tx);
@@ -1877,6 +1878,11 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             byte[] bytes = null;
+
+            if(currentMdl == null)
+            {
+                throw new Exception("Unable to locate a base MDL to use during import.");
+            }
 
             // Wrapping this in an await ensures we're run asynchronously on a new thread.
             await Task.Run(async () =>
