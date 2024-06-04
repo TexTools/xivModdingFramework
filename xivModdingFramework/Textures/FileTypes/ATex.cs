@@ -56,6 +56,10 @@ namespace xivModdingFramework.Textures.FileTypes
         }
         public static async Task<List<string>> GetAtexPaths(string vfxPath, bool forceOriginal = false, ModTransaction tx = null)
         {
+            if (!IOUtil.IsFFXIVInternalPath(vfxPath))
+            {
+                return new List<string>();
+            }
             var df = IOUtil.GetDataFileFromPath(vfxPath);
             if(tx == null)
             {
