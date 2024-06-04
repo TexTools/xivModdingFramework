@@ -923,7 +923,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     foreach (var tex in itemXivMtrl.Textures)
                     {
-                        tex.TexturePath = itemXivMtrl.DetokenizePath(tex.TexturePath, mtrl.ResolveFullUsage(tex));
+                        tex.TexturePath = itemXivMtrl.DetokenizePath(tex.TexturePath, tex);
                     }
 
                     // Write the new Material

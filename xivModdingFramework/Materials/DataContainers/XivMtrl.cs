@@ -540,14 +540,14 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <param name="path"></param>
         /// <param name="usage"></param>
         /// <returns></returns>
-        public string DetokenizePath(string path, XivTexType usage)
+        public string DetokenizePath(string path, MtrlTexture texture)
         {
             var rootPath = GetTextureRootDirectoy();
 
             // No path, assign it by default.
             if (path == "")
             {
-                path = rootPath + "/" + GetDefaultTexureName(usage);
+                path = rootPath + "/" + GetDefaultTexureName(ResolveFullUsage(texture));
                 return path;
             }
             var variantString = GetVariantString();
