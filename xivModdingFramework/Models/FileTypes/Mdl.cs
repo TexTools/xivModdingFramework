@@ -5186,19 +5186,26 @@ namespace xivModdingFramework.Models.FileTypes
                 return;
             }
 
-            if(boneRefs.Count > 10 || boneRefs.Any(x => x.BoneCount > 64 || x.BoneCount < 0))
+            if (boneRefs.Count > 10 || boneRefs.Any(x => x.BoneCount > 64 || x.BoneCount < 0))
             {
-                throw new InvalidDataException("Failed to retrieve v5 model bone count information.");
-            }
+                // Something went wrong, try to v6 Updgrade the file.
+                var ttMdl = await GetTTModel(path, false, tx);
+                var xivMdl = await GetXivMdl(path, false, tx);
+                ttMdl.MdlVersion = 6;
 
-            using (var ms = new MemoryStream(uncomp))
+                uncomp = await MakeCompressedMdlFile(ttMdl, xivMdl);
+            }
+            else
             {
-                using (var bw = new BinaryWriter(ms))
+                using (var ms = new MemoryStream(uncomp))
                 {
-                    foreach(var b in boneRefs)
+                    using (var bw = new BinaryWriter(ms))
                     {
-                        bw.BaseStream.Seek(b.Offset, SeekOrigin.Begin);
-                        bw.Write(BitConverter.GetBytes(64));
+                        foreach (var b in boneRefs)
+                        {
+                            bw.BaseStream.Seek(b.Offset, SeekOrigin.Begin);
+                            bw.Write(BitConverter.GetBytes(64));
+                        }
                     }
                 }
             }
