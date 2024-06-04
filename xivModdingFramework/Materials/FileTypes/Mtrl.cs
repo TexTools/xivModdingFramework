@@ -1144,7 +1144,7 @@ namespace xivModdingFramework.Materials.FileTypes
             foreach (var mtrl in materials)
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
-                await FixPreDawntrailMaterial(mtrl, source, true, tx);
+                await UpdateEndwalkerMaterial(mtrl, source, true, tx);
                 i++;
             }
 
@@ -1189,7 +1189,7 @@ namespace xivModdingFramework.Materials.FileTypes
             return false;
         }
 
-        public static async Task FixPreDawntrailMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null)
+        public static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null)
         {
             if (!createTextures)
             {
@@ -1388,6 +1388,12 @@ namespace xivModdingFramework.Materials.FileTypes
                     SamplerIdRaw = 1449103320,
                 };
                 mtrl.Textures.Add(tex);
+            }
+
+            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
+            if(specTex != null)
+            {
+                specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
             }
 
             await ImportMtrl(mtrl, null, source, false, tx);

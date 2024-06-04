@@ -857,7 +857,7 @@ namespace xivModdingFramework.Materials.DataContainers
         }
 
         /// <summary>
-        /// Bytes 4-10 of the Sampler Settings
+        /// Bits 4-10 of the Sampler Settings
         /// Unknown Usage, but sometimes have actual values.
         /// </summary>
         public byte SamplerSettingsLowUnknown
