@@ -183,9 +183,28 @@ namespace xivModdingFramework.Helpers
             }
 
             var basePath = XivCache.GameInfo.GameDirectory.Parent.FullName;
+            var validParents = new List<string>()
+            {
+                "ffxiv",
+                "ex1",
+                "ex2",
+                "ex3",
+                "ex4",
+                "ex5",
+                "ex6",
+                "ex7",
+                "ex8",
+                "ex9",
+            };
             foreach(var backup in backups)
             {
-                var target = Path.GetFullPath(Path.Combine(basePath, new DirectoryInfo(backup).Parent.ToString(), Path.GetFileName(backup)));
+                var parPath = new DirectoryInfo(backup).Parent.ToString();
+                if (!validParents.Contains(parPath))
+                {
+                    continue;
+                }
+
+                var target = Path.GetFullPath(Path.Combine(basePath, parPath, Path.GetFileName(backup)));
                 File.Copy(backup, target, true);
 
             }
