@@ -1083,7 +1083,7 @@ namespace xivModdingFramework.Models.Helpers
 
                 loggingFunction(false, "Attempting to deform model...");
 
-                var def = await Mdl.GetDeformationMatrices(targetRace, tx);
+                var def = await PDB.GetDeformationMatrices(targetRace, tx);
 
 
 
