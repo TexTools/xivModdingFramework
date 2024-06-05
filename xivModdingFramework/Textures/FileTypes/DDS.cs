@@ -232,7 +232,7 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(pfFlags));
 
             uint dwFourCC = GetDDSType(format);
-            if (layers > 1 || dwFourCC == 0)
+            if (layers > 1 || (dwFourCC == 0 && format != XivTexFormat.A8R8G8B8))
             {
                 dwFourCC = _DX10;
             }
