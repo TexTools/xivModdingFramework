@@ -56,6 +56,11 @@ using static xivModdingFramework.Cache.XivCache;
 using System.Security.Cryptography;
 using System.Runtime.CompilerServices;
 using System.Security.Policy;
+using SharpDX.Toolkit.Graphics;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Tga;
+using SixLabors.ImageSharp.Formats;
+using Image = SixLabors.ImageSharp.Image;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -5149,6 +5154,51 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             return ret;
+        }
+
+
+
+        public static async Task ExportAllTextures(TTModel model, string targetFolder, int materialSet = 1, ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            var root = await XivCache.GetFirstRoot(model.Source);
+
+            var materials = await GetReferencedMaterialPaths(model.Materials, model.Source, materialSet, false, true, tx);
+
+            if (root != null)
+            {
+                materials = root.GetVariantShiftedMaterials(materials, materialSet).ToList();
+            }
+
+            HashSet<string> textures = new HashSet<string>();
+            foreach (var mt in materials) {
+                textures.UnionWith(await Mtrl.GetTexturePathsFromMtrlPath(mt, false, false, tx));
+            }
+
+            Directory.CreateDirectory(targetFolder);
+            foreach(var tex in textures)
+            {
+                var path = Path.Combine(targetFolder, Path.GetFileNameWithoutExtension(tex) + ".png");
+
+                IImageEncoder encoder;
+                encoder = new PngEncoder()
+                {
+                        BitDepth = PngBitDepth.Bit16,
+                };
+
+                var xTex = await Tex.GetXivTex(tex, false, tx);
+
+                var pixData = await xTex.GetRawPixels();
+                using (var img = Image.LoadPixelData<Rgba32>(pixData, xTex.Width, xTex.Height))
+                {
+                    img.Save(path, encoder);
+                }
+            }
         }
 
         #endregion
