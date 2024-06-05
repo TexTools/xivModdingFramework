@@ -29,6 +29,7 @@ using Index = xivModdingFramework.SqPack.FileTypes.Index;
 using xivModdingFramework.Mods.Enums;
 using System.Diagnostics;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.DataContainers;
 
 namespace xivModdingFramework.Helpers
 {
@@ -176,6 +177,23 @@ namespace xivModdingFramework.Helpers
                 return false;
             }
 
+            // Backups must include the Chara index backup as we use it in validation.
+            var charaIndex2Backup = backups.FirstOrDefault(x => x.EndsWith(Path.Combine("ffxiv","040000.win32.index2")));
+            if (charaIndex2Backup == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                AssertIndexIsClean(charaIndex2Backup, XivDataFile._04_Chara);
+            }
+            catch(Exception ex)
+            {
+                Trace.WriteLine(ex);
+                return false;
+            }
+
             return true;
         }
 
@@ -192,20 +210,9 @@ namespace xivModdingFramework.Helpers
                 throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
             }
 
-            var currentVersion = XivCache.GameInfo.GameVersion;
-            var backupFile = Path.Combine(backupDirectory, GameInfo.GameVersionFileName);
-            var backupVersion = GameInfo.ReadVersionFile(backupFile);
-
-            if(currentVersion != backupVersion)
+            if (!AreBackupsValid(backupDirectory))
             {
-                throw new InvalidDataException("Index Backups FFXIV Version does not match current FFXIV Version");
-            }
-
-
-            var backups = GetAvailableIndexBackups(backupDirectory);
-            if(backups.Count == 0)
-            {
-                throw new FileNotFoundException("No Index Backups found to restore.");
+                throw new Exception("Cannot restore Index Backups when Index Backups are missing, from another FFXIV version, or invalid.");
             }
 
             var basePath = XivCache.GameInfo.GameDirectory.Parent.FullName;
@@ -222,7 +229,9 @@ namespace xivModdingFramework.Helpers
                 "ex8",
                 "ex9",
             };
-            foreach(var backup in backups)
+
+            var backups = GetAvailableIndexBackups(backupDirectory);
+            foreach (var backup in backups)
             {
                 var parPath = new DirectoryInfo(backup).Parent.ToString();
                 if (!validParents.Contains(parPath))
@@ -369,14 +378,31 @@ namespace xivModdingFramework.Helpers
             });
         }
 
-        public static async Task AssertIndexIsClean(XivDataFile df)
+        public static void AssertIndexIsClean(string index2Path, XivDataFile datafile)
+        {
+            var offsets = IndexFile.GetOffsetsFromRawIndex2File(index2Path);
+            var originalList = Dat.GetOriginalDatList(datafile);
+            var maxSafeDat = originalList.Count;
+
+            foreach (var offset in offsets)
+            {
+                var parts = IOUtil.Offset8xToParts(offset);
+
+                if (parts.DatNum > maxSafeDat)
+                {
+                    throw new InvalidDataException("The given index references modded data files.");
+                }
+            }
+        }
+
+        public static async Task AssertIndexIsClean(XivDataFile dataFile)
         {
             var rtx = ModTransaction.BeginTransaction();
             var iFile = await rtx.GetIndexFile(XivDataFile._04_Chara);
 
             var offsets = iFile.GetAllIndex2Offsets();
 
-            var originalList = Dat.GetOriginalDatList(df);
+            var originalList = Dat.GetOriginalDatList(dataFile);
             var maxSafeDat = originalList.Count;
 
             foreach(var offset in offsets)

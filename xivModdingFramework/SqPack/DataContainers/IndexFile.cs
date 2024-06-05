@@ -75,6 +75,11 @@ namespace xivModdingFramework.SqPack.DataContainers
         public readonly XivDataFile DataFile;
 
 
+        private IndexFile()
+        {
+
+        }
+
         /// <summary>
         /// Standard constructor.
         /// </summary>
@@ -210,6 +215,27 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             // Skip past the hash.
             br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+        }
+
+        /// <summary>
+        /// Retrieves just the raw indexes from an index2 file at the given file system path.
+        /// Used in validating index backups.
+        /// </summary>
+        /// <param name="index2Path"></param>
+        /// <returns></returns>
+        internal static List<long> GetOffsetsFromRawIndex2File(string index2Path)
+        {
+            var offsets = new List<long>();
+            IndexFile i = new IndexFile();
+            using(var fs = new FileStream(index2Path, FileMode.Open, FileAccess.Read))
+            {
+                using(var br = new BinaryReader(fs))
+                {
+                    i.ReadIndexFile(br, 1);
+                }
+            }
+
+            return i.Index2Entries.Select(x => x.Value.DataOffset).ToList();
         }
 
         protected virtual void ReadSynTable(BinaryReader br, int indexId)
