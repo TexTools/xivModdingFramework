@@ -50,6 +50,16 @@ namespace xivModdingFramework.Models.FileTypes
         }
         public const string BoneDeformFile = "chara/xls/bonedeformer/human.pbd";
 
+        public static async Task<BoneDeformSet> GetBoneDeformSet(XivRace race, ModTransaction tx = null)
+        {
+            return await GetBoneDeformSet((ushort)race.GetRaceCodeInt());
+        }
+        public static async Task<BoneDeformSet> GetBoneDeformSet(ushort raceCode, ModTransaction tx = null)
+        {
+            var sets = await GetBoneDeformSets(tx);
+
+            return sets.FirstOrDefault(x => x.Value.RaceId == raceCode).Value;
+        }
         public static async Task<Dictionary<ushort, BoneDeformSet>> GetBoneDeformSets(ModTransaction tx = null)
         {
             if(tx == null)

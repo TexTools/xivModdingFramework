@@ -55,6 +55,7 @@ using System.Data.SQLite;
 using static xivModdingFramework.Cache.XivCache;
 using System.Security.Cryptography;
 using System.Runtime.CompilerServices;
+using System.Security.Policy;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -1941,7 +1942,7 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 // Apply our Model Modifier options to the model.
-                options.Apply(ttModel, currentMdl, originalMdl);
+                await options.Apply(ttModel, currentMdl, originalMdl);
 
 
                 // Call the user function, if one was provided.
@@ -4028,31 +4029,30 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
+        public class DeformationCollection
+        {
+            public Dictionary<string, Matrix> Deformations = new Dictionary<string, Matrix>();
+            public Dictionary<string, Matrix> InvertedDeformations = new Dictionary<string, Matrix>();
+            public Dictionary<string, Matrix> NormalDeformations = new Dictionary<string, Matrix>();
+            public Dictionary<string, Matrix> InvertedNormalDeformations = new Dictionary<string, Matrix>();
+
+        }
+
         /// <summary>
-        /// Loads the deformation files for attempting racial deformation
-        /// Currently in debugging phase.
-        /// 
-        /// NOTE: NOT Transaction safe... If the skeleton files were altered during transaction.
-        /// Which seems rare enough to not follow up on this at the moment.
+        /// Loads the deformation files for attempting racial deformation.
         /// </summary>
         /// <param name="race"></param>
         /// <param name="deformations"></param>
         /// <param name="recalculated"></param>
-        public static void GetDeformationMatrices(XivRace race, out Dictionary<string, Matrix> deformations, out Dictionary<string, Matrix> invertedDeformations, out Dictionary<string, Matrix> normalDeformations, out Dictionary<string, Matrix> invertedNormalDeformations)
+        public static async Task<DeformationCollection> GetDeformationMatrices(XivRace race, ModTransaction tx = null)
         {
-            deformations = new Dictionary<string, Matrix>();
-            invertedDeformations = new Dictionary<string, Matrix>();
-            normalDeformations = new Dictionary<string, Matrix>();
-            invertedNormalDeformations = new Dictionary<string, Matrix>();
+            var ret = new DeformationCollection();
 
+            var deformSet = await PDB.GetBoneDeformSet(race, tx);
 
-            var deformFile = "Skeletons/c" + race.GetRaceCode() + "_deform.json";
-            var deformationLines = File.ReadAllLines(deformFile);
-            string deformationJson = deformationLines[0];
-            var deformationData = JsonConvert.DeserializeObject<DeformationBoneSet>(deformationJson);
-            foreach (var set in deformationData.Data)
+            foreach (var set in deformSet.Deforms)
             {
-                deformations.Add(set.Name, new Matrix(set.Matrix));
+                ret.Deformations.Add(set.Value.Name, new Matrix(set.Value.Matrix));
             }
 
             var skelName = "c" + race.GetRaceCode();
@@ -4088,57 +4088,58 @@ namespace xivModdingFramework.Models.FileTypes
 
             var root = FullSkel["n_root"];
 
-            BuildNewTransfromMatrices(root, FullSkel, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
+            BuildNewTransfromMatrices(root, FullSkel, ret);
+            return ret;
         }
-        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, Dictionary<string, Matrix> deformations, Dictionary<string, Matrix> invertedDeformations, Dictionary<string, Matrix> normalDeformations, Dictionary<string, Matrix> invertedNormalDeformations)
+        private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, DeformationCollection def)
         {
             if (node.BoneParent == -1)
             {
-                if (!deformations.ContainsKey(node.BoneName))
+                if (!def.Deformations.ContainsKey(node.BoneName))
                 {
-                    deformations.Add(node.BoneName, Matrix.Identity);
+                    def.Deformations.Add(node.BoneName, Matrix.Identity);
                 }
-                invertedDeformations.Add(node.BoneName, Matrix.Identity);
-                normalDeformations.Add(node.BoneName, Matrix.Identity);
-                invertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
+                def.InvertedDeformations.Add(node.BoneName, Matrix.Identity);
+                def.NormalDeformations.Add(node.BoneName, Matrix.Identity);
+                def.InvertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
             }
             else
             {
-                if (deformations.ContainsKey(node.BoneName))
+                if (def.Deformations.ContainsKey(node.BoneName))
                 {
-                    invertedDeformations.Add(node.BoneName, deformations[node.BoneName].Inverted());
+                    def.InvertedDeformations.Add(node.BoneName, def.Deformations[node.BoneName].Inverted());
 
-                    var normalMatrix = deformations[node.BoneName].Inverted();
+                    var normalMatrix = def.Deformations[node.BoneName].Inverted();
                     normalMatrix.Transpose();
-                    normalDeformations.Add(node.BoneName, normalMatrix);
+                    def.NormalDeformations.Add(node.BoneName, normalMatrix);
 
-                    var invertexNormalMatrix = deformations[node.BoneName].Inverted();
+                    var invertexNormalMatrix = def.Deformations[node.BoneName].Inverted();
                     normalMatrix.Transpose();
                     invertexNormalMatrix.Invert();
-                    invertedNormalDeformations.Add(node.BoneName, invertexNormalMatrix);
+                    def.InvertedNormalDeformations.Add(node.BoneName, invertexNormalMatrix);
 
                 }
                 else
                 {
                     if (!skeletonData.ContainsKey(node.BoneName))
                     {
-                        deformations[node.BoneName] = Matrix.Identity;
-                        invertedDeformations[node.BoneName] = Matrix.Identity;
-                        normalDeformations[node.BoneName] = Matrix.Identity;
-                        invertedNormalDeformations[node.BoneName] = Matrix.Identity;
+                        def.Deformations[node.BoneName] = Matrix.Identity;
+                        def.InvertedDeformations[node.BoneName] = Matrix.Identity;
+                        def.NormalDeformations[node.BoneName] = Matrix.Identity;
+                        def.InvertedNormalDeformations[node.BoneName] = Matrix.Identity;
                     }
                     else
                     {
                         var skelEntry = skeletonData[node.BoneName];
                         while (skelEntry != null)
                         {
-                            if (deformations.ContainsKey(skelEntry.BoneName))
+                            if (def.Deformations.ContainsKey(skelEntry.BoneName))
                             {
                                 // This parent has a deform.
-                                deformations[node.BoneName] = deformations[skelEntry.BoneName];
-                                invertedDeformations[node.BoneName] = invertedDeformations[skelEntry.BoneName];
-                                normalDeformations[node.BoneName] = normalDeformations[skelEntry.BoneName];
-                                invertedNormalDeformations[node.BoneName] = invertedNormalDeformations[skelEntry.BoneName];
+                                def.Deformations[node.BoneName] = def.Deformations[skelEntry.BoneName];
+                                def.InvertedDeformations[node.BoneName] = def.InvertedDeformations[skelEntry.BoneName];
+                                def.NormalDeformations[node.BoneName] = def.NormalDeformations[skelEntry.BoneName];
+                                def.InvertedNormalDeformations[node.BoneName] = def.InvertedNormalDeformations[skelEntry.BoneName];
                                 break;
                             }
 
@@ -4148,10 +4149,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (skelEntry == null)
                         {
-                            deformations[node.BoneName] = Matrix.Identity;
-                            invertedDeformations[node.BoneName] = Matrix.Identity;
-                            normalDeformations[node.BoneName] = Matrix.Identity;
-                            invertedNormalDeformations[node.BoneName] = Matrix.Identity;
+                            def.Deformations[node.BoneName] = Matrix.Identity;
+                            def.InvertedDeformations[node.BoneName] = Matrix.Identity;
+                            def.NormalDeformations[node.BoneName] = Matrix.Identity;
+                            def.InvertedNormalDeformations[node.BoneName] = Matrix.Identity;
                         }
                     }
                 }
@@ -4159,7 +4160,7 @@ namespace xivModdingFramework.Models.FileTypes
             var children = skeletonData.Where(x => x.Value.BoneParent == node.BoneNumber);
             foreach (var c in children)
             {
-                BuildNewTransfromMatrices(c.Value, skeletonData, deformations, invertedDeformations, normalDeformations, invertedNormalDeformations);
+                BuildNewTransfromMatrices(c.Value, skeletonData, def);
             }
         }
 
@@ -4807,7 +4808,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (originalRace != newRace)
                 {
                     // Convert the model to the new race.
-                    ModelModifiers.RaceConvert(model, originalRace, newPath);
+                    await ModelModifiers.RaceConvert(model, originalRace, newPath);
                     ModelModifiers.FixUpSkinReferences(model, newPath);
                 }
 
@@ -5125,7 +5126,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mainRace != mergeInRace)
                 {
                     // Convert the model to the new race.
-                    ModelModifiers.RaceConvert(mergeInModel, mainRace, mainModel.Source);
+                    await ModelModifiers.RaceConvert(mergeInModel, mainRace, mainModel.Source);
                 }
 
                 // Merging the actual models is the simplest part of this whole affair...

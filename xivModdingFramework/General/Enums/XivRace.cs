@@ -234,7 +234,7 @@ namespace xivModdingFramework.General.Enums
 #if DAWNTRAIL
             dict.Add(XivRace.Hrothgar_Female, new XivRaceNode()
             {
-                Parent = dict[XivRace.Elezen_Female],
+                Parent = dict[XivRace.Hyur_Midlander_Female],
                 Race = XivRace.Hrothgar_Female,
                 Children = new List<XivRaceNode>(),
                 HasSkin = true
@@ -966,6 +966,10 @@ namespace xivModdingFramework.General.Enums
                         XivRace.Elezen_Female_NPC,
                         XivRace.Roegadyn_Female,
                         XivRace.Roegadyn_Female_NPC,
+#if DAWNTRAIL
+                        XivRace.Hrothgar_Female,
+                        XivRace.Hrothgar_Female_NPC,
+#endif
 
                         // Lala ? 
                         XivRace.Lalafell_Male,

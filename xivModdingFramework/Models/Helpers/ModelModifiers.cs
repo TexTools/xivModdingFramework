@@ -83,7 +83,7 @@ namespace xivModdingFramework.Models.Helpers
         /// originalMdl is optional as it's only used when copying shape data.
         /// </summary>
         /// <param name="ttModel"></param>
-        public void Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null)
+        public async Task Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null)
         {
             if (LoggingFunction == null)
             {
@@ -141,7 +141,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot racially convert from null MDL.");
                 }
-                ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, LoggingFunction);
+                await ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, LoggingFunction);
             }
 
             // We need to load the original unmodified model to get the shape data.
@@ -972,7 +972,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="model"></param>
         /// <param name="originalRace"></param>
         /// <param name="loggingFunction"></param>
-        public static void RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null)
+        public static async Task RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
@@ -999,7 +999,7 @@ namespace xivModdingFramework.Models.Helpers
 
                 try
                 {
-                    RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction);
+                    await RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction);
                 }
                 finally
                 {
@@ -1022,7 +1022,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="targetRace"></param>
         /// <param name="originalRace"></param>
         /// <param name="loggingFunction"></param>
-        private static void RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction)
+        private static async Task RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction)
         {
             try
             {
@@ -1031,30 +1031,30 @@ namespace xivModdingFramework.Models.Helpers
                 // [ Current > (apply deform) > Target ]
                 if (originalRace.IsDirectParentOf(targetRace))
                 {
-                    ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction);
                 }
                 // Target race is parent node of Current race
                 // Convert to parent (invert deform)
                 // [ Current > (apply inverse deform) > Target ]
                 else if (targetRace.IsDirectParentOf(originalRace))
                 {
-                    ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
                 }
                 // Current race is not parent of Target Race and Current race has parent
                 // Make a recursive call with the current races parent race
                 // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
                 else if (originalRace.GetNode().Parent != null)
                 {
-                    ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
-                    RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
+                    await RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
                 }
                 // Current race has no parent
                 // Make a recursive call with the target races parent race
                 // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
                 else
                 {
-                    ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
-                    RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
+                    await RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
                 }
             }
             catch (Exception ex)
@@ -1072,7 +1072,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="model"></param>
         /// <param name="targetRace"></param>
         /// <param name="loggingFunction"></param>
-        public static void ApplyRacialDeform(TTModel model, XivRace targetRace, bool invert = false, Action<bool, string> loggingFunction = null)
+        public static async Task ApplyRacialDeform(TTModel model, XivRace targetRace, bool invert = false, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             try
             {
@@ -1083,8 +1083,7 @@ namespace xivModdingFramework.Models.Helpers
 
                 loggingFunction(false, "Attempting to deform model...");
 
-                Dictionary<string, Matrix> deformations, inverted, normalmatrixes, invertednormalmatrixes;
-                Mdl.GetDeformationMatrices(targetRace, out deformations, out inverted, out normalmatrixes, out invertednormalmatrixes);
+                var def = await Mdl.GetDeformationMatrices(targetRace, tx);
 
 
 
@@ -1095,7 +1094,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     foreach (var mBone in m.Bones)
                     {
-                        if (!deformations.ContainsKey(mBone))
+                        if (!def.Deformations.ContainsKey(mBone))
                         {
                             missingDeforms.Add(mBone);
                         }
@@ -1119,7 +1118,7 @@ namespace xivModdingFramework.Models.Helpers
                             var parent = dict.FirstOrDefault(x => x.Value.BoneNumber == dict[bone].BoneParent).Value;
 
                             // Walk up the tree until we find a parent with a deform.
-                            while(parent != null && !deformations.ContainsKey(parent.BoneName))
+                            while(parent != null && !def.Deformations.ContainsKey(parent.BoneName))
                             {
                                 parent = dict.FirstOrDefault(x => x.Value.BoneNumber == parent.BoneParent).Value;
                             }
@@ -1127,26 +1126,26 @@ namespace xivModdingFramework.Models.Helpers
                             if(parent != null)
                             {
                                 // Found a parent? use that bone's deforms.
-                                deformations[bone] = deformations[parent.BoneName];
-                                inverted[bone] = inverted[parent.BoneName];
-                                normalmatrixes[bone] = normalmatrixes[parent.BoneName];
-                                invertednormalmatrixes[bone] = invertednormalmatrixes[parent.BoneName];
+                                def.Deformations[bone] = def.Deformations[parent.BoneName];
+                                def.InvertedDeformations[bone] = def.InvertedDeformations[parent.BoneName];
+                                def.NormalDeformations[bone] = def.NormalDeformations[parent.BoneName];
+                                def.InvertedNormalDeformations[bone] = def.InvertedNormalDeformations[parent.BoneName];
                             } else
                             {
                                 // No Parent? No Deforms.
-                                deformations[bone] = Matrix.Identity;
-                                inverted[bone] = Matrix.Identity;
-                                normalmatrixes[bone] = Matrix.Identity;
-                                invertednormalmatrixes[bone] = Matrix.Identity;
+                                def.Deformations[bone] = Matrix.Identity;
+                                def.InvertedDeformations[bone] = Matrix.Identity;
+                                def.NormalDeformations[bone] = Matrix.Identity;
+                                def.InvertedNormalDeformations[bone] = Matrix.Identity;
                             }
                         }
                         else
                         {
                             // Bone doesn't exist in the skel, can't deform it.
-                            deformations[bone] = Matrix.Identity;
-                            inverted[bone] = Matrix.Identity;
-                            normalmatrixes[bone] = Matrix.Identity;
-                            invertednormalmatrixes[bone] = Matrix.Identity;
+                            def.Deformations[bone] = Matrix.Identity;
+                            def.InvertedDeformations[bone] = Matrix.Identity;
+                            def.NormalDeformations[bone] = Matrix.Identity;
+                            def.InvertedNormalDeformations[bone] = Matrix.Identity;
                         }
                     }
                 }
@@ -1176,13 +1175,13 @@ namespace xivModdingFramework.Models.Helpers
 
                                 var matrix = Matrix.Identity;
                                 var normalMatrix = Matrix.Identity;
-                                matrix = deformations[boneName];
-                                normalMatrix = normalmatrixes[boneName];
+                                matrix = def.Deformations[boneName];
+                                normalMatrix = def.NormalDeformations[boneName];
 
                                 if (invert)
                                 {
-                                    matrix = inverted[boneName];
-                                    normalMatrix = invertednormalmatrixes[boneName];
+                                    matrix = def.InvertedDeformations[boneName];
+                                    normalMatrix = def.InvertedNormalDeformations[boneName];
                                 }
 
 
@@ -1217,13 +1216,13 @@ namespace xivModdingFramework.Models.Helpers
 
                                     var matrix = Matrix.Identity;
                                     var normalMatrix = Matrix.Identity;
-                                    matrix = deformations[boneName];
-                                    normalMatrix = normalmatrixes[boneName];
+                                    matrix = def.Deformations[boneName];
+                                    normalMatrix = def.NormalDeformations[boneName];
 
                                     if (invert)
                                     {
-                                        matrix = inverted[boneName];
-                                        normalMatrix = invertednormalmatrixes[boneName];
+                                        matrix = def.InvertedDeformations[boneName];
+                                        normalMatrix = def.InvertedNormalDeformations[boneName];
                                     }
 
 
