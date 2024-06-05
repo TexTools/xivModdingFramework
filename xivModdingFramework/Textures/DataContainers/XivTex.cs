@@ -39,7 +39,7 @@ namespace xivModdingFramework.Textures.DataContainers
     /// that the file stemmed from that location, or that that is the only location 
     /// or even necessarily correct or only usage of the texture.
     /// </summary>
-    public class XivTex
+    public class XivTex : ICloneable
     {
         /// <summary>
         /// The Textures Format <see cref="XivTexFormat"/>
@@ -160,5 +160,13 @@ namespace xivModdingFramework.Textures.DataContainers
             return await DDS.ConvertPixelData(TexData, Width, Height, TextureFormat, layers, layer);
         }
 
+        public object Clone()
+        {
+            var tex = (XivTex) MemberwiseClone();
+            tex.TexData = (byte[]) TexData.Clone();
+
+            return tex;
+
+        }
     }
 }
