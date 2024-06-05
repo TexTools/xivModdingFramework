@@ -81,6 +81,8 @@ namespace xivModdingFramework.Models.Helpers
         /// <summary>
         /// Function to apply these options to a given model.
         /// originalMdl is optional as it's only used when copying shape data.
+        /// 
+        /// Transaction is only used for race conversions when reading the .PDB file.
         /// </summary>
         /// <param name="ttModel"></param>
         public async Task Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null, ModTransaction tx = null)
@@ -96,7 +98,7 @@ namespace xivModdingFramework.Models.Helpers
             }
 
 
-            if (CopyAttributes)
+            if (CopyAttributes && originalMdl != null)
             {
                 if(currentMdl == null)
                 {
@@ -106,7 +108,7 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.MergeAttributeData(ttModel, currentMdl, LoggingFunction);
             }
 
-            if (CopyMaterials)
+            if (CopyMaterials && originalMdl != null)
             {
                 if (currentMdl == null)
                 {
@@ -135,7 +137,7 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.ClearVAlpha(ttModel, LoggingFunction);
             }
 
-            if(SourceRace != XivRace.All_Races)
+            if(SourceRace != XivRace.All_Races && originalMdl != null)
             {
                 if (currentMdl == null)
                 {
@@ -145,7 +147,7 @@ namespace xivModdingFramework.Models.Helpers
             }
 
             // We need to load the original unmodified model to get the shape data.
-            if (UseOriginalShapeData)
+            if (UseOriginalShapeData && originalMdl != null)
             {
                 if (originalMdl == null)
                 {
@@ -162,7 +164,7 @@ namespace xivModdingFramework.Models.Helpers
                 }
             }
 
-            if (AutoScale)
+            if (AutoScale && originalMdl != null)
             {
                 if (originalMdl == null)
                 {

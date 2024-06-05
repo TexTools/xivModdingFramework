@@ -1904,12 +1904,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Probably could stand to push this out to its own function later.
                 var mdlPath = currentMdl.MdlPath;
 
-                loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
-                loggingFunction(false, "Starting Import of file: " + externalPath);
-
-                var suffix = externalPath == null || externalPath == "" ? null : Path.GetExtension(externalPath).ToLower().Substring(1);
                 TTModel ttModel = null;
-
 
                 // Loading and Running the actual Importers.
                 if (externalPath == null || externalPath == "")
@@ -1917,18 +1912,9 @@ namespace xivModdingFramework.Models.FileTypes
                     // If we were given no path, load the current model.
                     ttModel = await GetTTModel(internalPath);
                 }
-                else if (suffix == "db")
-                {
-                    // Raw already converted DB file, just load it.
-                    loggingFunction(false, "Loading intermediate file...");
-                    ttModel = TTModel.LoadFromFile(externalPath, loggingFunction);
-                }
                 else
                 {
-                    // External Importer converts the file to .db format.
-                    var dbFile = await RunExternalImporter(suffix, externalPath, loggingFunction);
-                    loggingFunction(false, "Loading intermediate file...");
-                    ttModel = TTModel.LoadFromFile(dbFile, loggingFunction, options);
+                    ttModel = await LoadExternalModel(externalPath, options, false);
                 }
                 #endregion
 
@@ -1981,6 +1967,61 @@ namespace xivModdingFramework.Models.FileTypes
             });
 
             return bytes;
+        }
+
+
+        /// <summary>
+        /// Performs the most basic load of an external file to TTModel.
+        /// </summary>
+        /// <param name="externalPath"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidDataException"></exception>
+        public static async Task<TTModel> LoadExternalModel(string externalPath, ModelImportOptions options = null, bool applyOptions = true)
+        {
+            if(options == null)
+            {
+                options = new ModelImportOptions();
+            }
+            var loggingFunction = options.LoggingFunction;
+            loggingFunction = loggingFunction == null ? NoOp : loggingFunction;
+            loggingFunction(false, "Starting Import of file: " + externalPath);
+
+            var suffix = externalPath == null || externalPath == "" ? null : Path.GetExtension(externalPath).ToLower().Substring(1);
+            TTModel ttModel = null;
+
+
+            if (suffix == "db")
+            {
+                // Raw already converted DB file, just load it.
+                loggingFunction(false, "Loading intermediate file...");
+                ttModel = TTModel.LoadFromFile(externalPath, loggingFunction);
+            }
+            else
+            {
+                // External Importer converts the file to .db format.
+                var dbFile = await RunExternalImporter(suffix, externalPath, loggingFunction);
+                loggingFunction(false, "Loading intermediate file...");
+                ttModel = TTModel.LoadFromFile(dbFile, loggingFunction, options);
+            }
+
+            if(ttModel == null)
+            {
+                throw new InvalidDataException("No importer found for the given file: " + externalPath);
+            }
+
+            var sane = TTModel.SanityCheck(ttModel, loggingFunction);
+            if (!sane)
+            {
+                throw new InvalidDataException("Model is corrupt or otherwise invalid.");
+            }
+
+            if (applyOptions)
+            {
+                await options.Apply(ttModel);
+            }
+
+            return ttModel;
         }
 
         /// <summary>
