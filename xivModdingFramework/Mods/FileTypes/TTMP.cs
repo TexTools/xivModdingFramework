@@ -903,7 +903,6 @@ namespace xivModdingFramework.Mods.FileTypes
             var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
-
             await Mtrl.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress);
 
             var idx = 0;
@@ -914,6 +913,9 @@ namespace xivModdingFramework.Mods.FileTypes
                 idx++;
                 await Mdl.UpdateEndwalkerModels(path, source, tx);
             }
+
+            progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
+            await Mtrl.CheckImportForOldHairJank(filePaths.ToList(), source, tx);
         }
 
         /// <summary>

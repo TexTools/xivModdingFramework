@@ -1147,7 +1147,6 @@ namespace xivModdingFramework.Materials.FileTypes
                 await UpdateEndwalkerMaterial(mtrl, source, true, tx);
                 i++;
             }
-
         }
 
         private const uint _OldShaderConstant1 = 0x36080AD0; // == 1
@@ -1457,10 +1456,16 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrl.ShaderConstants = constantBase.ShaderConstants;
             var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
 
+            await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx);
 
+            await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
+        }
+
+        private static async Task UpdateEndwalkerHairTextures(string normalPath, string maskPath, string source, ModTransaction tx)
+        {
             // Read normal file.
-            var normalTex = await Tex.GetXivTex(normalTexSampler.Dx11Path, false, tx);
-            var maskTex = await Tex.GetXivTex(maskTexSampler.Dx11Path, false, tx);
+            var normalTex = await Tex.GetXivTex(normalPath, false, tx);
+            var maskTex = await Tex.GetXivTex(maskPath, false, tx);
 
             // Resize to be same size.
             var data = await TextureHelpers.ResizeImages(normalTex, maskTex);
@@ -1477,9 +1482,8 @@ namespace xivModdingFramework.Materials.FileTypes
             maskData = Tex.DDSToUncompressedTex(maskData);
 
             // Write final files.
-            await Dat.WriteModFile(normalData, normalTexSampler.Dx11Path, source, null, tx, false);
-            await Dat.WriteModFile(maskData, maskTexSampler.Dx11Path, source, null, tx, false);
-            await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
+            await Dat.WriteModFile(normalData, normalPath, source, null, tx, false);
+            await Dat.WriteModFile(maskData, maskPath, source, null, tx, false);
         }
 
         private static Half[] GetDefaultColorsetRow()
@@ -1508,7 +1512,139 @@ namespace xivModdingFramework.Materials.FileTypes
             return row;
         }
 
+        // Resolves for old-style default hair textures.
+        private static Regex OldHairTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})h([0-9]{4})_hir_([ns])\\.tex");
+        private static Regex OldHairMaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})h([0-9]{4})_hir_a\\.mtrl");
+        private static string OldHairMaterialFormat = "chara/human/c{0}/obj/hair/h{1}/material/v0001/mt_c{0}h{1}_hir_a.mtrl";
+        private static string NewHairTextureFormat = "chara/human/c{0}/obj/hair/h{1}/texture/c{0}h{1}_hir_{2}.tex";
+
+        /// <summary>
+        /// This function does some jank analysis of inbound hair texture files,
+        /// automatically copying them to SE's new pathing /if/ they were included by themselves, without their 
+        /// associated default material.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <param name="source"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        internal static async Task CheckImportForOldHairJank(List<string> files, string source, ModTransaction tx)
+        {
+
+            var results = new Dictionary<int, Dictionary<int, List<(string Path, XivTexType TexType)>>>();
+
+            var materials = new List<(int Race, int Hair)>();
+            foreach(var file in files)
+            {
+                var matMatch = OldHairMaterialRegex.Match(file);
+                if (matMatch.Success)
+                {
+                    var rid = Int32.Parse(matMatch.Groups[1].Value);
+                    var hid = Int32.Parse(matMatch.Groups[2].Value);
+                    materials.Add((rid, hid));
+                    continue;
+                }
+
+                var match = OldHairTextureRegex.Match(file);
+                if (!match.Success) continue;
+
+                var raceId = Int32.Parse(match.Groups[1].Value);
+                var hairId = Int32.Parse(match.Groups[2].Value);
+                var tex = match.Groups[3].Value;
+                if (!results.ContainsKey(raceId))
+                {
+                    results.Add(raceId, new Dictionary<int, List<(string Path, XivTexType TexType)>>());
+                }
+
+                if (!results[raceId].ContainsKey(hairId))
+                {
+                    results[raceId].Add(hairId, new List<(string Path, XivTexType TexType)>());
+                }
+
+                var tt = tex == "n" ? XivTexType.Normal : XivTexType.Specular;
+
+                if (results[raceId][hairId].Any(x => x.TexType == tt))
+                {
+                    var prev = results[raceId][hairId].First(x => x.TexType == tt);
+                    if (prev.Path.Contains("--"))
+                    {
+                        // Dx11 wins out.
+                        continue;
+                    } else
+                    {
+                        results[raceId][hairId].RemoveAll(x => x.TexType == tt);
+                    }
+                }
+                results[raceId][hairId].Add((file, tt));
+            }
+
+            // Winnow list to only entries with both types, that also lack material files.
+            var races = results.Keys.ToList();
+            foreach(var r in races)
+            {
+                var hairs = results[r].Keys.ToList();
+                foreach(var h in hairs)
+                {
+                    if (results[r][h].Count < 2)
+                    {
+                        results[r].Remove(h);
+                    } else if(materials.Any(x => x.Hair == h && x.Race == r))
+                    {
+                        results[r].Remove(h);
+                    }
+                }
+
+                if (results[r].Count == 0)
+                {
+                    results.Remove(r);
+                }
+            }
+
+            if (results.Count == 0) return;
+
+            foreach(var rKv in results)
+            {
+                var race = rKv.Key.ToString("D4");
+                foreach(var hKv in rKv.Value)
+                {
+                    var hair = hKv.Key.ToString("D4");
+                    var material = string.Format(OldHairMaterialFormat, race, hair);
+                    if(!await tx.FileExists(material))
+                    {
+                        // Weird, but nothing to be done.
+                        continue;
+                    }
+                    var root = await XivCache.GetFirstRoot(material);
+                    IItem item = null;
+                    if (root != null)
+                    {
+                        item = root.GetFirstItem();
+                    }
+
+                    foreach (var tex in hKv.Value)
+                    {
+                        var suffix = tex.TexType == XivTexType.Normal ? "norm" : "mask";
+                        var newPath = string.Format(NewHairTextureFormat, race, hair, suffix);
+
+                        if (files.Contains(newPath))
+                        {
+                            continue;
+                        }
+
+                        await Dat.CopyFile(tex.Path, newPath, source, true, item, tx);
+                        files.Add(newPath);
+                    }
+
+                    var newNorm = string.Format(NewHairTextureFormat, race, hair, "norm");
+                    var newMask = string.Format(NewHairTextureFormat, race, hair, "mask");
+                    await UpdateEndwalkerHairTextures(newNorm, newMask, source, tx);
+                }
+            }
+        }
+
         #endregion
+
+
+
 
         #region Dynamic Material Path Resolution
 
