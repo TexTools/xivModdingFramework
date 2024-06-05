@@ -39,6 +39,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
         public XivRace SourceRace { get; set; }
+        public XivRace TargetRace { get; set; }
         public IItem ReferenceItem { get; set; }
 
         public bool ValidateMaterials { get; set; }
@@ -72,11 +73,14 @@ namespace xivModdingFramework.Models.Helpers
             AutoScale = true;
             ValidateMaterials = true;
             SourceRace = XivRace.All_Races;
+            TargetRace = XivRace.All_Races;
             LoggingFunction = null;
             IntermediaryFunction = null;
             SourceApplication = "Unknown";
             ReferenceItem = null;
         }
+
+
 
         /// <summary>
         /// Function to apply these options to a given model.
@@ -96,7 +100,6 @@ namespace xivModdingFramework.Models.Helpers
             {
                 originalMdl = currentMdl;
             }
-
 
             if (CopyAttributes && originalMdl != null)
             {
@@ -137,13 +140,24 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.ClearVAlpha(ttModel, LoggingFunction);
             }
 
-            if(SourceRace != XivRace.All_Races && originalMdl != null)
+            if(SourceRace != XivRace.All_Races && SourceRace != TargetRace)
             {
-                if (currentMdl == null)
+                if(TargetRace == XivRace.All_Races && currentMdl != null)
                 {
-                    throw new Exception("Cannot racially convert from null MDL.");
+                    TargetRace = IOUtil.GetRaceFromPath(currentMdl.MdlPath);
                 }
-                await ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, LoggingFunction, tx);
+
+                if (TargetRace == XivRace.All_Races)
+                {
+                    TargetRace = IOUtil.GetRaceFromPath(ttModel.Source);
+                }
+
+                if (TargetRace == XivRace.All_Races)
+                {
+                    throw new Exception("Cannot racially convert model without a valid source and target race.");
+                }
+
+                await ModelModifiers.RaceConvertRecursive(ttModel, TargetRace, SourceRace, LoggingFunction, tx);
             }
 
             // We need to load the original unmodified model to get the shape data.
