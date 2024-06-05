@@ -83,7 +83,7 @@ namespace xivModdingFramework.Models.Helpers
         /// originalMdl is optional as it's only used when copying shape data.
         /// </summary>
         /// <param name="ttModel"></param>
-        public async Task Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null)
+        public async Task Apply(TTModel ttModel, XivMdl currentMdl = null, XivMdl originalMdl = null, ModTransaction tx = null)
         {
             if (LoggingFunction == null)
             {
@@ -141,7 +141,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     throw new Exception("Cannot racially convert from null MDL.");
                 }
-                await ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, LoggingFunction);
+                await ModelModifiers.RaceConvert(ttModel, SourceRace, currentMdl.MdlPath, LoggingFunction, tx);
             }
 
             // We need to load the original unmodified model to get the shape data.
@@ -972,7 +972,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="model"></param>
         /// <param name="originalRace"></param>
         /// <param name="loggingFunction"></param>
-        public static async Task RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null)
+        public static async Task RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -999,7 +999,7 @@ namespace xivModdingFramework.Models.Helpers
 
                 try
                 {
-                    await RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction);
+                    await RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction, tx);
                 }
                 finally
                 {
@@ -1022,7 +1022,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="targetRace"></param>
         /// <param name="originalRace"></param>
         /// <param name="loggingFunction"></param>
-        private static async Task RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction)
+        public static async Task RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             try
             {
@@ -1031,30 +1031,30 @@ namespace xivModdingFramework.Models.Helpers
                 // [ Current > (apply deform) > Target ]
                 if (originalRace.IsDirectParentOf(targetRace))
                 {
-                    await ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction, tx);
                 }
                 // Target race is parent node of Current race
                 // Convert to parent (invert deform)
                 // [ Current > (apply inverse deform) > Target ]
                 else if (targetRace.IsDirectParentOf(originalRace))
                 {
-                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction, tx);
                 }
                 // Current race is not parent of Target Race and Current race has parent
                 // Make a recursive call with the current races parent race
                 // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
                 else if (originalRace.GetNode().Parent != null)
                 {
-                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction);
-                    await RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction, tx);
+                    await RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction, tx);
                 }
                 // Current race has no parent
                 // Make a recursive call with the target races parent race
                 // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
                 else
                 {
-                    await ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction);
-                    await RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction);
+                    await ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction, tx);
+                    await RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction, tx);
                 }
             }
             catch (Exception ex)
@@ -1062,7 +1062,13 @@ namespace xivModdingFramework.Models.Helpers
                 // Show a warning that deforms are missing for the target race
                 // This mostly happens with Face, Hair, Tails, Ears, and Female > Male deforms
                 // The model is still added but no deforms are applied
-                loggingFunction(true, "Unable to convert racial model.");
+                if (loggingFunction == null)
+                {
+                    loggingFunction(true, "Unable to convert racial model.");
+                } else
+                {
+                    throw;
+                }
             }
         }
 

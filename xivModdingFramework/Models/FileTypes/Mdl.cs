@@ -1942,7 +1942,7 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction(false, "Merging in existing Attribute & Material Data...");
 
                 // Apply our Model Modifier options to the model.
-                await options.Apply(ttModel, currentMdl, originalMdl);
+                await options.Apply(ttModel, currentMdl, originalMdl, tx);
 
 
                 // Call the user function, if one was provided.
@@ -4657,7 +4657,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (originalRace != newRace)
                 {
                     // Convert the model to the new race.
-                    await ModelModifiers.RaceConvert(model, originalRace, newPath);
+                    await ModelModifiers.RaceConvert(model, originalRace, newPath, null, tx);
                     ModelModifiers.FixUpSkinReferences(model, newPath);
                 }
 
@@ -4975,7 +4975,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mainRace != mergeInRace)
                 {
                     // Convert the model to the new race.
-                    await ModelModifiers.RaceConvert(mergeInModel, mainRace, mainModel.Source);
+                    await ModelModifiers.RaceConvert(mergeInModel, mainRace, mainModel.Source, null, tx);
                 }
 
                 // Merging the actual models is the simplest part of this whole affair...

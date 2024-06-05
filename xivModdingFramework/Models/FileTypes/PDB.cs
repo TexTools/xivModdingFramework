@@ -205,7 +205,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
         /// <summary>
-        /// Loads the deformation files for attempting racial deformation.
+        /// Retrieves the full set of calculated deformation matrices for a given race.
         /// </summary>
         /// <param name="race"></param>
         /// <param name="deformations"></param>
@@ -257,6 +257,14 @@ namespace xivModdingFramework.Models.FileTypes
             BuildNewTransfromMatrices(root, FullSkel, ret);
             return ret;
         }
+
+
+        /// <summary>
+        /// Builds the full set of forward/backwards and normalmodifier matrices from the original deformation matrices.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="skeletonData"></param>
+        /// <param name="def"></param>
         private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, DeformationCollection def)
         {
             if (node.BoneParent == -1)
