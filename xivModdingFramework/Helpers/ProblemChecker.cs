@@ -153,6 +153,32 @@ namespace xivModdingFramework.Helpers
             return allBackups;
         }
 
+
+        /// <summary>
+        /// Check if the index backups that are stored exist and are for this game version.
+        /// </summary>
+        /// <param name="backupDirectory"></param>
+        /// <returns></returns>
+        public static bool AreBackupsValid(string backupDirectory)
+        {
+            var currentVersion = XivCache.GameInfo.GameVersion;
+            var backupFile = Path.Combine(backupDirectory, GameInfo.GameVersionFileName);
+            var backupVersion = GameInfo.ReadVersionFile(backupFile);
+
+            if (currentVersion != backupVersion)
+            {
+                return false;
+            }
+
+            var backups = GetAvailableIndexBackups(backupDirectory);
+            if (backups.Count == 0)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// Restores Indexes to their backup state, if backups exist.
         /// </summary>
@@ -283,6 +309,19 @@ namespace xivModdingFramework.Helpers
                 Index.UNSAFE_ResetAllIndexDatCounts();
                 try
                 {
+
+                    // Validate that the indexes refer only to base game indexes.
+                    try
+                    {
+                        await AssertIndexIsClean(XivDataFile._04_Chara);
+                    }
+                    catch
+                    {
+                        throw new InvalidDataException("Cannot create index backups.  Indexes are unclean and still refer to modified dats even after disabling all mods.");
+                    }
+
+
+
                     ClearIndexBackups(backupDirectory);
 
                     foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
@@ -328,6 +367,27 @@ namespace xivModdingFramework.Helpers
                     }
                 }
             });
+        }
+
+        public static async Task AssertIndexIsClean(XivDataFile df)
+        {
+            var rtx = ModTransaction.BeginTransaction();
+            var iFile = await rtx.GetIndexFile(XivDataFile._04_Chara);
+
+            var offsets = iFile.GetAllIndex2Offsets();
+
+            var originalList = Dat.GetOriginalDatList(df);
+            var maxSafeDat = originalList.Count;
+
+            foreach(var offset in offsets)
+            {
+                var parts = IOUtil.Offset8xToParts(offset);
+
+                if(parts.DatNum > maxSafeDat)
+                {
+                    throw new InvalidDataException("The given index references modded data files.");
+                }
+            }
         }
 
     }

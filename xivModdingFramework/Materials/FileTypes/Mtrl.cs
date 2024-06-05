@@ -1433,7 +1433,6 @@ namespace xivModdingFramework.Materials.FileTypes
             // Disabled for now.  SkinLegacy causes the Benchmark to crash in Benchmark 1.1
             return;
 
-
             // ShaderPack update is all we have for this one for now.
             mtrl.ShaderPack = EShaderPack.SkinLegacy;
             var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);

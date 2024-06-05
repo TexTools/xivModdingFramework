@@ -945,6 +945,13 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
             return false;
         }
+
+
+
+        internal IEnumerable<long> GetAllIndex2Offsets()
+        {
+            return Index2Entries.Values.Select(x => x.DataOffset);
+        }
     }
 
     /// <summary>
