@@ -666,15 +666,7 @@ namespace xivModdingFramework.Cache
                 var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
 
                 List<XivRace> races = null;
-                if (tx != null)
-                {
-                    var metadata = await ItemMetadata.GetMetadata(this, false, tx);
-                    races = metadata.EqdpEntries.Where(x => x.Value.HasModel).Select(x => x.Key).ToList();
-                }
-                else
-                {
-                    races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true, tx);
-                }
+                races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true, tx);
 
                 var models = new List<string>();
                 foreach (var race in races)
