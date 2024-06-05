@@ -25,7 +25,7 @@ namespace xivModdingFramework.Textures
         /// <param name="width"></param>
         /// <param name="height"></param>
         /// <returns></returns>
-        internal static async Task ModifyPixels(Action<int> action, int width, int height)
+        public static async Task ModifyPixels(Action<int> action, int width, int height)
         {
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < height; i++)
@@ -53,7 +53,6 @@ namespace xivModdingFramework.Textures
             };
             await ModifyPixels(act, width, height);
         }
-
         internal static async Task CreateIndexTexture(byte[] normalPixelData, byte[] indexPixelData, int width, int height)
         {
             await ModifyPixels((int offset) =>
@@ -127,7 +126,7 @@ namespace xivModdingFramework.Textures
         /// <param name="texA"></param>
         /// <param name="texB"></param>
         /// <returns></returns>
-        internal static async Task<(byte[] TexA, byte[] TexB, int Width, int Height)> ResizeImages(XivTex texA, XivTex texB)
+        public static async Task<(byte[] TexA, byte[] TexB, int Width, int Height)> ResizeImages(XivTex texA, XivTex texB)
         {
             var maxW = Math.Max(texA.Width, texB.Width);
             var maxH = Math.Max(texA.Height, texB.Height);
@@ -147,7 +146,7 @@ namespace xivModdingFramework.Textures
         /// <param name="newWidth"></param>
         /// <param name="newHeight"></param>
         /// <returns></returns>
-        internal static async Task<byte[]> ResizeImage(XivTex tex, int newWidth, int newHeight)
+        public static async Task<byte[]> ResizeImage(XivTex tex, int newWidth, int newHeight)
         {
             var pixels = await tex.GetRawPixels();
             if (newWidth == tex.Width && newHeight == tex.Height)
@@ -166,7 +165,7 @@ namespace xivModdingFramework.Textures
         /// <param name="newWidth"></param>
         /// <param name="newHeight"></param>
         /// <returns></returns>
-        internal static async Task<byte[]> ResizeImage(byte[] pixelData, int width, int height, int newWidth, int newHeight)
+        public static async Task<byte[]> ResizeImage(byte[] pixelData, int width, int height, int newWidth, int newHeight)
         {
             return await Task.Run(() =>
             {

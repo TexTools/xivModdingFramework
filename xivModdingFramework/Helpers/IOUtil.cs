@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Advanced;
+using SixLabors.ImageSharp.Memory;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -631,6 +635,31 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-
+        public static byte[] GetImageSharpPixels(Image<Bgra32> img)
+        {
+            var mg = img.GetPixelMemoryGroup();
+            using (var ms = new MemoryStream())
+            {
+                foreach (var g in mg)
+                {
+                    var data = MemoryMarshal.AsBytes(g.Span).ToArray();
+                    ms.Write(data, 0, data.Length);
+                }
+                return ms.ToArray();
+            }
+        }
+        public static byte[] GetImageSharpPixels(Image<Rgba32> img)
+        {
+            var mg = img.GetPixelMemoryGroup();
+            using (var ms = new MemoryStream())
+            {
+                foreach (var g in mg)
+                {
+                    var data = MemoryMarshal.AsBytes(g.Span).ToArray();
+                    ms.Write(data, 0, data.Length);
+                }
+                return ms.ToArray();
+            }
+        }
     }
 }
