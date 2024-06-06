@@ -245,9 +245,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         }
                         else if(group.Type == "Multi")
                         {
-                            // Bitmask options.
-                            for (int i = 0; i < group.Options.Count; i++)
+                            var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority);
+
+                            // Bitmask options.  Install in priority order.
+                            foreach(var op in ordered)
                             {
+                                var i = group.Options.IndexOf(op);
                                 var value = 1 << i;
                                 if ((selected & value) > 0)
                                 {
@@ -643,7 +646,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
-        public static async Task<PmpStandardOptionJson> CreatePmpStandardOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, string imagePath = null)
+        public static async Task<PmpStandardOptionJson> CreatePmpStandardOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, string imagePath = null, int priority = 0)
         {
             var opt = new PmpStandardOptionJson()
             {
@@ -652,6 +655,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 Files = new Dictionary<string, string>(),
                 FileSwaps = new Dictionary<string, string>(),
                 Manipulations = new List<PMPManipulationWrapperJson>(),
+                Priority = priority,
             };
 
             // TODO - Could paralell this? Unsure how big the gains would really be though,
@@ -1086,7 +1090,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Image;
         public int Page;
 
-        // "Multi" or "Single"
+        // "Multi", "Single", or "Imc"
         public string Type;
 
         // Only used internally when the user is selecting options during install/application.
@@ -1166,6 +1170,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public Dictionary<string, string> Files;
         public Dictionary<string, string> FileSwaps;
         public List<PMPManipulationWrapperJson> Manipulations;
+        public int Priority;
     }
 
     public class PmpDisableImcOptionJson : PMPOptionJson
