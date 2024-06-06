@@ -593,17 +593,25 @@ namespace xivModdingFramework.Helpers
 
         public static bool IsDirectory(string path)
         {
-            if (!File.Exists(path))
+            if(path.EndsWith("/") || path.EndsWith("\\"))
+            {
+                path = path.Substring(0, path.Length - 1);
+            }
+
+            try
+            {
+                FileAttributes attr = File.GetAttributes(path);
+
+                //detect whether its a directory or file
+                if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
+                    return true;
+                else
+                    return false;
+            }
+            catch
             {
                 return false;
             }
-            FileAttributes attr = File.GetAttributes(path);
-
-            //detect whether its a directory or file
-            if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
-                return true;
-            else
-                return false;
         }
 
         public static string MakePathSafe(string fileName, bool makeLowercase = true)

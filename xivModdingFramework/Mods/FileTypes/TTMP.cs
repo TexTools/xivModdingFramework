@@ -1310,8 +1310,15 @@ namespace xivModdingFramework.Mods.FileTypes
             var ret = new Dictionary<string, FileStorageInformation>();
             foreach (var file in mods)
             {
+
+
                 if (!includeData)
                 {
+                    if (ret.ContainsKey(file.FullPath))
+                    {
+                        continue;
+                    }
+
                     ret.Add(file.FullPath, new FileStorageInformation() { 
                         FileSize = file.ModSize
                     });
@@ -1341,6 +1348,13 @@ namespace xivModdingFramework.Mods.FileTypes
                         // Skip the file?
                         continue;
                     }
+                }
+
+                if (ret.ContainsKey(file.FullPath))
+                {
+                    // Last addition gets priority?
+                    // This is a very undefined case, but somehow people made simple modpacks with 2 different files for the same path.
+                    ret.Remove(file.FullPath);
                 }
 
                 ret.Add(file.FullPath, storeInfo);

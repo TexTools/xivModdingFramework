@@ -796,12 +796,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     zipArchivePath = Path.GetDirectoryName(zipArchivePath);
                 }
+            }
 
-                if (IOUtil.IsDirectory(zipArchivePath))
-                {
-                    alreadyUnzipped = true;
-                    unzipPath = zipArchivePath;
-                }
+            if (IOUtil.IsDirectory(zipArchivePath))
+            {
+                alreadyUnzipped = true;
+                unzipPath = zipArchivePath;
             }
 
             if (!alreadyUnzipped && unzipPath == null)
@@ -818,14 +818,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
             // Task wrapper since we might be doing some heavy lifting.
-            await Task.Run(async () =>
+            if (!alreadyUnzipped)
             {
-                // Resolve the base path we're working, and unzip if needed...
-                if (includeData)
+                await Task.Run(async () =>
                 {
-                    await IOUtil.UnzipFiles(zipArchivePath, unzipPath, option.Files.Values);
-                }
-            });
+                    // Resolve the base path we're working, and unzip if needed...
+                    if (includeData)
+                    {
+                        await IOUtil.UnzipFiles(zipArchivePath, unzipPath, option.Files.Values);
+                    }
+                });
+            }
 
             var ret = new Dictionary<string, FileStorageInformation>();
 
