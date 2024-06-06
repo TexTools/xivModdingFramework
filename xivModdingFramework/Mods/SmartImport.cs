@@ -151,7 +151,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath, ModTransaction tx = null)
+        public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath, ModTransaction tx = null, XivTexFormat forcedFormat = XivTexFormat.INVALID)
         {
             ulong magic;
             uint magic32;
@@ -186,7 +186,7 @@ namespace xivModdingFramework.Mods
                     // Our DDS Converter can't operate on Streams, so...
                     await Task.Run(async () =>
                     {
-                        ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, XivTexFormat.INVALID, tx);
+                        ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, forcedFormat, tx);
                     });
                 }
 
