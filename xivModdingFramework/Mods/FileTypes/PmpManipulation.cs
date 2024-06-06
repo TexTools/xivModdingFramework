@@ -1,4 +1,5 @@
-﻿using JsonSubTypes;
+﻿using HelixToolkit.SharpDX.Core.Model;
+using JsonSubTypes;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
@@ -27,7 +28,9 @@ namespace xivModdingFramework.Mods.FileTypes
     [JsonSubtypes.KnownSubType(typeof(PMPGlobalEqpManipulationWrapperJson), "GlobalEqp")]
     public class PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 1)]
         public string Type;
+
 
         public virtual object GetManipulation()
         {
@@ -46,6 +49,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
     public class PMPUnknownManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public object Manipulation = new object();
         public override object GetManipulation()
         {
@@ -59,6 +63,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
     public class PMPImcManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPImcManipulationJson Manipulation = new PMPImcManipulationJson();
         public override object GetManipulation()
         {
@@ -76,6 +81,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPEstManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPEstManipulationJson Manipulation = new PMPEstManipulationJson();
         public override object GetManipulation()
         {
@@ -93,6 +99,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPEqpManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPEqpManipulationJson Manipulation = new PMPEqpManipulationJson();
         public override object GetManipulation()
         {
@@ -110,6 +117,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPEqdpManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPEqdpManipulationJson Manipulation = new PMPEqdpManipulationJson();
         public override object GetManipulation()
         {
@@ -127,6 +135,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPGmpManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPGmpManipulationJson Manipulation = new PMPGmpManipulationJson();
         public override object GetManipulation()
         {
@@ -144,6 +153,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPRspManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPRspManipulationJson Manipulation = new PMPRspManipulationJson();
         public override object GetManipulation()
         {
@@ -160,6 +170,7 @@ namespace xivModdingFramework.Mods.FileTypes
     }
     public class PMPGlobalEqpManipulationWrapperJson : PMPManipulationWrapperJson
     {
+        [JsonProperty(Order = 2)]
         public PMPGlobalEqpManipulationJson Manipulation = new PMPGlobalEqpManipulationJson();
         public override object GetManipulation()
         {
@@ -520,6 +531,22 @@ namespace xivModdingFramework.Mods.FileTypes
             eqp.SetBytes(data);
         }
 
+        public EquipmentParameter ToEquipmentParameter()
+        {
+            var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+            var offset = EquipmentParameterSet.EntryOffsets[slot];
+            var size = EquipmentParameterSet.EntrySizes[slot];
+
+            var shifted = Entry >> (offset * 8);
+            var shiftedBytes = BitConverter.GetBytes(shifted);
+
+            var data = new byte[size];
+            Array.Copy(shiftedBytes, 0, data, 0, size);
+
+            var eqp = new EquipmentParameter(slot, data);
+            return eqp;
+        }
+
         public static PMPEqpManipulationJson FromEqpEntry(EquipmentParameter entry, XivDependencyRootInfo root)
         {
 
@@ -574,12 +601,23 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public void ApplyToMetadata(ItemMetadata metadata)
         {
-            // We could bind the data individually...
-            // Or we could just copy in the full uint Value since it's stored here.
-
-            var gmp = new GimmickParameter(BitConverter.GetBytes(Entry.Value));
-            metadata.GmpEntry = gmp;
+            metadata.GmpEntry = ToGmp();
         }
+
+        public GimmickParameter ToGmp()
+        {
+            var gmp = new GimmickParameter();
+            gmp.Animated = Entry.Animated;
+            gmp.Enabled = Entry.Enabled;
+            gmp.RotationA = Entry.RotationA;
+            gmp.RotationB = Entry.RotationB;
+            gmp.RotationC = Entry.RotationC;
+            gmp.Byte4Low = Entry.UnknownA;
+            gmp.Byte4High = Entry.UnknownB;
+
+            return gmp;
+        }
+
         public static PMPGmpManipulationJson FromGmpEntry(GimmickParameter entry, XivDependencyRootInfo root)
         {
             var pEntry = new PMPGmpManipulationJson();
@@ -591,8 +629,10 @@ namespace xivModdingFramework.Mods.FileTypes
             pEntry.Entry.RotationA = entry.RotationA;
             pEntry.Entry.RotationB = entry.RotationB;
             pEntry.Entry.RotationC = entry.RotationC;
-            pEntry.Entry.UnknownA = entry.UnknownLow;
-            pEntry.Entry.UnknownB = entry.UnknownHigh;
+            pEntry.Entry.UnknownA = entry.Byte4Low;
+            pEntry.Entry.UnknownB = entry.Byte4High;
+            pEntry.Entry.UnknownTotal = entry.Byte4;
+            pEntry.Entry.Value = (ulong) entry.ToLong();
 
             return pEntry;
         }
