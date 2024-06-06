@@ -798,10 +798,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
             }
 
-            if (IOUtil.IsDirectory(zipArchivePath))
+            if (zipArchivePath == null || IOUtil.IsDirectory(zipArchivePath))
             {
                 alreadyUnzipped = true;
-                unzipPath = zipArchivePath;
+                if (zipArchivePath != null)
+                {
+                    unzipPath = zipArchivePath;
+                }
             }
 
             if (!alreadyUnzipped && unzipPath == null)

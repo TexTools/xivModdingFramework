@@ -593,6 +593,7 @@ namespace xivModdingFramework.Helpers
 
         public static bool IsDirectory(string path)
         {
+            if(path == null) return false;
             if(path.EndsWith("/") || path.EndsWith("\\"))
             {
                 path = path.Substring(0, path.Length - 1);
