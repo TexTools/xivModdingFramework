@@ -111,7 +111,7 @@ namespace xivModdingFramework.General.Enums
     /// </summary>
     public static class XivDataFiles
     {
-        public static string GetFullPath(this XivDataFile df, string extension = "")
+        internal static string GetFullPath(this XivDataFile df, string extension = "")
         {
             var parent = XivCache.GameInfo.GameDirectory.Parent.FullName;
             var path = Path.Combine(parent, GetFilePath(df)) + extension;
@@ -127,14 +127,14 @@ namespace xivModdingFramework.General.Enums
         /// </summary>
         /// <param name="value">The enum value</param>
         /// <returns>The File Name</returns>
-        public static string GetFilePath(this XivDataFile value)
+        internal static string GetFilePath(this XivDataFile value)
         {
             var field = value.GetType().GetField(value.ToString());
             var attribute = (XivDataFileDescriptionAttribute[])field.GetCustomAttributes(typeof(XivDataFileDescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].CatNumber : value.ToString();
         }
 
-        public static string GetContainingFolder(this XivDataFile value)
+        internal static string GetContainingFolder(this XivDataFile value)
         {
             var path = GetFullPath(value);
             var df = new DirectoryInfo(path);
@@ -146,7 +146,7 @@ namespace xivModdingFramework.General.Enums
         /// </summary>
         /// <param name="value">The enum value</param>
         /// <returns>The folder key</returns>
-        public static string GetFolderKey(this XivDataFile value)
+        internal static string GetFolderKey(this XivDataFile value)
         {
             var field = value.GetType().GetField(value.ToString());
             var attribute = (XivDataFileDescriptionAttribute[])field.GetCustomAttributes(typeof(XivDataFileDescriptionAttribute), false);

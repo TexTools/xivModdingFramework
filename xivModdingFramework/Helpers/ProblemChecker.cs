@@ -60,6 +60,11 @@ namespace xivModdingFramework.Helpers
                 XivCache.CacheWorkerEnabled = false;
                 try
                 {
+                    if (!Index.CanWriteAllIndexes())
+                    {
+                        throw new Exception("Unable to open one or more index files for writing.  The files may currently be in use.");
+                    }
+
                     progress?.Report("Restoring index file backups...");
                     try
                     {

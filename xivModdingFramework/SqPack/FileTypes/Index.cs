@@ -45,6 +45,30 @@ namespace xivModdingFramework.SqPack.FileTypes
         internal const string Index2Extension = ".win32.index2";
         internal static SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
+
+
+        internal static bool CanWriteAllIndexes()
+        {
+            try
+            {
+                foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+                {
+                    var index1Path = XivDataFiles.GetFullPath(df, IndexExtension);
+                    var index2Path = XivDataFiles.GetFullPath(df, Index2Extension);
+
+                    var fs = File.OpenWrite(index1Path);
+                    fs.Dispose();
+                    var fs2 = File.OpenWrite(index2Path);
+                    fs2.Dispose();
+                }
+            }
+            catch(Exception ex)
+            {
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>
         /// Checks whether the index file contains any of the folders passed in
         /// 
