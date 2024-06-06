@@ -282,6 +282,11 @@ namespace xivModdingFramework.Helpers
                 await Task.Delay(5);
             }
 
+            if(Transaction == null)
+            {
+                return;
+            }
+
             _LOADING = true;
             try
             {

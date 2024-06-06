@@ -17,6 +17,7 @@
 using HelixToolkit.SharpDX.Core;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -751,7 +752,12 @@ namespace xivModdingFramework.SqPack.FileTypes
             var indexBuffers = new List<Task<byte[]>>[_VertexSegments];
             for (int i = 0; i < _VertexSegments; i++)
             {
-                indexBuffers[i] = BeginReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i]);
+                var last = false;
+                if(i == _VertexSegments - 1)
+                {
+                    last = true;
+                }
+                indexBuffers[i] = BeginReadCompressedBlocks(br, (int)indexBufferBlockCounts[i], endOfHeader + indexBufferOffsets[i], last);
             }
 
             // Reserve space at the start of the result for the header
@@ -883,7 +889,13 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 br.BaseStream.Seek(mipMapPartOffset, SeekOrigin.Begin);
 
-                mipData[i] = BeginReadCompressedBlocks(br, mipMapParts);
+                var last = false;
+                if(i == mipCount -1)
+                {
+                    last = true;
+                }
+
+                mipData[i] = BeginReadCompressedBlocks(br, mipMapParts, -1, last);
             }
 
             for (int i = 0; i < mipCount; i++)
@@ -2257,7 +2269,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         // Begins decompressing a sequence of blocks in parallel
         // Returns a list of tasks that should be passed to CompleteReadCompressedBlocks()
-        public static List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1)
+        public static List<Task<byte[]>> BeginReadCompressedBlocks(BinaryReader br, int blockCount, long offset = -1, bool lastInFile = false)
         {
             if (blockCount == 0)
             {
@@ -2320,7 +2332,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
                     else if (paddingData.Any(x => x != 0))
                     {
-                        throw new Exception("Unexpected real data in compressed data block padding section.");
+                        if (lastInFile && i != blockCount - 1)
+                        {
+                           throw new Exception("Unexpected real data in compressed data block padding section.");
+                        }
                     }
                 }
 

@@ -636,6 +636,11 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task CommitTransaction(ModTransaction tx, bool closeTransaction = true)
         {
+            if(tx == null)
+            {
+                return;
+            }
+
             if (tx._ReadOnly)
             {
                 throw new Exception("Attempted to commit a Read Only Transaction.");
