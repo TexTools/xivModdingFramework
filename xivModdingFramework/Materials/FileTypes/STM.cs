@@ -4,6 +4,7 @@ using SharpDX;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -213,13 +214,13 @@ namespace xivModdingFramework.Materials.FileTypes
 
 
             // This format sucks.
+            var moreData = new List<ushort>();
             for (int i = 0; i < _ItemCount; i++)
             {
                 arrayEnds.Add(BitConverter.ToUInt16(data, offset));
                 offset += 2;
             }
             int headerSize = _ItemCount * 2;
-
 
             var lastOffset = 0;
             for (int x = 0; x < _ItemCount; x++)
@@ -233,6 +234,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
 
                 var arraySize = (arrayEnds[x] - lastOffset) / elementSize;
+                var originalArraySize = arraySize;
                 var type = StainingTemplateArrayType.OneToOne;
 
                 // Calculate the data type.
@@ -286,27 +288,28 @@ namespace xivModdingFramework.Materials.FileTypes
                 {
                     var nArray = new List<Half[]>();
                     var indexes = new byte[128];
+                    var indexCopy = data.Skip(indexStart).Take(129).ToArray();
                     for (int i = 0; i < 128; i++)
                     {
                         try
                         {
-                            var index = data[indexStart + i + 1];
-                            var entry = new Half[3];
-                            if (index > halfData.Count)
+                            var index = data[indexStart + i];
+                            if (index == 255 || index == 0)
                             {
-                                nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                if (x < 3)
+                                {
+                                    nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                }
+                                else
+                                {
+                                    nArray.Add(new Half[] { new Half() });
+                                }
                                 continue;
                             }
-
-                            if (index == 0)
+                            else
                             {
-                                nArray.Add(new Half[] { new Half(), new Half(), new Half() });
-                                continue;
+                                nArray.Add(halfData[index-1]);
                             }
-
-                            index -= 1;
-
-                            nArray.Add(halfData[index]);
                         } catch(Exception ex)
                         {
                             throw;
@@ -325,9 +328,15 @@ namespace xivModdingFramework.Materials.FileTypes
                 }
 
 
+                var idx = 0;
                 foreach (var arr in halfData)
                 {
+                    if(x > 2 && arr.Length > 1)
+                    {
+                        Trace.WriteLine("asdf");
+                    }
                     Entries[x].Add(arr);
+                    idx++;
                 }
 
                 lastOffset = arrayEnds[x];
@@ -377,7 +386,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var unknown = BitConverter.ToUInt16(data, 6);
 
 
-            Dictionary<ushort, ushort> entryOffsets = new Dictionary<ushort, ushort>();
+            Dictionary<ushort, int> entryOffsets = new Dictionary<ushort, int>();
 
             List<ushort> keys = new List<ushort>();
             List<ushort> values = new List<ushort>();
@@ -398,7 +407,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
             for (int i = 0; i < entryCount; i++)
             {
-                entryOffsets[keys[i]] = (ushort) ((BitConverter.ToUInt16(data, offset) * 2) + endOfHeader);
+                entryOffsets[keys[i]] = ((BitConverter.ToUInt16(data, offset) * 2) + endOfHeader);
                 offset += 2;
             }
 
