@@ -710,8 +710,16 @@ namespace xivModdingFramework.Mods.FileTypes
 
                         if (needsTexFix && modJson.FullPath.EndsWith(".tex"))
                         {
-                            // Have to fix old busted textures.
-                            storeInfo = await FixOldTexData(storeInfo);
+                            try
+                            {
+                                // Have to fix old busted textures.
+                                storeInfo = await FixOldTexData(storeInfo);
+                            } catch(Exception ex)
+                            {
+                                // File is significantly/unreadably broken.
+                                Trace.WriteLine(ex);
+                                continue;
+                            }
                         }
 
 
@@ -1322,8 +1330,17 @@ namespace xivModdingFramework.Mods.FileTypes
                 // Ancient bug issues....
                 if (needsTexFix && file.FullPath.EndsWith(".tex") && includeData)
                 {
-                    // Have to fix old busted textures.
-                    storeInfo = await FixOldTexData(storeInfo);
+                    try
+                    {
+                        // Have to fix old busted textures.
+                        storeInfo = await FixOldTexData(storeInfo);
+                    }
+                    catch
+                    {
+                        // Hmm... What should we do about this?
+                        // Skip the file?
+                        continue;
+                    }
                 }
 
                 ret.Add(file.FullPath, storeInfo);
