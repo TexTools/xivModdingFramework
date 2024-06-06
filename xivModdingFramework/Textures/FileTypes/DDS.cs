@@ -15,8 +15,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using SharpDX;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -429,71 +432,6 @@ namespace xivModdingFramework.Textures.FileTypes
             return header.ToArray();
         }
 
-
-        /// <summary>
-        /// Creates the DDS header for given texture data.
-        /// <see cref="https://msdn.microsoft.com/en-us/library/windows/desktop/bb943982(v=vs.85).aspx"/>
-        /// </summary>
-        /// <returns>Byte array containing DDS header</returns>
-        private static byte[] CreateColorDDSHeader(XivTex tex)
-        {
-            var header = new List<byte>();
-
-            // DDS header magic number
-            const uint dwMagic = 0x20534444;
-            header.AddRange(BitConverter.GetBytes(dwMagic));
-
-            // Size of structure. This member must be set to 124.
-            const uint dwSize = 124;
-            header.AddRange(BitConverter.GetBytes(dwSize));
-
-            // Flags to indicate which members contain valid data.
-            const uint dwFlags = 528399;
-            header.AddRange(BitConverter.GetBytes(dwFlags));
-
-            // Surface height (in pixels).
-            header.AddRange(BitConverter.GetBytes(tex.Height));
-
-            // Surface width (in pixels).
-            header.AddRange(BitConverter.GetBytes(tex.Width));
-
-            // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
-            header.AddRange(BitConverter.GetBytes(tex.Width * 32));
-
-            // Depth of a volume texture (in pixels), otherwise unused.
-            const uint dwDepth = 0;
-            header.AddRange(BitConverter.GetBytes(dwDepth));
-
-            // Number of mipmap levels, otherwise unused.
-            const uint dwMipMapCount = 0;
-            header.AddRange(BitConverter.GetBytes(dwMipMapCount));
-
-            // Unused.
-            var dwReserved1 = new byte[44];
-            header.AddRange(dwReserved1);
-
-            // DDS_PIXELFORMAT start
-
-            // Structure size; set to 32 (bytes).
-            const uint pfSize = 32;
-            header.AddRange(BitConverter.GetBytes(pfSize));
-
-            // Values which indicate what type of data is in the surface.
-            const uint pfFlags = 4;
-            header.AddRange(BitConverter.GetBytes(pfFlags));
-
-            // Four-character codes for specifying compressed or custom formats.
-            const uint dwFourCC = 0x71;
-            header.AddRange(BitConverter.GetBytes(dwFourCC));
-
-            // dwRGBBitCount, dwRBitMask, dwGBitMask, dwBBitMask, dwABitMask, dwCaps, dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-            // Unused.
-            var blank1 = new byte[40];
-            header.AddRange(blank1);
-
-            return header.ToArray();
-        }
-
         /// <summary>
         /// Compresses a normal DDS File into just the core image data that FFXIV stores.
         /// This assumes the Binary Reader is already positioned at the end of whatever header there is (.DDS or .Tex)
@@ -826,6 +764,123 @@ namespace xivModdingFramework.Textures.FileTypes
             return data;
         }
         #endregion
+
+
+        public static async Task<byte[]> TexConvRawPixels(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false)
+        {
+            return await Task.Run(async () =>
+            {
+                // ImageSharp => TexConv Route.
+                var ddsFile = await DDS.TexConv(rgbaData, width, height, format, generateMipMaps);
+                try
+                {
+                    using (var fs = File.OpenRead(ddsFile))
+                    {
+                        using (var br = new BinaryReader(fs))
+                        {
+                            br.BaseStream.Seek(148, SeekOrigin.Begin);
+
+                            return br.ReadAllBytes();
+                        }
+                    }
+                }
+                finally
+                {
+                    IOUtil.DeleteTempFile(ddsFile);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Takes uncompressed RGBA data and uses TexConv.exe to convert it into a DDS file in the temp directory.
+        /// </summary>
+        /// <param name="rgbaData"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <param name="format"></param>
+        /// <param name="generateMipMaps"></param>
+        /// <returns></returns>
+        public static async Task<string> TexConv(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false)
+        {
+            var input = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".tga");
+            using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
+            {
+                img.SaveAsTga(input);
+            }
+
+            try
+            {
+                return await TexConv(input, format, generateMipMaps);
+            }
+            finally
+            {
+                IOUtil.DeleteTempFile(input);
+            }
+        }
+
+
+        public static async Task<string> TexConv(string file, string format, bool generateMipMaps = true)
+        {
+            return await Task.Run(() =>
+            {
+
+                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var workingDirectory = Path.Combine(cwd, "converters");
+                var converter = Path.Combine(workingDirectory, "texconv.exe");
+
+                var mipArg = "-m " + (generateMipMaps ? 0 : 1);
+                var formatArg = "-f " + format;
+
+
+                var guid = Guid.NewGuid().ToString();
+                var input = guid + Path.GetExtension(file);
+                var output = guid + ".dds";
+                var inFull = Path.Combine(workingDirectory, input);
+
+                File.Copy(file, inFull);
+                try
+                {
+
+                    var outFile = Path.Combine(workingDirectory, output);
+                    var outTemp = Path.Combine(Path.GetTempPath(), output);
+
+                    var args = $"{formatArg} {mipArg} -sepalpha -y {input}";
+
+                    var proc = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = converter,
+                            Arguments = args,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WorkingDirectory = workingDirectory,
+                        }
+                    };
+
+                    proc.Start();
+                    proc.WaitForExit();
+                    var code = proc.ExitCode;
+
+                    var command = converter + " " + args;
+
+                    if (code != 0)
+                    {
+                        throw new Exception("TexConv.exe threw error code: " + proc.ExitCode);
+                    }
+
+                    File.Move(outFile, outTemp);
+
+                    return outTemp;
+                }
+                finally
+                {
+                    File.Delete(inFull);
+                }
+            });
+        }
 
         public enum DXGI_FORMAT : uint
         {

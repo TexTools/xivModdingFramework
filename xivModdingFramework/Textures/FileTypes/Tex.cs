@@ -448,12 +448,21 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.BC5:
                         compressionFormat = CompressionFormat.BC5;
                         break;
+                    case XivTexFormat.BC7:
+                        compressionFormat = CompressionFormat.BC7;
+                        break;
                     case XivTexFormat.A8R8G8B8:
                         compressionFormat = CompressionFormat.BGRA;
                         break;
                     default:
                         throw new Exception($"Format {texFormat} is not currently supported for Non-DDS import\n\nPlease use the DDS import option instead.");
                 }
+
+                if(compressionFormat == CompressionFormat.BC7)
+                {
+                    return await DDS.TexConv(externalPath, "BC7_UNORM", useMips);
+                }
+
                 using (var surface = Surface.LoadFromFile(externalPath))
                 {
                     if (surface == null)
@@ -509,6 +518,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexFormat.BC5:
                     compressionFormat = CompressionFormat.BC5;
                     break;
+                case XivTexFormat.BC7:
+                    compressionFormat = CompressionFormat.BC7;
+                    break;
                 case XivTexFormat.A8R8G8B8:
                     compressionFormat = CompressionFormat.BGRA;
                     break;
@@ -519,36 +531,44 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             byte[] ddsData = null;
-            unsafe
+            if (compressionFormat == CompressionFormat.BC7)
             {
-                fixed (byte* p = data)
+                ddsData = await DDS.TexConvRawPixels(data, tex.Width, tex.Height, "BC7_UNORM", useMips);
+            }
+            else
+            {
+                // TexImpNet Route
+                unsafe
                 {
-                    var ptr = (IntPtr)p;
-                    using (var surface = Surface.LoadFromRawData(ptr, tex.Width, tex.Height, tex.Width*4, false, false))
+                    fixed (byte* p = data)
                     {
-                        if (surface == null)
-                            throw new FormatException($"Unsupported texture format");
-
-                        var maxMipCount = 1;
-                        if (useMips)
+                        var ptr = (IntPtr)p;
+                        using (var surface = Surface.LoadFromRawData(ptr, tex.Width, tex.Height, tex.Width * 4, false, false))
                         {
-                            // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
-                            // (Ex. The Default Mat-Add textures)
-                            maxMipCount = -1;
-                        }
+                            if (surface == null)
+                                throw new FormatException($"Unsupported texture format");
 
-                        using (var compressor = new Compressor())
-                        {
-                            using (var ms = new MemoryStream())
+                            var maxMipCount = 1;
+                            if (useMips)
                             {
-                                // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
-                                compressor.Input.SetMipmapGeneration(true, maxMipCount);
-                                compressor.Input.SetData(surface);
-                                compressor.Compression.Format = compressionFormat;
-                                compressor.Compression.SetBGRAPixelFormat();
-                                compressor.Output.OutputHeader = false;
-                                compressor.Process(ms);
-                                ddsData = ms.ToArray();
+                                // For things that have real roots (things that have actual models/aren't UI textures), we always want mipMaps, even if the existing texture only has one.
+                                // (Ex. The Default Mat-Add textures)
+                                maxMipCount = -1;
+                            }
+
+                            using (var compressor = new Compressor())
+                            {
+                                using (var ms = new MemoryStream())
+                                {
+                                    // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
+                                    compressor.Input.SetMipmapGeneration(true, maxMipCount);
+                                    compressor.Input.SetData(surface);
+                                    compressor.Compression.Format = compressionFormat;
+                                    compressor.Compression.SetBGRAPixelFormat();
+                                    compressor.Output.OutputHeader = false;
+                                    compressor.Process(ms);
+                                    ddsData = ms.ToArray();
+                                }
                             }
                         }
                     }
