@@ -1393,6 +1393,8 @@ namespace xivModdingFramework.Mods.FileTypes
                 // We can't do an in-place write here b/c we might bash something else's data.
                 fpath = Path.GetTempFileName();
                 offset = 0;
+                info.RealPath = fpath;
+                info.RealOffset = 0;
                 info.StorageType = EFileStorageType.CompressedIndividual;
             }
 
