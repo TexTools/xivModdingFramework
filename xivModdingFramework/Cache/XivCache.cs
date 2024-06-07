@@ -49,14 +49,14 @@ namespace xivModdingFramework.Cache
         {
             get
             {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;Timeout=1;Default Timeout=1;DefaultTimeout=1;";
             }
         }
         internal static string RootsCacheConnectionString
         {
             get
             {
-                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
+                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;Timeout=1;Default Timeout=1;DefaultTimeout=1;";
             }
         }
 
@@ -2265,7 +2265,7 @@ namespace xivModdingFramework.Cache
         /// or is disabled, all functionally will/must continue to operate - however, calls to
         /// GetParentFiles()/GetChildFiles() may often be significantly slower, as the data may not already be cached.
         /// </summary>
-        private static void ProcessDependencyQueue(object sender, DoWorkEventArgs e)
+        private static async void ProcessDependencyQueue(object sender, DoWorkEventArgs e)
         {
             // Note: The Cache worker only runs when Transactions are not active.
 
@@ -2296,10 +2296,7 @@ namespace xivModdingFramework.Cache
 
                             // Use a temporary readonly TX for perf.
                             var tx = ModTransaction.BeginTransaction();
-                            var task = GetChildFiles(file, tx);
-
-                            // Set a safety timeout here.
-                            task.Wait(3000);
+                            await GetChildFiles(file, tx);
                         }
                         finally
                         {
@@ -2335,10 +2332,7 @@ namespace xivModdingFramework.Cache
                                 var tx = ModTransaction.BeginTransaction();
 
                                 // The get call will automatically cache the data, if it needs updating.
-                                var task = GetParentFiles(file, tx);
-
-                                // Set a safety timeout here.
-                                task.Wait(3000);
+                                await GetParentFiles(file, tx);
                             } finally
                             {
                                 RemoveFromParentQueue(file);
@@ -2401,35 +2395,40 @@ namespace xivModdingFramework.Cache
         /// Gets the current length of the dependency processing queue.
         /// </summary>
         /// <returns></returns>
-        public static int GetDependencyQueueLength()
+        public static async Task<int> GetDependencyQueueLength()
         {
             int length = 0;
-            using (var db = new SQLiteConnection(CacheConnectionString))
+            await Task.Run(async () =>
             {
-                db.Open();
-
-                var query = "select count(file) as cnt from dependencies_parents_queue";
-                using (var selectCmd = new SQLiteCommand(query, db))
+                using (var db = new SQLiteConnection(CacheConnectionString))
                 {
-                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                    db.DefaultTimeout = 1;
+                    db.BusyTimeout = 1;
+                    db.Open();
+
+                    var query = "select count(file) as cnt from dependencies_parents_queue";
+                    using (var selectCmd = new SQLiteCommand(query, db))
                     {
-                        reader.NextRow();
-                        // Got the new item.
-                        length = reader.GetInt32("cnt");
+                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        {
+                            reader.NextRow();
+                            // Got the new item.
+                            length = reader.GetInt32("cnt");
+                        }
+                    }
+
+                    query = "select count(file) as cnt from dependencies_children_queue";
+                    using (var selectCmd = new SQLiteCommand(query, db))
+                    {
+                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        {
+                            reader.NextRow();
+                            // Got the new item.
+                            length += reader.GetInt32("cnt");
+                        }
                     }
                 }
-
-                query = "select count(file) as cnt from dependencies_children_queue";
-                using (var selectCmd = new SQLiteCommand(query, db))
-                {
-                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
-                    {
-                        reader.NextRow();
-                        // Got the new item.
-                        length += reader.GetInt32("cnt");
-                    }
-                }
-            }
+            });
             return length;
         }
 
@@ -2452,6 +2451,8 @@ namespace xivModdingFramework.Cache
             List<T> list = new List<T>();
             using (var db = new SQLiteConnection(connectionString))
             {
+                db.DefaultTimeout = 1;
+                db.BusyTimeout = 1;
                 db.Open();
                 // Check how large the result set will be so we're not constantly
                 // Reallocating the array.
