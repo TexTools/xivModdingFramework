@@ -372,6 +372,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 1648149758, "g_OutlineColor", true);
                 UpdateConstantName(shKv.Key, 2289092920, "g_OutlineWidth", true);
                 UpdateConstantName(shKv.Key, 0x39551220, "g_TextureMipBias", true);
+                UpdateConstantName(shKv.Key, 0x7801E004, "g_GlassIOR", true);
             }
 
         }
