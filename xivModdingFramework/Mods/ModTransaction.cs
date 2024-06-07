@@ -761,7 +761,7 @@ namespace xivModdingFramework.Mods
                 openSlots = new Dictionary<XivDataFile, Dictionary<long, uint>>();
                 foreach(var df in _IndexFiles.Keys)
                 {
-                    openSlots.Add(df, Dat.ComputeOpenSlots(df, originalModList));
+                    openSlots.Add(df, await Dat.ComputeOpenSlots(df, originalModList));
                 }
             }
 

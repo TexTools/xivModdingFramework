@@ -2046,11 +2046,16 @@ namespace xivModdingFramework.Models.DataContainers
                             var getModelQuery = "SELECT model FROM models";
                             using (var cmd = new SQLiteCommand(getModelQuery, db))
                             {
-                                var sqReader = cmd.ExecuteReader();
-
-                                while (sqReader.Read())
+                                using (var sqReader = cmd.ExecuteReader())
                                 {
-                                    modelList.Add(sqReader.GetInt32(0));
+                                    while (sqReader.Read())
+                                    {
+                                        modelList.Add(sqReader.GetInt32(0));
+                                    }
+                                    if(!sqReader.IsClosed)
+                                    {
+                                        sqReader.Close();
+                                    }
                                 }
                             }
 
@@ -2072,11 +2077,16 @@ namespace xivModdingFramework.Models.DataContainers
                             var getSkelQuery = "SELECT name FROM skeleton";
                             using (var cmd = new SQLiteCommand(getSkelQuery, db))
                             {
-                                var sqReader = cmd.ExecuteReader();
-
-                                while (sqReader.Read())
+                                using (var sqReader = cmd.ExecuteReader())
                                 {
-                                    skelList.Add(sqReader.GetString(0));
+                                    while (sqReader.Read())
+                                    {
+                                        skelList.Add(sqReader.GetString(0));
+                                    }
+                                    if (!sqReader.IsClosed)
+                                    {
+                                        sqReader.Close();
+                                    }
                                 }
                             }
 
@@ -2110,11 +2120,16 @@ namespace xivModdingFramework.Models.DataContainers
                             var getMatIdQuery = "SELECT material_id FROM materials";
                             using (var cmd = new SQLiteCommand(getMatIdQuery, db))
                             {
-                                var sqReader = cmd.ExecuteReader();
-
-                                while (sqReader.Read())
+                                using (var sqReader = cmd.ExecuteReader())
                                 {
-                                    matIdList.Add(sqReader.GetInt32(0));
+                                    while (sqReader.Read())
+                                    {
+                                        matIdList.Add(sqReader.GetInt32(0));
+                                    }
+                                    if (!sqReader.IsClosed)
+                                    {
+                                        sqReader.Close();
+                                    }
                                 }
                             }
 
@@ -2156,11 +2171,16 @@ namespace xivModdingFramework.Models.DataContainers
                             var getMeshIdQuery = "SELECT mesh FROM bones";
                             using (var cmd = new SQLiteCommand(getMeshIdQuery, db))
                             {
-                                var sqReader = cmd.ExecuteReader();
-
-                                while (sqReader.Read())
+                                using (var sqReader = cmd.ExecuteReader())
                                 {
-                                    meshIdList.Add(sqReader.GetInt32(0));
+                                    while (sqReader.Read())
+                                    {
+                                        meshIdList.Add(sqReader.GetInt32(0));
+                                    }
+                                    if (!sqReader.IsClosed)
+                                    {
+                                        sqReader.Close();
+                                    }
                                 }
                             }
 

@@ -2352,8 +2352,8 @@ namespace xivModdingFramework.Cache
 
             // Ensure we're good and clean up after ourselves.
             SQLiteConnection.ClearAllPools();
-            GC.WaitForPendingFinalizers();
             _cacheWorker = null;
+            GC.WaitForPendingFinalizers();
         }
 
 
@@ -2776,17 +2776,9 @@ namespace xivModdingFramework.Cache
                 // Check to see if Dispose has already been called.
                 if (!this.disposed)
                 {
-                    // If disposing equals true, dispose all managed
-                    // and unmanaged resources.
-                    if (disposing)
+                    if(_reader != null && _reader.IsClosed)
                     {
-                        // Dispose managed resources.
-
-                        // Ensure the raw reader's file handle was closed.
-                        if (!_reader.IsClosed)
-                        {
-                            _reader.Close();
-                        }
+                        _reader.Close();
                     }
 
                     // Note disposing has been done.

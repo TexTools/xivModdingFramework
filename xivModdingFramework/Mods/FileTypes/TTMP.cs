@@ -744,7 +744,6 @@ namespace xivModdingFramework.Mods.FileTypes
                         mod.ItemName = modJson.Name;
                         mod.ItemCategory = modJson.Category;
                         mod.FilePath = modJson.FullPath;
-                        mod.FileSize = modJson.ModSize;
                         mod.ModOffset8x = offset;
                         mod.OriginalOffset8x = oldOffset;
                         mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
@@ -1050,6 +1049,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     settings.ProgressReporter?.Report((i, files.Count, "Writing Mod Files..."));
                     i++;
+                    if (IOUtil.IsMetaInternalFile(kv.Key))
+                    {
+                        continue;
+                    }
+
                     var internalPath = kv.Key;
                     var fileInfo = kv.Value;
 
@@ -1062,15 +1066,6 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     // Inject Index offset pointer
                     var ogOffset = await tx.Set8xDataOffset(internalPath, offset);
-
-                    // Get compressed file size.
-                    var compSize = fileInfo.FileSize;
-                    if (fileInfo.StorageType == EFileStorageType.UncompressedIndividual || fileInfo.StorageType == EFileStorageType.UncompressedBlob) {
-                        compSize = await tx.GetCompressedFileSize(df, offset);
-                    } else if(compSize == 0 && fileInfo.StorageType == EFileStorageType.CompressedIndividual)
-                    {
-                        compSize = (int) new FileInfo(fileInfo.RealPath).Length;
-                    }
 
                     // Resolve name and category for modlist.
                     var root = await XivCache.GetFirstRoot(internalPath);
@@ -1092,7 +1087,6 @@ namespace xivModdingFramework.Mods.FileTypes
                         FilePath = internalPath,
                         ItemName = itemName,
                         ItemCategory = itemCategory,
-                        FileSize = compSize,
                         ModPack = mpName,
                         ModOffset8x = offset,
                         SourceApplication = settings.SourceApplication,

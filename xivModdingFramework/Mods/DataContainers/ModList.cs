@@ -535,7 +535,16 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The size in bytes of the SqPack compressed mod file.
         /// </summary>
-        public int FileSize { get; set; }
+        public async Task<int> GetCompressedSize(ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX against base file system state, though a passed in TX is fine too.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            return await tx.GetCompressedFileSize(DataFile, ModOffset8x);
+        }
 
         public bool IsInternal()
         {

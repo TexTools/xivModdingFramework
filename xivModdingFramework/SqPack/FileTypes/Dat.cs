@@ -1275,7 +1275,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     };
                     mod.ModOffset8x = offset8x;
                     mod.OriginalOffset8x = originalOffset;
-                    mod.FileSize = fileData.Length;
                     mod.FilePath = internalFilePath;
 
                     // If we don't have a specified modpack, but this file is already modded, retain its modpack association.
@@ -1295,7 +1294,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                     mod.ModOffset8x = offset8x;
                     mod.FilePath = internalFilePath;
                     mod.ModPack = mod.IsInternal() ? null : mp;
-                    mod.FileSize = fileData.Length;
                     mod.ItemName = itemName;
                     mod.ItemCategory = category;
                     mod.SourceApplication = sourceApplication;
@@ -1438,11 +1436,14 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="df"></param>
         /// <returns></returns>
-        internal static Dictionary<long, uint> ComputeOpenSlots(XivDataFile df, ModList modlist)
+        internal static async Task<Dictionary<long, uint>> ComputeOpenSlots(XivDataFile df, ModList modlist)
         {
 
             var moddedDats = Dat.GetModdedDatList(df);
             var slots = new Dictionary<long, uint>();
+
+            // Readonly TX against base file system state.
+            var tx = ModTransaction.BeginTransaction();
 
             var allModsByOffset = modlist.GetModsByOffset();
             if (!allModsByOffset.ContainsKey(df))
@@ -1476,7 +1477,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     }
 
 
-                    uint size = (uint)mod.FileSize;
+                    uint size = (uint)await tx.GetCompressedFileSize(mod.DataFile, mod.ModOffset8x);
                     if (size <= 0)
                     {
                         // Force filesize read.
