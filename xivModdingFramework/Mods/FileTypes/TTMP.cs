@@ -1186,10 +1186,25 @@ namespace xivModdingFramework.Mods.FileTypes
             if (!File.Exists(modpackPath) && !Directory.Exists(modpackPath))
                 return null;
 
-            if (modpackPath.EndsWith(".pmp") || modpackPath.EndsWith(".json") || modpackPath.EndsWith("/"))
+            if (modpackPath.EndsWith(".pmp") || modpackPath.EndsWith(".json"))
             {
                 return await PMP.PMP.UnpackPMP(modpackPath, includeData, tx);
             }
+
+            if (IOUtil.IsDirectory(modpackPath))
+            {
+                var metaPath = Path.Combine(modpackPath, "meta.json");
+                if (File.Exists(metaPath))
+                {
+                    return await PMP.PMP.UnpackPMP(modpackPath, includeData, tx);
+                }
+                else
+                {
+                    return UnpackFolderTree(modpackPath);
+                }
+            }
+
+
             if (!modpackPath.EndsWith(".ttmp2") && !modpackPath.EndsWith(".ttmp"))
             {
                 throw new InvalidDataException("File must be .TTMP2 or .PMP");
@@ -1212,6 +1227,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 return null;
             }
         }
+
         private static async Task<Dictionary<string, FileStorageInformation>> UnpackSimpleModlist(string modpackPath, bool includeData = true, ModTransaction tx = null)
         {
             // Wrapped to task since we're going to be potentially unzipping a large file.
@@ -1407,5 +1423,63 @@ namespace xivModdingFramework.Mods.FileTypes
 
             return info;
         }
+
+        /// <summary>
+        /// Basic function to unpack a simple folder tree into a collection of file handles.
+        /// </summary>
+        /// <param name="modpackPath"></param>
+        /// <param name="includeData"></param>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException"></exception>
+        private static Dictionary<string, FileStorageInformation> UnpackFolderTree(string modpackPath)
+        {
+            foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+            {
+                var fn = Path.GetFileNameWithoutExtension(modpackPath);
+                var dfn = df.GetFolderKey();
+                dfn = dfn.Substring(0, dfn.IndexOf("/"));
+
+                if (fn == dfn)
+                {
+                    // Catch for trying to import a base level folder instead of root.
+                    modpackPath = Path.GetDirectoryName(modpackPath);
+                    break;
+                }
+            }
+
+            var ret = new Dictionary<string, FileStorageInformation>();
+            foreach(XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+            {
+                var folderBase = df.GetFolderKey();
+                var path = Path.GetFullPath(Path.Combine(modpackPath, folderBase));
+
+                if (!Directory.Exists(path)) continue;
+
+                var files = IOUtil.GetFilesInFolder(path);
+
+                foreach(var file in files)
+                {
+                    var fPath = Path.GetFullPath(file);
+
+                    var internalPath = fPath.Substring(modpackPath.Length).Replace("\\","/");
+                    if (internalPath.StartsWith("/"))
+                    {
+                        internalPath = internalPath.Substring(1);
+                    }
+
+                    var info = new FileStorageInformation()
+                    {
+                        FileSize = 0,
+                        RealOffset = 0,
+                        RealPath = fPath,
+                        StorageType = EFileStorageType.UncompressedIndividual,
+                    };
+
+                    ret.Add(internalPath, info);
+                }
+            }
+            return ret;
+        }
+
     }
 }
