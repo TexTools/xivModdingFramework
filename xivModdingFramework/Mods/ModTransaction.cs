@@ -709,7 +709,12 @@ namespace xivModdingFramework.Mods
 
             if(State != ETransactionState.Open)
             {
-                throw new Exception("Cannot commit Transcation that is not in the Open state.");
+                throw new Exception("Cannot commit transcation that is not in the Open state.");
+            }
+
+            if(Settings.Target == ETransactionTarget.GameFiles && _PrePrepStates.Count > 0)
+            {
+                throw new Exception("Cannot commit transactions with Preparation files to the live FFXIV Games Files.");
             }
 
 
