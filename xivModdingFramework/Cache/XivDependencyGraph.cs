@@ -445,56 +445,6 @@ namespace xivModdingFramework.Cache
             return null;
         }
 
-        /// <summary>
-        /// Handles stupid exceptions in child file references due to the chara/human/ tree being a hardcoded nightmare.
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <param name="mdlChildren"></param>
-        /// <param name="tx"></param>
-        internal static async Task<List<string>> HandleVieraFaceExceptions(string internalFilePath, IEnumerable<string> mdlChildren, ModTransaction tx)
-        {
-            var additional = new List<string>();
-            if (internalFilePath.StartsWith("chara/human/") && internalFilePath.Contains("/obj/face/"))
-            {
-                // Stupid hard-coded exception-riddled tree.
-                var regex = new Regex("/f([0-9]{4})/");
-                var match = regex.Match(internalFilePath);
-                if (match.Success)
-                {
-                    var oldFaceNumber = Int32.Parse(match.Groups[1].Value);
-                    if (oldFaceNumber < 200)
-                    {
-                        var newFaceNumber = oldFaceNumber + 100;
-                        var oldFaceString = string.Format("f{0:D4}", oldFaceNumber);
-                        var newFaceString = string.Format("f{0:D4}", newFaceNumber);
-                        var otherModelPath = internalFilePath.Replace(oldFaceString, newFaceString);
-                        if (tx == null)
-                        {
-                            // Readonly TX if we don't have one.
-                            tx = ModTransaction.BeginTransaction();
-                        }
-
-                        if (!await tx.FileExists(otherModelPath))
-                        {
-                            // We're getting child files for a 00xx Face, which does not have a 01xx Face
-                            // These use a shared model, but have a second set of materials higher up for their alt-clan.
-
-                            var mtrls = mdlChildren.ToList();
-                            foreach (var mtrl in mtrls)
-                            {
-                                var newMtrlPath = mtrl.Replace(oldFaceString, newFaceString);
-                                if (await tx.FileExists(newMtrlPath))
-                                {
-                                    // Add the 01xx Mtrl to our child files.
-                                    additional.Add(newMtrlPath);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            return additional;
-        }
 
         /// <summary>
         /// Retrieves the dependency file type of a given file in the system.

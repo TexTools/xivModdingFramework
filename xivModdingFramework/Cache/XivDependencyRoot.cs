@@ -689,24 +689,6 @@ namespace xivModdingFramework.Cache
                 var modelPath = Info.GetModelPath();
 
 
-                if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair && Info.SecondaryId / 100 >= 1)
-                {
-                    // For human types, if their model is missing, the version 00xx is used instead.
-                    if (tx == null)
-                    {
-                        // Readonly TX if we don't have one.
-                        tx = ModTransaction.BeginTransaction();
-                    }
-
-                    if (!(await tx.FileExists(modelPath)))
-                    {
-                        var replacementNumber = (Info.SecondaryId % 100);
-                        var alteredRoot = new XivDependencyRoot(Info.PrimaryType, Info.PrimaryId, Info.SecondaryType, replacementNumber, Info.Slot);
-
-                        return await alteredRoot.GetModelFiles(tx);
-                    }
-                }
-
                 if (!await tx.FileExists(modelPath))
                 {
                     return new List<string>();
@@ -777,6 +759,40 @@ namespace xivModdingFramework.Cache
 
                 materialVariant = -1;
             }
+            else if (Info.PrimaryType == XivItemType.human && Info.SecondaryType != XivItemType.hair && Info.SecondaryId > 100)
+            {
+                // These are special case shenanigans.
+                var models = await GetModelFiles(tx);
+                if (models != null && models.Count > 0)
+                {
+                    var dataFile = IOUtil.GetDataFileFromPath(models[0]);
+                    foreach (var model in models)
+                    {
+                        var modelMats = await GetVariantShiftedMaterials(model, materialVariant, tx);
+                        materials.UnionWith(modelMats);
+                    }
+                } else
+                {
+                    // Things like Viera or Au Ra alt-clan faces (Ex. Xaela) don't have a model of their own, but do have materials.
+                    var baseInfo = Info;
+                    baseInfo.SecondaryId = Info.SecondaryId % 100;
+                    var baseRoot = new XivDependencyRoot(baseInfo);
+                    var baseMaterials = await baseRoot.GetMaterialFiles(materialVariant, tx, false);
+
+                    var ownId = XivItemTypes.GetSystemPrefix(Info.SecondaryType.Value) + Info.SecondaryId.Value.ToString("D4");
+                    var baseId = XivItemTypes.GetSystemPrefix(Info.SecondaryType.Value) + baseInfo.SecondaryId.Value.ToString("D4");
+
+                    for(int i = 0; i < baseMaterials.Count; i++)
+                    {
+                        var ownMat = baseMaterials[i].Replace(baseId, ownId);
+                        if(await tx.FileExists(baseMaterials[i]))
+                        {
+                            materials.Add(ownMat);
+                        }
+                    }
+                }
+
+            }
             else if (Info.PrimaryType == XivItemType.painting)
             {
 
@@ -791,9 +807,6 @@ namespace xivModdingFramework.Cache
                 if (models != null && models.Count > 0)
                 {
                     var dataFile = IOUtil.GetDataFileFromPath(models[0]);
-
-
-
                     foreach (var model in models)
                     {
                         var modelMats = await GetVariantShiftedMaterials(model, materialVariant, tx);

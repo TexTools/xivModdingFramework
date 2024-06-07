@@ -1270,13 +1270,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            // Viera suck.
-            var extras = await XivDependencyGraph.HandleVieraFaceExceptions(mdlPath, uniqueMaterialPaths, tx);
-            foreach (var extra in extras)
-            {
-                uniqueMaterialPaths.Add(extra);
-            }
-
             return uniqueMaterialPaths.ToList();
         }
 
