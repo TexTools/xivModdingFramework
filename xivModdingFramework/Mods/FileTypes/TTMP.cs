@@ -1391,7 +1391,8 @@ namespace xivModdingFramework.Mods.FileTypes
             var offset = info.RealOffset;
             if(info.FileSize > originalSize && info.IsBlob) {
                 // We can't do an in-place write here b/c we might bash something else's data.
-                fpath = Path.GetTempFileName();
+                var baseFolder = Path.GetDirectoryName(info.RealPath);
+                fpath = Path.Combine(baseFolder, Guid.NewGuid().ToString());
                 offset = 0;
                 info.RealPath = fpath;
                 info.RealOffset = 0;
