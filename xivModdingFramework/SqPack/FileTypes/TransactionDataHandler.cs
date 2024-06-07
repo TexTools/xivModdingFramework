@@ -840,7 +840,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             }
 
             var files = di.EnumerateFiles();
-            if (files.Any(x => x.Extension.ToLower() != ".json"))
+            if (!files.Any(x => x.Extension.ToLower() == ".json"))
             {
                 // Sus...
                 throw new Exception("Target Penumbra Mod Directory seems invalid.  Please select an individual Penumbra mod folder or create a blank folder.");

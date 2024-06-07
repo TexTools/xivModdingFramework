@@ -24,6 +24,13 @@ namespace xivModdingFramework.Helpers
                 return Transaction != null;
             }
         }
+        public static bool IsPaused
+        {
+            get
+            {
+                return _LOADING;
+            }
+        }
 
         private static ModTransaction Transaction;
 
@@ -104,9 +111,12 @@ namespace xivModdingFramework.Helpers
             {
                 tx.Settings = settings;
                 tx.Start();
-            } else
+            } else if(tx.State == ETransactionState.Open)
             {
-                throw new Exception("Transaction must be null or preparing to use with Penumbra attach.");
+                tx.Settings = settings;
+            } else 
+            {
+                throw new Exception("Cannot attach to actively working or closed transaction.");
             }
 
             Transaction = tx;
@@ -374,7 +384,7 @@ namespace xivModdingFramework.Helpers
 
                 foreach(var file in modifiedFiles)
                 {
-                    if (!allFiles.Contains(file))
+                    if (!allFiles.Contains(file) && !IOUtil.IsMetaInternalFile(file))
                     {
                         await Transaction.ResetFile(file);
                     }
@@ -493,6 +503,7 @@ namespace xivModdingFramework.Helpers
             Transaction.FileChanged -= Transaction_FileChanged;
             Transaction.TransactionStateChanged -= Transaction_TransactionStateChanged;
             DetatchWatch();
+            _LOADING = true;
         }
 
         public static void Resume()
@@ -500,6 +511,7 @@ namespace xivModdingFramework.Helpers
             Transaction.FileChanged += Transaction_FileChanged;
             Transaction.TransactionStateChanged += Transaction_TransactionStateChanged;
             AttachWatch();
+            _LOADING = false;
         }
 
         private static void ParsePmpInfo()
@@ -555,6 +567,7 @@ namespace xivModdingFramework.Helpers
         {
             if (Watcher != null)
             {
+                Watcher.EnableRaisingEvents = false;
                 Watcher.Changed -= Watcher_FileChanged;
                 Watcher.Created -= Watcher_FileCreated;
                 Watcher.Deleted -= Watcher_FileDeleted;
@@ -568,6 +581,7 @@ namespace xivModdingFramework.Helpers
             {
                 // Safety call to prevent multi-attach.
                 DetatchWatch();
+                Watcher.EnableRaisingEvents = true;
                 Watcher.Changed += Watcher_FileChanged;
                 Watcher.Created += Watcher_FileCreated;
                 Watcher.Deleted += Watcher_FileDeleted;

@@ -112,7 +112,7 @@ namespace xivModdingFramework.Mods
 
             await Task.Run(async () =>
             {
-                var data = await CreateCompressedFile(externalPath, internalPath);
+                var data = await CreateCompressedFile(externalPath, internalPath, tx);
 
                 // Establish an item to associate the mod import with, if one exists.
                 var root = await XivCache.GetFirstRoot(internalPath);
@@ -194,7 +194,7 @@ namespace xivModdingFramework.Mods
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.
-                return await Mdl.FileToUncompressedMdl(externalPath, internalPath);
+                return await Mdl.FileToUncompressedMdl(externalPath, internalPath, null, tx);
             }
 
             // This is either a binary file for type 2 compression or an already compressed file.
