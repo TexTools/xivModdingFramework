@@ -2352,8 +2352,8 @@ namespace xivModdingFramework.Cache
 
             // Ensure we're good and clean up after ourselves.
             SQLiteConnection.ClearAllPools();
-            _cacheWorker = null;
             GC.WaitForPendingFinalizers();
+            _cacheWorker = null;
         }
 
 
