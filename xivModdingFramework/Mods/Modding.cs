@@ -517,10 +517,18 @@ namespace xivModdingFramework.Mods
                     foreach (var mod in toRemove) {
                         await INTERNAL_DeleteMod(mod, true, tx);
                     }
+
                 }
 
 
                 await boiler.Commit();
+
+                if (boiler.OwnTx && (state == EModState.UnModded || state == EModState.Disabled))
+                {
+                    // This is a little cheatyface here, but if we just disabled everything, we can do a
+                    // soft 'start over' and adjust the index counts back so our final indexes are bytewise identical to originals.
+                    Index.UNSAFE_ResetAllIndexDatCounts();
+                }
             }
             catch
             {
