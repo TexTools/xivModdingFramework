@@ -2464,6 +2464,7 @@ namespace xivModdingFramework.Cache
             List<T> list = new List<T>();
             using (var db = new SQLiteConnection(connectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
                 // Check how large the result set will be so we're not constantly
                 // Reallocating the array.

@@ -10,6 +10,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
@@ -19,6 +20,20 @@ using xivModdingFramework.Textures.FileTypes;
 namespace xivModdingFramework.Mods
 {
 
+    public class SmartImportOptions : ICloneable
+    {
+        public XivTexFormat TextureFormat = XivTexFormat.INVALID;
+        public ModelImportOptions ModelOptions = null;
+
+        public object Clone()
+        {
+            var op = (SmartImportOptions) MemberwiseClone();
+            var mops = (ModelImportOptions) ModelOptions.Clone();
+            op.ModelOptions = mops;
+            return op;
+        }
+    }
+
     /// <summary>
     /// Static class that handles importing arbitrary files, and dynamically calling the appropriate functions, 
     /// to convert those files into the FFXIV format files, and/or SQPack them as needed, before ultimately
@@ -26,6 +41,7 @@ namespace xivModdingFramework.Mods
     /// </summary>
     public static class SmartImport
     {
+
 
         /// <summary>
         /// Imports an arbitrary subset of files to the given transaction target.
@@ -103,7 +119,7 @@ namespace xivModdingFramework.Mods
         /// <param name="cachedIndexFile"></param>
         /// <param name="cachedModList"></param>
         /// <returns></returns>
-        public static async Task Import(string externalPath, string internalPath, string sourceApplication = "Unknown", ModTransaction tx = null)
+        public static async Task Import(string externalPath, string internalPath, string sourceApplication = "Unknown", ModTransaction tx = null, SmartImportOptions options = null)
         {
             if (!File.Exists(externalPath))
             {
@@ -112,7 +128,7 @@ namespace xivModdingFramework.Mods
 
             await Task.Run(async () =>
             {
-                var data = await CreateCompressedFile(externalPath, internalPath, tx);
+                var data = await CreateCompressedFile(externalPath, internalPath, tx, options);
 
                 // Establish an item to associate the mod import with, if one exists.
                 var root = await XivCache.GetFirstRoot(internalPath);
@@ -134,12 +150,12 @@ namespace xivModdingFramework.Mods
         /// <param name="internalPath"></param>
         /// <param name="tx">Active transaction.  Used down in the guts of texture generation to match DDS type to the current modded file.</param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateCompressedFile(string externalPath, string internalPath, ModTransaction tx = null)
+        public static async Task<byte[]> CreateCompressedFile(string externalPath, string internalPath, ModTransaction tx = null, SmartImportOptions options = null)
         {
             // ATex files are just .tex files but forced into a type 2 wrapper.
             var forceType2 = internalPath.EndsWith(".atex");
 
-            return await CreateCompressedFile(await CreateUncompressedFile(externalPath, internalPath, tx), forceType2);
+            return await CreateCompressedFile(await CreateUncompressedFile(externalPath, internalPath, tx, options), forceType2);
         }
 
         /// <summary>
@@ -151,8 +167,13 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath, ModTransaction tx = null, XivTexFormat forcedFormat = XivTexFormat.INVALID)
+        public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath, ModTransaction tx = null, SmartImportOptions options = null)
         {
+            if(options == null)
+            {
+                options = new SmartImportOptions();
+            }
+
             ulong magic;
             uint magic32;
             uint magic16;
@@ -186,7 +207,7 @@ namespace xivModdingFramework.Mods
                     // Our DDS Converter can't operate on Streams, so...
                     await Task.Run(async () =>
                     {
-                        ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, forcedFormat, tx);
+                        ddsPath = await Tex.ConvertToDDS(externalPath, internalPath, options.TextureFormat, tx);
                     });
                 }
 
@@ -194,7 +215,7 @@ namespace xivModdingFramework.Mods
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
             {
                 // Do Model import.
-                return await Mdl.FileToUncompressedMdl(externalPath, internalPath, null, tx);
+                return await Mdl.FileToUncompressedMdl(externalPath, internalPath, options.ModelOptions, tx);
             }
 
             // This is either a binary file for type 2 compression or an already compressed file.

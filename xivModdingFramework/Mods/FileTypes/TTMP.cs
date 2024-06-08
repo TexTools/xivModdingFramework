@@ -919,6 +919,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
             progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
             await Mtrl.CheckImportForOldHairJank(filePaths.ToList(), source, tx);
+
+            progress?.Report((0, total, "Endwalker Upgrades Complete..."));
         }
 
         /// <summary>

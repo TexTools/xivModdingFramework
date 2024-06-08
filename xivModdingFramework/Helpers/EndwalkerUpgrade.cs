@@ -126,6 +126,7 @@ namespace xivModdingFramework.Helpers
             // Write bone set size.
             short boneSetSize = (short) (64 * mdlData.BoneSetCount);
             mdlData.BoneSetSize = (short)boneSetSize;
+            mdlData.LoDCount = 1;
             bw.BaseStream.Seek(mdlDataOffset, SeekOrigin.Begin);
             mdlData.Write(bw);
 

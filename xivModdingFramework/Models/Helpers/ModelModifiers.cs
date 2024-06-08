@@ -27,7 +27,7 @@ namespace xivModdingFramework.Models.Helpers
     /// <summary>
     /// Simple booleans to determine behavior of the gobal level model modifiers.
     /// </summary>
-    public class ModelImportOptions
+    public class ModelImportOptions : ICloneable
     {
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
@@ -191,6 +191,11 @@ namespace xivModdingFramework.Models.Helpers
 
             // Ensure shape data is updated with our various changes.
             ttModel.UpdateShapeData();
+        }
+
+        public object Clone()
+        {
+            return MemberwiseClone();
         }
     }
 
