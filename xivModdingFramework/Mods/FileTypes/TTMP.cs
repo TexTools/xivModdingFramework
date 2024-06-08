@@ -823,11 +823,8 @@ namespace xivModdingFramework.Mods.FileTypes
                     // Fix Pre-Dawntrail files.
                     if (settings.UpdateEndwalkerFiles)
                     {
-                        if (modpackMpl != null && Int32.Parse(modpackMpl.TTMPVersion.Substring(0, 1)) <= 1)
-                        {
-                            var modPack = filteredModsJson[0].ModPackEntry;
-                            await UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, progress, tx);
-                        }
+                        var modPack = filteredModsJson[0].ModPackEntry;
+                        await UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, progress, tx);
                     }
 
                     count = 0;
