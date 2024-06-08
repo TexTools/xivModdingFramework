@@ -101,8 +101,9 @@ namespace xivModdingFramework.General.Enums
         //[XivDataFileDescription("ex3/020300", "bg/ex3/00_")] _EX3_BG_00,
         //[XivDataFileDescription("ex4/020400", "bg/ex4/00_")] _EX4_BG_00,
 
-        // This is a almost entirely empty Data File, but has an extra folder listing which we fail to replicate on write,
-        // as it has no files in it, but it thusly causes hashing errors if it ever gets resaved.
+        // This oddball has a folder entry with Hash [0] in it, that points to the end of the File Entries table, but claims it has 1 file.
+        // Since we naturally drop the folder on write, it causes a hashing difference if this index is ever re-saved.
+        // The index only has a few files in it anyways, so it's safest/simplest to just disable it.
         //[XivDataFileDescription("ex3/020305", "bg/ex3/05_")] _EX3_BG_05,
 
 
