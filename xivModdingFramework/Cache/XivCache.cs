@@ -2071,6 +2071,7 @@ namespace xivModdingFramework.Cache
             {
                 using (var db = new SQLiteConnection(CacheConnectionString))
                 {
+                    db.BusyTimeout = 3;
                     db.Open();
                     using (var transaction = db.BeginTransaction())
                     {
@@ -2366,6 +2367,8 @@ namespace xivModdingFramework.Cache
             // So instead...
 
             _cacheWorker = null;
+
+            await Task.Delay(50);
 
             // We commit sudoku.
             Thread.CurrentThread.Abort();
