@@ -435,7 +435,15 @@ namespace xivModdingFramework.SqPack.DataContainers
                     Write64ByteHash(bw, sh.ComputeHash(EmptyBlock[indexId]));
 
                     // Folder Data Segment
-                    bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 ? 0 : folderSegmentOffset));
+                    if (indexId == 0)
+                    {
+                        // SE writes this offset for index1s even if there is no data.
+                        bw.Write(BitConverter.GetBytes(folderSegmentOffset));
+                        //bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 ? 0 : folderSegmentOffset));
+                    } else
+                    {
+                        bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 ? 0 : folderSegmentOffset));
+                    }
                     bw.Write(BitConverter.GetBytes(folderSegmentSize));
                     Write64ByteHash(bw, sh.ComputeHash(folderSegment));
 

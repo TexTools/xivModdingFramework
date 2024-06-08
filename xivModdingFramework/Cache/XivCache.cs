@@ -49,14 +49,14 @@ namespace xivModdingFramework.Cache
         {
             get
             {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;Timeout=1;Default Timeout=1;DefaultTimeout=1;";
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
         internal static string RootsCacheConnectionString
         {
             get
             {
-                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;Timeout=1;Default Timeout=1;DefaultTimeout=1;";
+                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
 
@@ -2354,7 +2354,7 @@ namespace xivModdingFramework.Cache
             SQLiteConnection.ClearAllPools();
 
             // It'd be nice to be able to use this...
-            // GC.WaitForPendingFinalizers();
+            //GC.WaitForPendingFinalizers();
             // But the SQlite library sometimes hangs indefinitely if you call it.
             // So instead...
 
@@ -2410,8 +2410,6 @@ namespace xivModdingFramework.Cache
             {
                 using (var db = new SQLiteConnection(CacheConnectionString))
                 {
-                    db.DefaultTimeout = 1;
-                    db.BusyTimeout = 1;
                     db.Open();
 
                     var query = "select count(file) as cnt from dependencies_parents_queue";
@@ -2459,8 +2457,6 @@ namespace xivModdingFramework.Cache
             List<T> list = new List<T>();
             using (var db = new SQLiteConnection(connectionString))
             {
-                db.DefaultTimeout = 1;
-                db.BusyTimeout = 1;
                 db.Open();
                 // Check how large the result set will be so we're not constantly
                 // Reallocating the array.
