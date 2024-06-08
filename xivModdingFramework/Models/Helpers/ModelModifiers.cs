@@ -40,6 +40,8 @@ namespace xivModdingFramework.Models.Helpers
         public bool AutoScale { get; set; }
         public XivRace SourceRace { get; set; }
         public XivRace TargetRace { get; set; }
+
+        [JsonIgnore]
         public IItem ReferenceItem { get; set; }
 
         public bool ValidateMaterials { get; set; }
@@ -49,11 +51,13 @@ namespace xivModdingFramework.Models.Helpers
         /// <summary>
         /// Logging output function.
         /// </summary>
+        [JsonIgnore]
         public Action<bool, string> LoggingFunction { get; set; }
 
         /// <summary>
         /// Function that is called for any additional processing during import, if desired.
         /// </summary>
+        [JsonIgnore]
         public Func<TTModel, TTModel, Task<bool>> IntermediaryFunction { get; set; }
 
 
