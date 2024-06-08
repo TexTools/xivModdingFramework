@@ -47,7 +47,6 @@ namespace xivModdingFramework.General.Enums
 #if ENDWALKER
 
         // Heavensward
-        [XivDataFileDescription("ex1/020100", "bg/ex1/00_")] _EX1_BG_00,
         [XivDataFileDescription("ex1/020101", "bg/ex1/01_")] _EX1_BG_01,
         [XivDataFileDescription("ex1/020102", "bg/ex1/02_")] _EX1_BG_02,
         [XivDataFileDescription("ex1/020103", "bg/ex1/03_")] _EX1_BG_03,
@@ -56,7 +55,6 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex1/030100", "cut/ex3/")] _EX1_Cut,
 
         // Stormblood
-        [XivDataFileDescription("ex2/020200", "bg/ex2/00_")] _EX2_BG_00,
         [XivDataFileDescription("ex2/020201", "bg/ex2/01_")] _EX2_BG_01,
         [XivDataFileDescription("ex2/020202", "bg/ex2/02_")] _EX2_BG_02,
         [XivDataFileDescription("ex2/020203", "bg/ex2/03_")] _EX2_BG_03,
@@ -66,17 +64,14 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex2/0c0200", "music/ex2/")] _EX2_Music,
 
         // Shadowbringers
-        [XivDataFileDescription("ex3/020300", "bg/ex3/00_")] _EX3_BG_00,
         [XivDataFileDescription("ex3/020301", "bg/ex3/01_")] _EX3_BG_01,
         [XivDataFileDescription("ex3/020302", "bg/ex3/02_")] _EX3_BG_02,
         //[XivDataFileDescription("ex3/020303", "bg/ex3/03_")] _EX3_BG_03, // Doesn't exist
         [XivDataFileDescription("ex3/020304", "bg/ex3/04_")] _EX3_BG_04,
-        [XivDataFileDescription("ex3/020305", "bg/ex3/05_")] _EX3_BG_05,
         [XivDataFileDescription("ex3/030300", "cut/ex3/")] _EX3_Cut,
         [XivDataFileDescription("ex3/0c0300", "music/ex3/")] _EX3_Music,
 
         // Endwalker
-        [XivDataFileDescription("ex4/020400", "bg/ex4/00_")] _EX4_BG_00,
         [XivDataFileDescription("ex4/020401", "bg/ex4/01_")] _EX4_BG_01,
         [XivDataFileDescription("ex4/020402", "bg/ex4/02_")] _EX4_BG_02,
         [XivDataFileDescription("ex4/020403", "bg/ex4/03_")] _EX4_BG_03,
@@ -94,11 +89,21 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex5/020502", "bg/ex5/02")] _EX5_BG_02,
 #endif
 
-        //Empty Indexes
+        // Empty or virtually empty indexes.
+        // These have very inconsistent behavior on whether their empty offsets are written or not,
+        // Or how large their blank data segments are, making it hard for us to replicate them properly.
         //[XivDataFileDescription("ffxiv/090000", "ui_script")] _09_UiScript,
         //[XivDataFileDescription("ffxiv/120000", "???")] _09_UiScript,
         //[XivDataFileDescription("ffxiv/130000", "???")] _09_UiScript,
         //[XivDataFileDescription("ex1/120300", "???")] _EX1_12,
+        //[XivDataFileDescription("ex1/020100", "bg/ex1/00_")] _EX1_BG_00,
+        //[XivDataFileDescription("ex2/020200", "bg/ex2/00_")] _EX2_BG_00,
+        //[XivDataFileDescription("ex3/020300", "bg/ex3/00_")] _EX3_BG_00,
+        //[XivDataFileDescription("ex4/020400", "bg/ex4/00_")] _EX4_BG_00,
+
+        // This is a almost entirely empty Data File, but has an extra folder listing which we fail to replicate on write,
+        // as it has no files in it, but it thusly causes hashing errors if it ever gets resaved.
+        //[XivDataFileDescription("ex3/020305", "bg/ex3/05_")] _EX3_BG_05,
 
 
         ///Currently Disabled due to a CVE 

@@ -58,6 +58,9 @@ namespace xivModdingFramework.SqPack.DataContainers
         // We regenerate the directory list manually, so we don't save it.
         //protected List<byte[]> DirBlock = new List<byte[]>();
 
+        protected bool WriteEmptyBlockOffsetIndex1 = false;
+        protected bool WriteFolderBlockOffsetIndex1 = false;
+
 
         // Index1 entries.  Keyed by [Folder Hash, File Hash] => Entry
         protected Dictionary<uint, Dictionary<uint, FileIndexEntry>> Index1Entries = new Dictionary<uint, Dictionary<uint, FileIndexEntry>>();
@@ -152,10 +155,10 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             ReadSynTable(br, indexId);
 
-            EmptyBlock.Add(ReadSegment(br));
+            EmptyBlock.Add(ReadSegment(br, indexId, true));
 
             // We don't actually care about the directory data, since we regenerate it automatically.
-            var directoryData = ReadSegment(br);
+            var directoryData = ReadSegment(br, indexId, false);
 
             IndexType.Add(br.ReadUInt32());
 
@@ -270,13 +273,25 @@ namespace xivModdingFramework.SqPack.DataContainers
             br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
         }
 
-        protected virtual byte[] ReadSegment(BinaryReader br)
+        protected virtual byte[] ReadSegment(BinaryReader br, int indexId, bool isEmptyBlock)
         {
             int segmentOffset = br.ReadInt32();
             int segmentSize = br.ReadInt32();
             var storedOffset = br.BaseStream.Position;
             br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
             var data = br.ReadBytes(segmentSize);
+
+            if(indexId == 0 && segmentOffset > 0 )
+            {
+                // Very occasionally SE is weird and stores this offset even when there is no data.
+                if (isEmptyBlock)
+                {
+                    WriteEmptyBlockOffsetIndex1 = true;
+                } else
+                {
+                    WriteFolderBlockOffsetIndex1 = true;
+                }
+            }
 
             // Skip past the hash.
             br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
@@ -430,20 +445,14 @@ namespace xivModdingFramework.SqPack.DataContainers
                     Write64ByteHash(bw, sh.ComputeHash(synonymTableSegment));
 
                     // Empty Block Data Segment
-                    bw.Write(BitConverter.GetBytes(emptyBlockSize == 0 ? 0 : emptyBlockOffset));
+                    var forceWrite = (WriteEmptyBlockOffsetIndex1 && indexId == 0);
+                    bw.Write(BitConverter.GetBytes(emptyBlockSize == 0 && !forceWrite ? 0 : emptyBlockOffset));
                     bw.Write(BitConverter.GetBytes(emptyBlockSize));
                     Write64ByteHash(bw, sh.ComputeHash(EmptyBlock[indexId]));
 
                     // Folder Data Segment
-                    if (indexId == 0)
-                    {
-                        // SE writes this offset for index1s even if there is no data.
-                        bw.Write(BitConverter.GetBytes(folderSegmentOffset));
-                        //bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 ? 0 : folderSegmentOffset));
-                    } else
-                    {
-                        bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 ? 0 : folderSegmentOffset));
-                    }
+                    forceWrite = (WriteFolderBlockOffsetIndex1 && indexId == 0);
+                    bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 && !forceWrite ? 0 : folderSegmentOffset));
                     bw.Write(BitConverter.GetBytes(folderSegmentSize));
                     Write64ByteHash(bw, sh.ComputeHash(folderSegment));
 
