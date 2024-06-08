@@ -30,13 +30,19 @@ using xivModdingFramework.Mods.Enums;
 using System.Diagnostics;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.Helpers
 {
     public static class ProblemChecker
     {
 
-        public static async Task ResaveAllIndexFiles()
+        /// <summary>
+        /// Validates index hashes and resaves the files if their hashes are off.
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public static async Task RevalidateAllIndexHashes()
         {
             if (!XivCache.GameWriteEnabled)
             {
@@ -52,6 +58,10 @@ namespace xivModdingFramework.Helpers
                 {
                     foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
                     {
+                        if (CheckHashes(df))
+                        {
+                            continue;
+                        }
                         await tx.GetIndexFile(df);
                     }
 
@@ -64,6 +74,74 @@ namespace xivModdingFramework.Helpers
             });
 
         }
+        public static bool CheckHashes(XivDataFile df)
+        {
+            var index1Path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
+            var index2Path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+            using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
+            {
+                if (!CheckHashes(index1Stream))
+                {
+                    return false;
+                }
+            }
+            using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
+            {
+                if (!CheckHashes(index2Stream))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        private static bool CheckHashes(BinaryReader br)
+        {
+            br.BaseStream.Seek(IndexFile._SqPackHeaderSize, SeekOrigin.Begin);
+            var headerSize = br.ReadUInt32();
+            if (headerSize != IndexFile._IndexHeaderSize)
+            {
+                throw new Exception("Invalid index or index file format changed.");
+            }
+
+            var segmentHeaderOffsets = new List<int>()
+            {
+                (int)IndexFile._SqPackHeaderSize + 8,
+                (int)IndexFile._SqPackHeaderSize + 84,
+                (int)IndexFile._SqPackHeaderSize + 156,
+                (int)IndexFile._SqPackHeaderSize + 228,
+            };
+
+            foreach (var offset in segmentHeaderOffsets)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                if (!CheckSegmentHash(br))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool CheckSegmentHash(BinaryReader br)
+        {
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var hash = br.ReadBytes(64);
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            var data = br.ReadBytes(segmentSize);
+            var sh = SHA1.Create();
+            var hash2 = sh.ComputeHash(data);
+
+            for (int i = 0; i < hash.Length && i < hash2.Length; i++)
+            {
+                if (hash[i] != hash2[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
 
         /// <summary>
         /// Performs a full reset of game files.  Restores Index Backups, Deletes extra DATs, etc.

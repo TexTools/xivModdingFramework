@@ -28,6 +28,7 @@ using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.Enums;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods.DataContainers
 {
@@ -143,6 +144,7 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <param name="mod"></param>
         public void RemoveMod(Mod mod)
         {
+
             RemoveMod(mod.FilePath);
         }
 

@@ -41,7 +41,7 @@ using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
-
+using static xivModdingFramework.Cache.FrameworkExceptions;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Mods
@@ -387,6 +387,7 @@ namespace xivModdingFramework.Mods
                 var modList = await tx.GetModList();
 
                 var nmod = modList.GetMod(path);
+
                 // Mod doesn't exist in the modlist.
                 if (nmod == null) return;
 
@@ -395,6 +396,11 @@ namespace xivModdingFramework.Mods
                 if (modToRemove.IsInternal() && !allowInternal)
                 {
                     throw new Exception("Cannot delete internal data without explicit toggle.");
+                }
+
+                if(!Dat.IsOffsetSane(nmod.Value.DataFile, nmod.Value.ModOffset8x, true))
+                {
+                    throw new OffsetException("Mod does not have a valid original offset, cannot safely delete mod.");
                 }
 
                 await INTERNAL_SetModState(EModState.Disabled, path, allowInternal, tx);

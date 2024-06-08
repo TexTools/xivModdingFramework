@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -42,8 +43,8 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
         // Total size of the segment header block (usually 1024)
-        protected const uint _SqPackHeaderSize = 1024;
-        protected const uint _IndexHeaderSize = 1024;
+        internal const uint _SqPackHeaderSize = 1024;
+        internal const uint _IndexHeaderSize = 1024;
 
         protected List<byte[]> _SqPackHeader = new List<byte[]>((int)_SqPackHeaderSize);
 
@@ -128,6 +129,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
         }
 
+
         protected virtual void ReadIndexFile(BinaryReader br, int indexId = 0)
         {
             // Store the SqPack header for writing back later, though it's mostly just empty data.
@@ -164,6 +166,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
             // Rest of the file is padding and self-hash.
         }
+
 
         protected virtual void ReadIndex1Data(BinaryReader br)
         {

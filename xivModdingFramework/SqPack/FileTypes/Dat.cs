@@ -1915,6 +1915,28 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
         /// <summary>
+        /// Validates that an offset points to an existing DAT file.
+        /// </summary>
+        /// <param name="df"></param>
+        /// <param name="offset8x"></param>
+        /// <returns></returns>
+        public static bool IsOffsetSane(XivDataFile df, long offset8x, bool originalDatsOnly = false)
+        {
+            var parts = IOUtil.Offset8xToParts(offset8x);
+
+            if (originalDatsOnly)
+            {
+                var maxDat = GetOriginalDatList(df).Count - 1;
+                return parts.DatNum <= maxDat;
+            }
+            else
+            {
+                var maxDat = GetLargestDatNumber(df);
+                return parts.DatNum <= maxDat;
+            }
+        }
+
+        /// <summary>
         /// This is a very specific fixer-function designed to handle a very specific error caused by very old TexTools builds that would
         /// generate invalid compressed file sizes for texture files.
         /// 
