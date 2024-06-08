@@ -212,17 +212,32 @@ namespace xivModdingFramework.Mods.FileTypes
         private static async Task<ItemMetadata> CreateFromRaw(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
 
+            if (tx == null) {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginTransaction();
+            }
+
+
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
 
             // These functions generate the path::offset to each of our
             // contiguous metadata entries.
-            var imcPaths = await root.GetImcEntryPaths(tx);
 
             var ret = new ItemMetadata(root);
-
-            if (imcPaths.Count > 0)
+            if (Imc.UsesImc(root))
             {
-                ret.ImcEntries = await Imc.GetEntries(imcPaths, forceDefault, tx);
+                var baseImc = root.GetRawImcFilePath();
+                if (await tx.FileExists(baseImc, forceDefault))
+                {
+                    var imcPaths = await root.GetImcEntryPaths(tx);
+                    if (imcPaths.Count > 0)
+                    {
+                        ret.ImcEntries = await Imc.GetEntries(imcPaths, forceDefault, tx);
+                    }
+                } else
+                {
+                    // IMC file did not exist, so no entries.
+                }
             }
 
             ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault, tx);
@@ -319,90 +334,6 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
             }
         }
-
-        /// <summary>
-        /// Applies multiple metadata mods simultaneously for performance gains.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <param name="index"></param>
-        /// <param name="modlist"></param>
-        /// <returns></returns>
-        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, ModTransaction tx)
-        {
-            if (data == null || data.Count == 0) return;
-
-            var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-
-            var dummyItem = new XivGenericItemModel();
-            dummyItem.Name = Constants.InternalModSourceName;
-            dummyItem.SecondaryCategory = Constants.InternalModSourceName;
-
-            Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> eqdpEntries = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
-            Dictionary<Est.EstType, List<ExtraSkeletonEntry>> estEntries = new Dictionary<Est.EstType, List<ExtraSkeletonEntry>>();
-            List<(uint PrimaryId, EquipmentParameter EqpData)> eqpEntries = new List<(uint PrimaryId, EquipmentParameter EqpData)>();
-            List<(uint PrimaryId, GimmickParameter GmpData)> gmpEntries = new List<(uint PrimaryId, GimmickParameter GmpData)>();
-
-            foreach (var meta in data)
-            {
-                // Construct the parameter collections for each function call.
-                foreach(var kv in meta.EqdpEntries)
-                {
-                    if (!eqdpEntries.ContainsKey(kv.Key))
-                    {
-                        eqdpEntries.Add(kv.Key, new List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>());
-                    }
-
-                    eqdpEntries[kv.Key].Add(((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, kv.Value));
-                }
-
-                var estType = Est.GetEstType(meta.Root);
-                foreach (var kv in meta.EstEntries)
-                {
-                    if (!estEntries.ContainsKey(estType))
-                    {
-                        estEntries.Add(estType, new List<ExtraSkeletonEntry>());
-                    }
-
-                    estEntries[estType].Add(kv.Value);
-                }
-
-                if (meta.EqpEntry != null)
-                {
-                    eqpEntries.Add(((uint)meta.Root.Info.PrimaryId, meta.EqpEntry));
-                }
-
-                if (meta.GmpEntry != null)
-                {
-                    gmpEntries.Add(((uint)meta.Root.Info.PrimaryId, meta.GmpEntry));
-                }
-            }
-
-
-            // Batch install functions for these three.
-            await _eqp.SaveEqpEntries(eqpEntries, dummyItem, tx);
-            await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, tx);
-            await _eqp.SaveGmpEntries(gmpEntries, dummyItem, tx);
-
-            // The EST function already does batch applications by nature of how it works,
-            // so just call it once for each of the four EST types represented.
-            foreach (var kv in estEntries)
-            {
-                await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, tx);
-            }
-
-
-            // IMC Files don't really overlap that often, so it's
-            // not a significant loss generally to just write them individually.
-            foreach (var meta in data)
-            {
-                if (meta.ImcEntries.Count > 0)
-                {
-                    var imcPath = meta.Root.GetRawImcFilePath();
-                    await Imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, tx);
-                }
-            }
-        }
-
         internal static async Task ApplyMetadata(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
         {
             var exists = await tx.FileExists(internalPath, forceOriginal);
@@ -443,6 +374,19 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
                     var imcPath = meta.Root.GetRawImcFilePath();
                     await Imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, tx);
+                }
+                else
+                {
+                    var imcPath = meta.Root.GetRawImcFilePath();
+                    if (Imc.UsesImc(meta.Root) && await tx.FileExists(imcPath))
+                    {
+                        var mod = await tx.GetMod(imcPath);
+                        if (mod != null)
+                        {
+                            // Remove IMC file if we have 0 entries and it's a file we created.
+                            await tx.Set8xDataOffset(imcPath, 0);
+                        }
+                    }
                 }
 
                 var preOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
