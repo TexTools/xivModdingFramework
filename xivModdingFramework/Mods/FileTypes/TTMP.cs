@@ -1064,8 +1064,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     // Inject file info to data store.
                     var offset = tx.UNSAFE_AddFileInfo(fileInfo, df);
 
-                    // Inject Index offset pointer
-                    var ogOffset = await tx.Set8xDataOffset(internalPath, offset);
+                    // Inject Index offset pointerv
+                    await tx.Set8xDataOffset(internalPath, offset);
+                    var ogOffset = await tx.Get8xDataOffset(internalPath, true);
 
                     // Resolve name and category for modlist.
                     var root = await XivCache.GetFirstRoot(internalPath);
