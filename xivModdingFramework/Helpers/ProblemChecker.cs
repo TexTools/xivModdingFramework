@@ -528,5 +528,31 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+        public static async Task AssertAllIndexesAreClean()
+        {
+            var broken = new List<XivDataFile>();
+            foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+            {
+                try
+                {
+                    await AssertIndexIsClean(df);
+                }
+                catch (Exception ex)
+                {
+                    broken.Add(df);
+                }
+            }
+            if(broken.Count == 0)
+            {
+                return;
+            }
+
+            var mes = "The following Indexes have invalid offsets contained within them:\n\n";
+            foreach(var df in broken)
+            {
+                mes += XivDataFiles.GetFilePath(df) + "\n";
+            }
+            throw new InvalidDataException(mes);
+        }
     }
 }
