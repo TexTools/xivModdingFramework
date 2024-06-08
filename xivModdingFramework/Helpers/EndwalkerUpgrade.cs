@@ -19,6 +19,10 @@ namespace xivModdingFramework.Helpers
         /// <returns></returns>
         public static bool FastMdlv6Upgrade(BinaryReader br, BinaryWriter bw, long offset = -1)
         {
+#if ENDWALKER
+            return false;
+#endif
+
             if(offset < 0)
             {
                 offset = br.BaseStream.Position;
@@ -36,6 +40,17 @@ namespace xivModdingFramework.Helpers
 
             br.BaseStream.Seek(offset + 12, SeekOrigin.Begin);
             var meshCount = br.ReadUInt16();
+
+            if(meshCount == 0)
+            {
+                // Uhh..?
+                return false;
+            }
+
+            br.BaseStream.Seek(offset + 64, SeekOrigin.Begin);
+            var lodOffset = br.BaseStream.Position;
+            var lods = br.ReadByte();
+
             var endOfVertexHeaders = offset + Mdl._MdlHeaderSize + (Mdl._VertexDataHeaderSize * meshCount);
 
             br.BaseStream.Seek(endOfVertexHeaders + 4, SeekOrigin.Begin);
@@ -47,17 +62,13 @@ namespace xivModdingFramework.Helpers
             var mdlDataOffset = br.BaseStream.Position;
             var mdlData = MdlModelData.Read(br);
 
-            if (mdlData.BoneSetCount <= 1)
+            if(mdlData.BoneSetCount == 0 || mdlData.BoneCount == 0)
             {
+                // Not 100% sure how to update boneless meshes to v6 yet, so don't upgrade for safety.
                 return false;
             }
 
-
             br.ReadBytes(mdlData.ElementIdCount * 32);
-
-
-
-
 
             // LoD Headers
             br.ReadBytes(60 * 3);
@@ -105,6 +116,12 @@ namespace xivModdingFramework.Helpers
             // Write version information.
             bw.BaseStream.Seek(offset, SeekOrigin.Begin);
             bw.Write((ushort)6);
+
+
+            // Write LoD count.
+            bw.BaseStream.Seek(lodOffset, SeekOrigin.Begin);
+            bw.Write((byte)1);
+
 
             // Write bone set size.
             short boneSetSize = (short) (64 * mdlData.BoneSetCount);

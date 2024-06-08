@@ -2352,7 +2352,16 @@ namespace xivModdingFramework.Cache
 
             // Ensure we're good and clean up after ourselves.
             SQLiteConnection.ClearAllPools();
+
+            // It'd be nice to be able to use this...
+            // GC.WaitForPendingFinalizers();
+            // But the SQlite library sometimes hangs indefinitely if you call it.
+            // So instead...
+
             _cacheWorker = null;
+
+            // We commit sudoku.
+            Thread.CurrentThread.Abort();
         }
 
 
