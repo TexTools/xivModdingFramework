@@ -3305,32 +3305,6 @@ namespace xivModdingFramework.Models.FileTypes
                             else
                             {
 #if DAWNTRAIL
-                                /*
-                                // Debug Code
-                                HashSet<string> bonesAndParents = new HashSet<string>();
-                                foreach(var bone in ttModel.MeshGroups[mi].Bones)
-                                {
-                                    var b = skel.First(x => x.BoneName == bone);
-                                    var parents = Sklb.GetParents(b, skel);
-
-                                    var pNames = parents.Select(x => x.BoneName);
-                                    bonesAndParents.UnionWith(pNames);
-                                }
-
-                                bonesAndParents.UnionWith(ttModel.MeshGroups[mi].Bones);
-                                var missingBones = new List<string>();
-
-                                foreach(var b in bonesAndParents)
-                                {
-                                    if(ttModel.MeshGroups[mi].Bones.IndexOf(b) < 0)
-                                    {
-                                        missingBones.Add(b);
-                                    }
-                                }*/
-
-                                // DAWNTRAIL BENCHMARK HACKHACK - Force this to 64.
-                                data.AddRange(BitConverter.GetBytes(64));
-#else
                                 data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
 #endif
                             }
@@ -5069,35 +5043,19 @@ namespace xivModdingFramework.Models.FileTypes
                 }
             }
 
-            if (boneRefs.Count == 0)
+            if (boneRefs.Count <= 1)
             {
-                // No bones, no problems.
+                // Single or no boneset.
                 return;
             }
 
-            if (boneRefs.Count > 10 || boneRefs.Any(x => x.BoneCount > 64 || x.BoneCount < 0))
-            {
-                // Something went wrong, try to v6 Updgrade the file.
-                var ttMdl = await GetTTModel(path, false, tx);
-                var xivMdl = await GetXivMdl(path, false, tx);
-                ttMdl.MdlVersion = 6;
 
-                uncomp = await MakeCompressedMdlFile(ttMdl, xivMdl);
-            }
-            else
-            {
-                using (var ms = new MemoryStream(uncomp))
-                {
-                    using (var bw = new BinaryWriter(ms))
-                    {
-                        foreach (var b in boneRefs)
-                        {
-                            bw.BaseStream.Seek(b.Offset, SeekOrigin.Begin);
-                            bw.Write(BitConverter.GetBytes(64));
-                        }
-                    }
-                }
-            }
+            // Have to v6 the file for now, blergh.
+            var ttMdl = await GetTTModel(path, false, tx);
+            var xivMdl = await GetXivMdl(path, false, tx);
+            ttMdl.MdlVersion = 6;
+
+            uncomp = await MakeCompressedMdlFile(ttMdl, xivMdl);
 
             await Dat.WriteModFile(uncomp, path, source, null, tx, false);
         }
