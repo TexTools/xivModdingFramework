@@ -1040,13 +1040,12 @@ namespace xivModdingFramework.Cache
 
         public string GetRawImcFilePath()
         {
-            var imcPath = "";
-            if (Info.PrimaryType == XivItemType.indoor || Info.PrimaryType == XivItemType.outdoor)
+            if (!Imc.UsesImc(this))
             {
-                // These types can never have IMC entries.
                 return null;
             }
 
+            var imcPath = "";
 
             if (Info.SecondaryType == null)
             {
@@ -1177,7 +1176,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public IItemModel GetFirstItem(int defaultImcSubset = -1)
         {
-            using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
+            using (var db = new SQLiteConnection(XivCache.ReadOnlyCacheConnectionString))
             {
                 db.Open();
                 var rootString = Info.ToString();
@@ -1254,7 +1253,7 @@ namespace xivModdingFramework.Cache
         {
 
             var items = new List<IItemModel>();
-            using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
+            using (var db = new SQLiteConnection(XivCache.ReadOnlyCacheConnectionString))
             {
                 db.Open();
                 var rootString = Info.ToString();

@@ -52,6 +52,13 @@ namespace xivModdingFramework.Cache
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
+        internal static string ReadOnlyCacheConnectionString
+        {
+            get
+            {
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;Read Only=True";
+            }
+        }
         internal static string RootsCacheConnectionString
         {
             get
@@ -1372,7 +1379,7 @@ namespace xivModdingFramework.Cache
         public static string GetMetaValue(string key)
         {
             string val = null;
-            using (var db = new SQLiteConnection(CacheConnectionString))
+            using (var db = new SQLiteConnection(ReadOnlyCacheConnectionString))
             {
                 db.Open();
                 var query = "select value from meta where key = $key";
@@ -1506,7 +1513,7 @@ namespace xivModdingFramework.Cache
 
             if(allRoots.Count == 0)
             {
-                using (var db = new SQLiteConnection(CacheConnectionString))
+                using (var db = new SQLiteConnection(ReadOnlyCacheConnectionString))
                 {
                     // Gotta do this for all the supporting types...
                     var query = "select root from items";
@@ -1755,7 +1762,7 @@ namespace xivModdingFramework.Cache
             query = query.Substring(0, query.Length - 1);
             query += ") order by child";
 
-            using (var db = new SQLiteConnection(CacheConnectionString))
+            using (var db = new SQLiteConnection(ReadOnlyCacheConnectionString))
             {
                 db.Open();
                 using (var cmd = new SQLiteCommand(query, db))
@@ -2440,7 +2447,7 @@ namespace xivModdingFramework.Cache
 
         private static async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
         {
-            return await BuildListFromTable<T>(CacheConnectionString, table, where, func);
+            return await BuildListFromTable<T>(ReadOnlyCacheConnectionString, table, where, func);
         }
 
         /// <summary>
