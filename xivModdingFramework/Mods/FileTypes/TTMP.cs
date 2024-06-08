@@ -729,23 +729,19 @@ namespace xivModdingFramework.Mods.FileTypes
                         tempOffsets.Add(modJson.FullPath, offset);
 
                         // And Update the Index to point to the new file.
-                        var oldOffset = await tx.Set8xDataOffset(modJson.FullPath, offset);
+                        var ogOffset = await tx.Get8xDataOffset(modJson.FullPath, true);
+                        await tx.Set8xDataOffset(modJson.FullPath, offset);
 
                         // And Update the Modlist entry.
                         var prevMod = modList.GetMod(modJson.FullPath);
 
                         Mod mod = new Mod();
 
-                        if (prevMod != null)
-                        {
-                            oldOffset = prevMod.Value.OriginalOffset8x;
-                        }
-
                         mod.ItemName = modJson.Name;
                         mod.ItemCategory = modJson.Category;
                         mod.FilePath = modJson.FullPath;
                         mod.ModOffset8x = offset;
-                        mod.OriginalOffset8x = oldOffset;
+                        mod.OriginalOffset8x = ogOffset;
                         mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
                         mod.SourceApplication = settings.SourceApplication;
 
@@ -1064,9 +1060,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     // Inject file info to data store.
                     var offset = tx.UNSAFE_AddFileInfo(fileInfo, df);
 
-                    // Inject Index offset pointerv
-                    await tx.Set8xDataOffset(internalPath, offset);
+                    // Inject Index offset pointer
                     var ogOffset = await tx.Get8xDataOffset(internalPath, true);
+                    await tx.Set8xDataOffset(internalPath, offset);
 
                     // Resolve name and category for modlist.
                     var root = await XivCache.GetFirstRoot(internalPath);

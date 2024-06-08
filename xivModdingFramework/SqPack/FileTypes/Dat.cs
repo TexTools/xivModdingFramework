@@ -1252,7 +1252,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Write to the Data store and update the index with the temporary offset.
                 var offset8x = await tx.UNSAFE_WriteData(df, fileData, compressed);
-                var originalOffset = await tx.Set8xDataOffset(internalFilePath, offset8x);
+                var originalOffset = await tx.Get8xDataOffset(internalFilePath, true);
+                await tx.Set8xDataOffset(internalFilePath, offset8x);
                 
                 ModPack? modPack;
                 if(tx.ModPack != null)
@@ -1660,10 +1661,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                             var newOffset = WriteToTempDat(data, df);
 
-                            if (mod.IsCustomFile())
-                            {
-                                mod.OriginalOffset8x = newOffset;
-                            }
                             mod.ModOffset8x = newOffset;
                             indexFiles[df].Set8xDataOffset(mod.FilePath, newOffset);
                             newMods.Add(mod);
@@ -1922,6 +1919,12 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static bool IsOffsetSane(XivDataFile df, long offset8x, bool originalDatsOnly = false)
         {
+            if(offset8x == 0 )
+            {
+                // A 0 Offset is considered a valid offset (Removed file)
+                return true;
+            }
+
             var parts = IOUtil.Offset8xToParts(offset8x);
 
             if (originalDatsOnly)

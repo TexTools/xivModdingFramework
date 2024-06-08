@@ -832,9 +832,10 @@ namespace xivModdingFramework.Mods
                         m.ModOffset8x = kv.Value.RealOffset;
                         if(m.OriginalOffset8x == kv.Value.TempOffset)
                         {
-                            // Don't think we ever use this path now that we set original value to 0 for custom file mods.
-                            // But it's good to leave it in for safety.
-                            m.OriginalOffset8x = kv.Value.RealOffset;
+                            // This is an old-style identifier for a custom file mod.  It should be corrected, but if something is actually
+                            // hitting this codepath it needs to be fixed.
+                            m.OriginalOffset8x = 0;
+                            Trace.WriteLine("Mod with old style custom-file identifier during TX Commit:" + m.FilePath);
                         }
 
                         _ModList.AddOrUpdateMod(m);
@@ -1703,10 +1704,9 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public async Task<uint> GetSqPackType(XivDataFile dataFile, long offset, bool forceType2 = false)
         {
-            var parts = IOUtil.Offset8xToParts(offset);
-            using (var br = await _DataHandler.GetCompressedFileStream(dataFile, parts.Offset))
+            using (var br = await _DataHandler.GetCompressedFileStream(dataFile, offset, forceType2))
             {
-                return Dat.GetSqPackType(br, offset);
+                return Dat.GetSqPackType(br);
             }
         }
 

@@ -398,7 +398,7 @@ namespace xivModdingFramework.Mods
                     throw new Exception("Cannot delete internal data without explicit toggle.");
                 }
 
-                if(!Dat.IsOffsetSane(nmod.Value.DataFile, nmod.Value.ModOffset8x, true))
+                if(!Dat.IsOffsetSane(nmod.Value.DataFile, nmod.Value.OriginalOffset8x, true))
                 {
                     throw new OffsetException("Mod does not have a valid original offset, cannot safely delete mod.");
                 }
