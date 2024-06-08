@@ -24,6 +24,7 @@ using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Variants.FileTypes;
 using System.Security.Policy;
 using System.Security.Cryptography;
+using xivModdingFramework.VFX.FileTypes;
 
 namespace xivModdingFramework.Cache
 {
@@ -614,33 +615,15 @@ namespace xivModdingFramework.Cache
             var originalModelPaths = await GetModelFiles(tx);
             var originalMaterialPaths = await GetMaterialFiles(-1, tx, includeOrphanMaterials);
             var originalTexturePaths = await GetTextureFiles(-1, tx);
-
-            var originalVfxPaths = new HashSet<string>();
-            if (Imc.UsesImc(this))
-            {
-                var avfxSets = originalMetadata.ImcEntries.Select(x => x.Vfx).Distinct();
-                foreach (var avfx in avfxSets)
-                {
-                    var avfxStuff = await ATex.GetVfxPath(Info, avfx);
-                    if (String.IsNullOrEmpty(avfxStuff.Folder) || String.IsNullOrEmpty(avfxStuff.File)) continue;
-
-                    var path = avfxStuff.Folder + "/" + avfxStuff.File;
-                    if (await tx.FileExists(path))
-                    {
-                        originalVfxPaths.Add(path);
-                        var paths = await ATex.GetAtexPaths(path, false, tx);
-                        foreach (var p in paths)
-                        {
-                            originalVfxPaths.Add(p);
-                        }
-                    }
-                }
-            }
+            var originalAvfx = await GetAvfx(-1, tx);
+            var originalAtex = await GetVfxTextures(-1, tx);
+            
 
             var af = originalModelPaths.Select(x => x).Union(
                 originalMaterialPaths.Select(x => x)).Union(
                 originalTexturePaths.Select(x => x)).Union(
-                originalVfxPaths.Select(x => x));
+                originalAvfx.Select(x => x)).Union(
+                originalAtex.Select(x => x));
 
             var allFiles = new SortedSet<string>();
             foreach (var f in af)
@@ -980,9 +963,80 @@ namespace xivModdingFramework.Cache
                     }
                 }
             }
+
+
             return textures.ToList();
         }
 
+        
+        public async Task<List<string>> GetAvfx(int variant = -1, ModTransaction tx = null)
+        {
+            var files = new List<string>();
+
+            if (!Imc.UsesImc(this))
+            {
+                return files; 
+            }
+
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginTransaction();
+            }
+
+            try
+            {
+                var imc = await Imc.GetFullImcInfo(GetRawImcFilePath(), false, tx);
+
+                if (variant >= 0) {
+                    var entry = imc.GetEntry(variant, Info.Slot);
+                    var ff = await ATex.GetVfxPath(Info, entry.Vfx);
+                    var path = ff.Folder + "/" + ff.File;
+
+                    if(await tx.FileExists(path))
+                    {
+                        files.Add(path);
+                    }
+                } else
+                {
+                    for(int i = 0; i < imc.SubsetCount; i++)
+                    {
+                        var entry = imc.GetEntry(i, Info.Slot);
+                        var ff = await ATex.GetVfxPath(Info, entry.Vfx);
+                        var path = ff.Folder + "/" + ff.File;
+
+                        if (await tx.FileExists(path))
+                        {
+                            files.Add(path);
+                        }
+                    }
+
+                }
+                return files;
+            }
+            catch
+            {
+                return files;
+            }
+        }
+        public async Task<List<string>> GetVfxTextures(int variant = -1, ModTransaction tx = null)
+        {
+            var files = new List<string>();
+
+            var avfx = await GetAvfx(variant);
+
+            if(avfx.Count == 0)
+            {
+                return files;
+            }
+
+            foreach(var av in avfx)
+            {
+                files.AddRange(await Avfx.GetATexPaths(av, false, tx));
+            }
+
+
+            return files;
+        }
 
         public string GetRawImcFilePath()
         {

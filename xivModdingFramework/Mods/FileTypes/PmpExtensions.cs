@@ -212,6 +212,7 @@ namespace xivModdingFramework.Mods.FileTypes
             { XivItemType.accessory, PMPObjectType.Accessory },
             { XivItemType.demihuman, PMPObjectType.DemiHuman },
             { XivItemType.monster, PMPObjectType.Monster },
+            { XivItemType.body, PMPObjectType.Unknown },
         };
 
         public static PmpIdentifierJson GetPenumbraIdentifierFromRoot(XivDependencyRoot root, int variant = 1)

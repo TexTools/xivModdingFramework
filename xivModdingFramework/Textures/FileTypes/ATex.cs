@@ -49,8 +49,6 @@ namespace xivModdingFramework.Textures.FileTypes
 
 
 
-            var itemType = ItemType.GetPrimaryItemType(itemModel);
-
             var vfxPath = await GetVfxPath(itemModel, false, tx);
             return await GetAtexPaths(vfxPath.Folder + '/' + vfxPath.File, forceOriginal, tx);
         }
@@ -60,20 +58,17 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 return new List<string>();
             }
-            var df = IOUtil.GetDataFileFromPath(vfxPath);
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
                 tx = ModTransaction.BeginTransaction();
             }
 
-
             if (!await tx.FileExists(vfxPath))
             {
                 return new List<string>();
             }
 
-            var atexTexTypePathList = new List<TexTypePath>();
             return await Avfx.GetATexPaths(vfxPath, forceOriginal, tx);
         }
 
@@ -134,7 +129,7 @@ namespace xivModdingFramework.Textures.FileTypes
             string vfxFolder, vfxFile;
 
             switch (type)
-            {//
+            {
 
                 case XivItemType.equipment:
                     vfxFolder = $"chara/{type}/{prefix}{id}/vfx/eff";

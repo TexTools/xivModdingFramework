@@ -68,16 +68,27 @@ namespace xivModdingFramework.VFX.FileTypes
 
                         try
                         {
-                            while (br.PeekChar() != 120)
+                            byte ch = 0;
+
+                            // Read until a byte of 120 or end of stream...?
+                            var read = 0;
+                            while(ch != 120)
                             {
-                                if (br.PeekChar() == -1)
+                                if(br.BaseStream.Length == br.BaseStream.Position + 1)
                                 {
+                                    // End of Stream.
                                     break;
                                 }
 
-                                br.ReadByte();
+                                if(ch != 0)
+                                {
+                                    // End of block.
+                                    break;
+                                }
+                                read++;
+                                ch = br.ReadByte();
                             }
-
+                            br.BaseStream.Seek(-1, SeekOrigin.Current);
                             data = br.ReadInt32();
                         }
                         catch

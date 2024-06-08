@@ -372,7 +372,15 @@ namespace xivModdingFramework.Mods.FileTypes
             var pEntry = new PMPImcManipulationJson();
 
             pEntry.ObjectType = PMPExtensions.XivItemTypeToPenumbraObject[root.PrimaryType];
-            pEntry.BodySlot = root.SecondaryType == null ? PMPObjectType.Unknown : PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
+
+            if (root.SecondaryType != null && PMPExtensions.XivItemTypeToPenumbraObject.ContainsKey(root.SecondaryType.Value))
+            {
+                pEntry.BodySlot = PMPExtensions.XivItemTypeToPenumbraObject[root.SecondaryType.Value];
+            }
+            else
+            {
+                pEntry.BodySlot = PMPObjectType.Unknown;
+            }
             pEntry.PrimaryId = (uint)root.PrimaryId;
             pEntry.SecondaryId = (uint)(root.SecondaryId == null ? 0 : root.SecondaryId);
             pEntry.Variant = (uint)variant;
