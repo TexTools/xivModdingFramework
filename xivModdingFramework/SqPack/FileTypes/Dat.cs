@@ -1816,6 +1816,11 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         public static async Task RemoveEmptyDats(XivDataFile dataFile)
         {
+            if (!XivCache.GameWriteEnabled)
+            {
+                throw new Exception("Cannot alter game files while DAT writing is disabled.");
+            }
+
             if (ModTransaction.ActiveTransaction != null)
             {
                 // Safety check here to prevent any misuse or weird bugs from assuming this would be based on post-transaction state.

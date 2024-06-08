@@ -36,6 +36,35 @@ namespace xivModdingFramework.Helpers
     public static class ProblemChecker
     {
 
+        public static async Task ResaveAllIndexFiles()
+        {
+            if (!XivCache.GameWriteEnabled)
+            {
+                throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+            }
+
+            await Task.Run(async () =>
+            {
+                // The simplest way to do this is to just open a tx, pull every index, and save.
+                // That way all hashes/etc. will be recalculated.
+                var tx = ModTransaction.BeginTransaction(true, null, null, false, false);
+                try
+                {
+                    foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+                    {
+                        await tx.GetIndexFile(df);
+                    }
+
+                    await ModTransaction.CommitTransaction(tx, true);
+                }
+                catch
+                {
+                    ModTransaction.CancelTransaction(tx);
+                }
+            });
+
+        }
+
         /// <summary>
         /// Performs a full reset of game files.  Restores Index Backups, Deletes extra DATs, etc.
         /// If for some reason we cannot restore the Index Backups (Ex. They don't exist, or are for the wrong game version), 

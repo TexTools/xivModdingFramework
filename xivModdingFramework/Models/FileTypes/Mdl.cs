@@ -3265,9 +3265,7 @@ namespace xivModdingFramework.Models.FileTypes
                             }
                             else
                             {
-#if DAWNTRAIL
                                 data.AddRange(BitConverter.GetBytes(ttModel.MeshGroups[mi].Bones.Count));
-#endif
                             }
 
                             boneSetsBlock.AddRange(data);
