@@ -61,6 +61,7 @@ using SixLabors.ImageSharp.Formats.Bmp;
 using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.Formats;
 using Image = SixLabors.ImageSharp.Image;
+using System.Diagnostics.CodeAnalysis;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -70,8 +71,8 @@ namespace xivModdingFramework.Models.FileTypes
         private const string MdlExtension = ".mdl";
 
         // Some constant pointers/sizes
-        private const int _MdlHeaderSize = 0x44; // 68 Decimal
-        private const int _vertexDataHeaderSize = 0x88; // 136 Decimal
+        internal const int _MdlHeaderSize = 0x44; // 68 Decimal
+        internal const int _VertexDataHeaderSize = 0x88; // 136 Decimal
 
         private static string _EquipmentModelPathFormat = "chara/equipment/e{0}/model/c{1}e{0}_{2}.mdl";
         private static string _AccessoryModelPathFormat = "chara/accessory/a{0}/model/c{1}a{0}_{2}.mdl";
@@ -336,55 +337,6 @@ namespace xivModdingFramework.Models.FileTypes
             return GetXivMdl(mdlData, mdlPath);
         }
 
-        private static MdlModelData ReadModelData(BinaryReader br)
-        {
-            var mdlModelData = new MdlModelData
-            {
-                Radius = br.ReadSingle(),
-
-                MeshCount = br.ReadInt16(),
-                AttributeCount = br.ReadInt16(),
-                MeshPartCount = br.ReadInt16(),
-                MaterialCount = br.ReadInt16(),
-
-                BoneCount = br.ReadInt16(),
-                BoneListCount = br.ReadInt16(),
-
-                ShapeCount = br.ReadInt16(),
-                ShapePartCount = br.ReadInt16(),
-                ShapeDataCount = br.ReadUInt16(),
-
-                LoDCount = br.ReadByte(),
-
-                Flags1 = (EMeshFlags1)br.ReadByte(),
-
-                ElementIdCount = br.ReadUInt16(),
-                TerrainShadowMeshCount = br.ReadByte(),
-
-                Flags2 = (EMeshFlags2)br.ReadByte(),
-
-                ModelClipOutDistance = br.ReadSingle(),
-                ShadowClipOutDistance = br.ReadSingle(),
-
-                FurniturePartBoundingBoxCount = br.ReadUInt16(),
-                TerrainShadowPartCount = br.ReadInt16(),
-                Flags3 = (EMeshFlags3)br.ReadByte(),
-
-                BgChangeMaterialIndex = br.ReadByte(),
-                BgCrestChangeMaterialIndex = br.ReadByte(),
-
-                Unknown12 = br.ReadByte(),
-                BoneSetSize = br.ReadInt16(),
-
-                Unknown13 = br.ReadInt16(),
-                Unknown14 = br.ReadInt16(),
-                Unknown15 = br.ReadInt16(),
-                Unknown16 = br.ReadInt16(),
-                Unknown17 = br.ReadInt16()
-            };
-
-            return mdlModelData;
-        }
         public static XivMdl GetXivMdl(byte[] mdlData, string mdlPath = "")
         {
 
@@ -395,7 +347,7 @@ namespace xivModdingFramework.Models.FileTypes
             var meshCount = BitConverter.ToUInt16(mdlData, 12);
 
             // Calculated offsets
-            int _endOfVertexDataHeaders = _MdlHeaderSize + (_vertexDataHeaderSize * meshCount);
+            int _endOfVertexDataHeaders = _MdlHeaderSize + (_VertexDataHeaderSize * meshCount);
 
             using (var br = new BinaryReader(new MemoryStream(mdlData)))
             {
@@ -428,7 +380,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Finished reading all MdlModelData
                 // Adding to xivMdl
-                var mdlModelData = ReadModelData(br);
+                var mdlModelData = MdlModelData.Read(br);
                 xivMdl.ModelData = mdlModelData;
 
                 // Now that we have the path counts wee can parse the path strings
@@ -591,7 +543,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         // LoD Index * Vertex Data Structure size + Header
 
-                        br.BaseStream.Seek(j * _vertexDataHeaderSize + loDStructPos, SeekOrigin.Begin);
+                        br.BaseStream.Seek(j * _VertexDataHeaderSize + loDStructPos, SeekOrigin.Begin);
 
                         // If the first byte is 255, we reached the end of the Vertex Data Structs (For this Mesh)
                         while(true)
@@ -771,16 +723,20 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.BoneDataBlock = boneDataBlock;
                 // Bone Lists
                 xivMdl.MeshBoneSets = new List<BoneSet>();
+
+                var boneSetStart = br.BaseStream.Position;
+                var totalBoneBlockSize = (mdlModelData.BoneSetSize * 2) + (mdlModelData.BoneSetCount * 4);
+                var boneSetEnd = boneSetStart + totalBoneBlockSize;
                 if (mdlVersion >= 6) // Mdl Version 6
                 {
                     var boneIndexMetaTable = new List<short[]>();
 
-                    for (var i = 0; i < xivMdl.ModelData.BoneListCount; ++i)
+                    for (var i = 0; i < xivMdl.ModelData.BoneSetCount; i++)
                     {
                         boneIndexMetaTable.Add(new short[2] { br.ReadInt16(), br.ReadInt16() });
                     }
 
-                    for (var i = 0; i < xivMdl.ModelData.BoneListCount; ++i)
+                    for (var i = 0; i < xivMdl.ModelData.BoneSetCount; i++)
                     {
                         var boneCount = boneIndexMetaTable[i][1];
                         var boneIndexMesh = new BoneSet
@@ -801,10 +757,15 @@ namespace xivModdingFramework.Models.FileTypes
 
                         xivMdl.MeshBoneSets.Add(boneIndexMesh);
                     }
+
+                    while(br.BaseStream.Position < boneSetEnd)
+                    {
+                        br.ReadByte();
+                    }
                 }
                 else // Mdl Version 5
                 {
-                    for (var i = 0; i < xivMdl.ModelData.BoneListCount; i++)
+                    for (var i = 0; i < xivMdl.ModelData.BoneSetCount; i++)
                     {
                         var boneIndexMesh = new BoneSet
                         {
@@ -2633,9 +2594,9 @@ namespace xivModdingFramework.Models.FileTypes
                     var meshBlockSize = vertexInfoBlock.Count - startOfMesh;
 
                     // Fill rest of the array size.
-                    if (meshBlockSize < _vertexDataHeaderSize)
+                    if (meshBlockSize < _VertexDataHeaderSize)
                     {
-                        var remaining = _vertexDataHeaderSize - meshBlockSize;
+                        var remaining = _VertexDataHeaderSize - meshBlockSize;
 
                         vertexInfoBlock.AddRange(new byte[remaining]);
                     }
@@ -5023,129 +4984,24 @@ namespace xivModdingFramework.Models.FileTypes
         #region Dawntrail Model Fix
         public static async Task UpdateEndwalkerModels(string path, string source, ModTransaction tx)
         {
-            using (var br = await tx.GetFileStream(path))
-            {
-                var version = br.ReadUInt16();
-                if(version != 5)
-                {
-                    return;
-                }
-            };
-
             var uncomp = await tx.ReadFile(path, false, false);
 
-            var boneRefs = new List<(long Offset, int BoneCount)>();
             using (var ms = new MemoryStream(uncomp))
             {
                 using (var br = new BinaryReader(ms))
                 {
-                    boneRefs = GetV5BoneGroupCountOffsets(br);
+                    using (var bw = new BinaryWriter(ms))
+                    {
+                        var anyChanges = EndwalkerUpgrade.FastMdlv6Upgrade(br, bw);
+                        if (!anyChanges)
+                        {
+                            return;
+                        }
+                    }
                 }
             }
 
-            if (boneRefs.Count <= 1)
-            {
-                // Single or no boneset.
-                return;
-            }
-
-
-            // Have to v6 the file for now, blergh.
-            var ttMdl = await GetTTModel(path, false, tx);
-            var xivMdl = await GetXivMdl(path, false, tx);
-            ttMdl.MdlVersion = 6;
-
-            uncomp = await MakeCompressedMdlFile(ttMdl, xivMdl);
-
             await Dat.WriteModFile(uncomp, path, source, null, tx, false);
-        }
-
-
-        /// <summary>
-        /// Reads an uncompressed v5 MDL and retrieves the offsets to the bone lists, in order to update them.
-        /// </summary>
-        /// <param name="br"></param>
-        /// <param name="offset"></param>
-        /// <returns></returns>
-        private static List<(long Offset, int BoneCount)> GetV5BoneGroupCountOffsets(BinaryReader br, long offset = -1)
-        {
-            if (offset >= 0)
-            {
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
-            }
-            else
-            {
-                offset = br.BaseStream.Position;
-            }
-
-            var version = br.ReadUInt16();
-            if(version != 5)
-            {
-                return new List<(long Offset, int BoneCount)>();
-            }
-
-            br.BaseStream.Seek(offset + 12, SeekOrigin.Begin);
-            var meshCount = br.ReadUInt16();
-            var endOfVertexHeaders = offset + _MdlHeaderSize + (_vertexDataHeaderSize * meshCount);
-
-            br.BaseStream.Seek(endOfVertexHeaders + 4, SeekOrigin.Begin);
-            var pathBlockSize = br.ReadUInt32();
-
-            br.ReadBytes((int)pathBlockSize);
-            var endOfPathBlock = br.BaseStream.Position + pathBlockSize;
-
-            // Mesh data block.
-            var mdlData = ReadModelData(br);
-            br.ReadBytes(mdlData.ElementIdCount * 32);
-
-            if(mdlData.BoneListCount == 0)
-            {
-                return new List<(long Offset, int BoneCount)>();
-            }
-
-
-            // LoD Headers
-            br.ReadBytes(60 * 3);
-
-            if ((mdlData.Flags2 & EMeshFlags2.HasExtraMeshes) != 0)
-            {
-                // Extra Mesh Info Block.
-                br.ReadBytes(60);
-            }
-
-
-            // Mesh Group headers.
-            br.ReadBytes(36 * meshCount);
-
-            // Attribute pointers.
-            br.ReadBytes(4 * mdlData.AttributeCount);
-
-            // Mesh Part information.
-            br.ReadBytes(16 * mdlData.MeshPartCount);
-
-            // Show Mesh Part Information.
-            br.ReadBytes(12 * mdlData.TerrainShadowPartCount);
-
-            // Material Pointers.
-            br.ReadBytes(4 * mdlData.MaterialCount);
-
-            // Bone Pointers.
-            br.ReadBytes(4 * mdlData.BoneCount);
-
-            var ret = new List<(long Offset, int BoneCount)>();
-            for (int i = 0; i < mdlData.BoneListCount; i++)
-            {
-                // Bone List
-                br.ReadBytes(64 * 2);
-
-                // Bone List Size.
-                var countOffset = br.BaseStream.Position;
-                var count = br.ReadUInt32();
-
-                ret.Add((countOffset, (int)count));
-            }
-
-            return ret;
         }
 
 

@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.IO;
 using xivModdingFramework.Mods.DataContainers;
 
 namespace xivModdingFramework.Models.DataContainers
@@ -107,7 +108,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// There is usually one per LoD
         /// </remarks>
-        public short BoneListCount { get; set; }
+        public short BoneSetCount { get; set; }
 
         /// <summary>
         /// The number of Mesh Shapes
@@ -202,5 +203,88 @@ namespace xivModdingFramework.Models.DataContainers
         /// Padding?
         /// </summary>
         public short Unknown17 { get; set; }
+
+        public static MdlModelData Read(BinaryReader br)
+        {
+            var modelData = new MdlModelData
+            {
+                Radius = br.ReadSingle(),
+
+                MeshCount = br.ReadInt16(),
+                AttributeCount = br.ReadInt16(),
+                MeshPartCount = br.ReadInt16(),
+                MaterialCount = br.ReadInt16(),
+
+                BoneCount = br.ReadInt16(),
+                BoneSetCount = br.ReadInt16(),
+
+                ShapeCount = br.ReadInt16(),
+                ShapePartCount = br.ReadInt16(),
+                ShapeDataCount = br.ReadUInt16(),
+
+                LoDCount = br.ReadByte(),
+
+                Flags1 = (EMeshFlags1)br.ReadByte(),
+
+                ElementIdCount = br.ReadUInt16(),
+                TerrainShadowMeshCount = br.ReadByte(),
+
+                Flags2 = (EMeshFlags2)br.ReadByte(),
+
+                ModelClipOutDistance = br.ReadSingle(),
+                ShadowClipOutDistance = br.ReadSingle(),
+
+                FurniturePartBoundingBoxCount = br.ReadUInt16(),
+                TerrainShadowPartCount = br.ReadInt16(),
+                Flags3 = (EMeshFlags3)br.ReadByte(),
+
+                BgChangeMaterialIndex = br.ReadByte(),
+                BgCrestChangeMaterialIndex = br.ReadByte(),
+
+                Unknown12 = br.ReadByte(),
+                BoneSetSize = br.ReadInt16(),
+
+                Unknown13 = br.ReadInt16(),
+                Unknown14 = br.ReadInt16(),
+                Unknown15 = br.ReadInt16(),
+                Unknown16 = br.ReadInt16(),
+                Unknown17 = br.ReadInt16()
+            };
+
+            return modelData;
+        }
+
+        public void Write(BinaryWriter br)
+        {
+            br.Write(Radius);
+            br.Write(MeshCount);
+            br.Write(AttributeCount);
+            br.Write(MeshPartCount);
+            br.Write(MaterialCount);
+            br.Write(BoneCount);
+            br.Write(BoneSetCount);
+            br.Write(ShapeCount);
+            br.Write(ShapePartCount);
+            br.Write(ShapeDataCount);
+            br.Write(LoDCount);
+            br.Write((byte) Flags1);
+            br.Write(ElementIdCount);
+            br.Write(TerrainShadowMeshCount);
+            br.Write((byte)Flags2);
+            br.Write(ModelClipOutDistance);
+            br.Write(ShadowClipOutDistance);
+            br.Write(FurniturePartBoundingBoxCount);
+            br.Write(TerrainShadowPartCount);
+            br.Write((byte)Flags3);
+            br.Write(BgChangeMaterialIndex);
+            br.Write(BgCrestChangeMaterialIndex);
+            br.Write(Unknown12);
+            br.Write(BoneSetSize);
+            br.Write(Unknown13);
+            br.Write(Unknown14);
+            br.Write(Unknown15);
+            br.Write(Unknown16);
+            br.Write(Unknown17);
+        }
     }
 }

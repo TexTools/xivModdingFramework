@@ -1213,7 +1213,7 @@ namespace xivModdingFramework.Models.DataContainers
 
             var result = new List<byte>(new byte[(partial.Count * 2)]);
 
-            // This is essential a translation table of [mesh group bone index] => [full model bone index]
+            // This is essentially a translation table of [mesh group bone index] => [full model bone index]
             for (int i = 0; i < partial.Count; i++)
             {
                 var idx = (short)fullList.IndexOf(partial[i]);
