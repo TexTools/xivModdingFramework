@@ -106,7 +106,7 @@ namespace xivModdingFramework.Mods.DataContainers
 
                     foreach (var o in g.OptionList)
                     {
-                        if (o.ImagePath != null)
+                        if (!string.IsNullOrEmpty(o.ImagePath))
                         {
                             return o.ImagePath;
                         }
