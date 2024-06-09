@@ -462,9 +462,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<long> ImportType2Data(byte[] dataToImport,  string internalPath, string source, IItem referenceItem = null, ModTransaction tx = null)
         {
-
-            var newData = (await CompressType2Data(dataToImport));
-            var newOffset = await WriteModFile(newData, internalPath, source, referenceItem, tx);
+            var newOffset = await WriteModFile(dataToImport, internalPath, source, referenceItem, tx, false);
 
             if (newOffset <= 0)
             {

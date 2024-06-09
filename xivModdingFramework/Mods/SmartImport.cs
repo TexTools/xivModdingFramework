@@ -200,7 +200,8 @@ namespace xivModdingFramework.Mods
 
 
             byte[] result = null;
-            if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic)
+            // Targa is horrible to detect by bytes, so only allow it for file endings.
+            if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic || externalPath.ToLower().EndsWith(".tga"))
             {
                 var ddsPath = externalPath;
                 if (magic32 != DDSMagic)

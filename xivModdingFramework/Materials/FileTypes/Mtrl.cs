@@ -1232,7 +1232,14 @@ namespace xivModdingFramework.Materials.FileTypes
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx);
 
                 var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
-                await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
+                if (data.data != null)
+                {
+                    await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
+                } else
+                {
+                    // Resave the material with texture validation to create dummy textures if none exist.
+                    await ImportMtrl(mtrl, null, source, true, tx);
+                }
             } else if(mtrl.ShaderPack == EShaderPack.Skin)
             {
                 await UpdateEndwalkerSkinMaterial(mtrl, source, tx);
@@ -1415,6 +1422,12 @@ namespace xivModdingFramework.Materials.FileTypes
         private static async Task<(string indexFilePath, byte[] data)> CreateIndexFromNormal(string indexPath, string sourceNormalPath, ModTransaction tx = null)
         {
 
+            if (!await tx.FileExists(sourceNormalPath))
+            {
+                // Can't create an index.  Return null to indicate mtrl should be resaved with texture validation.
+                return (indexPath, null);
+            }
+
             // Read normal file.
             var normalTex = await Tex.GetXivTex(sourceNormalPath, false, tx);
             var normalData = await normalTex.GetRawPixels();
@@ -1456,15 +1469,30 @@ namespace xivModdingFramework.Materials.FileTypes
             // Arbitrary base game hair file to use to replace our shader constants.
             var constantBase = await GetXivMtrl("chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl", true, tx);
             mtrl.ShaderConstants = constantBase.ShaderConstants;
-            var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
 
-            await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx);
+            if (await tx.FileExists(normalTexSampler.Dx11Path) && await tx.FileExists(maskTexSampler.Dx11Path))
+            {
+                await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx);
 
-            await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
+                // Direct call to writemodfile is a little faster than going full import route.
+                var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+                await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
+            }
+            else
+            {
+                // Use slower material import path here to do texture stubbing.
+                await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+            }
+
         }
 
         private static async Task UpdateEndwalkerHairTextures(string normalPath, string maskPath, string source, ModTransaction tx)
         {
+            if(!await tx.FileExists(normalPath) || !await tx.FileExists(maskPath))
+            {
+                return;
+            }
+
             // Read normal file.
             var normalTex = await Tex.GetXivTex(normalPath, false, tx);
             var maskTex = await Tex.GetXivTex(maskPath, false, tx);
