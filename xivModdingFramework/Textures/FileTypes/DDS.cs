@@ -852,10 +852,10 @@ namespace xivModdingFramework.Textures.FileTypes
                         {
                             FileName = converter,
                             Arguments = args,
-                            RedirectStandardOutput = false,
-                            RedirectStandardError = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
                             UseShellExecute = false,
-                            CreateNoWindow = false,
+                            CreateNoWindow = true,
                             WorkingDirectory = workingDirectory,
                         }
                     };
