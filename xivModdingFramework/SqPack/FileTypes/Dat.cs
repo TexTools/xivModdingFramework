@@ -596,7 +596,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var fileType = br.ReadInt32();
             if (fileType != 2)
             {
-                return null;
+                throw new Exception("Requested Type 2 file is not a valid type 2 file.");
             }
             var uncompSize = br.ReadInt32();
             var bufferInfoA = br.ReadInt32();
@@ -1302,7 +1302,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 modList.AddOrUpdateMod(mod);
 
                 // Always expand metadata.
-                await ExpandMetadata(fileData, internalFilePath, tx);
+                await ExpandMetadata(fileData, internalFilePath, tx, compressed);
 
                 XivCache.QueueDependencyUpdate(internalFilePath);
 
@@ -1342,7 +1342,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <param name="data"></param>
         /// <param name="internalPath"></param>
         /// <returns></returns>
-        private static async Task ExpandMetadata(byte[] data, string internalPath, ModTransaction tx = null)
+        private static async Task ExpandMetadata(byte[] data, string internalPath, ModTransaction tx = null, bool compressed = true)
         {
             // Perform metadata expansion if needed.
             var ext = Path.GetExtension(internalPath);
@@ -1350,7 +1350,13 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (ext == ".meta")
             {
                 byte[] metaRaw;
-                metaRaw = (await ReadSqPackType2(data)).ToArray();
+                if (compressed)
+                {
+                    metaRaw = (await ReadSqPackType2(data)).ToArray();
+                } else
+                {
+                    metaRaw = data;
+                }
 
                 var meta = await ItemMetadata.Deserialize(metaRaw);
                 meta.Validate(internalPath);
@@ -1360,7 +1366,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             else if (ext == ".rgsp")
             {
                 byte[] rgspRaw;
-                rgspRaw = (await ReadSqPackType2(data)).ToArray();
+                if (compressed)
+                {
+                    rgspRaw = (await ReadSqPackType2(data)).ToArray();
+                }
+                else
+                {
+                    rgspRaw = data;
+                }
                 // Expand the racial scaling file.
                 await CMP.ApplyRgspFile(rgspRaw, tx);
             }
