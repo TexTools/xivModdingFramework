@@ -998,6 +998,8 @@ namespace xivModdingFramework.Mods.FileTypes
                 modpack.Version = mpl.Version;
                 description = mpl.Description;
 
+                image = await GetModpackHeaderImage(mpl, modpackFile);
+
             } else if(modpackFile.EndsWith(".pmp") || modpackFile.EndsWith(".json") || modpackFile.EndsWith("/"))
             {
                 var pmpAndPath = await PMP.PMP.LoadPMP(modpackFile, true, true);
@@ -1474,6 +1476,20 @@ namespace xivModdingFramework.Mods.FileTypes
             }
             return ret;
         }
+
+        public static async Task<string> GetModpackHeaderImage(ModPackJson mpl, string modpackPath)
+        {
+            var path = mpl.GetHeaderImagePath();
+            if (path == null) return null;
+
+            var tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
+            await IOUtil.UnzipFile(modpackPath, tempFolder, path);
+
+
+
+            return Path.GetFullPath(Path.Combine(tempFolder, path));
+        }
+
 
     }
 }

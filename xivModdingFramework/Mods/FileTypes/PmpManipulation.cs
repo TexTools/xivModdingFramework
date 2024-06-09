@@ -471,6 +471,10 @@ namespace xivModdingFramework.Mods.FileTypes
             var xivRace = PMPExtensions.GetRaceFromPenumbraValue(Race, Gender);
 
             // Tag bits.
+            if (!metadata.EqdpEntries.ContainsKey(xivRace))
+            {
+                metadata.EqdpEntries.Add(xivRace, new EquipmentDeformationParameter());
+            }
             metadata.EqdpEntries[xivRace].HasMaterial = (ShiftedEntry & 0x01) != 0;
             metadata.EqdpEntries[xivRace].HasModel = (ShiftedEntry & 0x02) != 0;
         }
