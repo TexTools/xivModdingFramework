@@ -1308,7 +1308,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
 
                 var needsTexFix = DoesModpackNeedTexFix(mpl);
-                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, includeData, needsTexFix);
+                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, needsTexFix, includeData);
 
             });
         }
