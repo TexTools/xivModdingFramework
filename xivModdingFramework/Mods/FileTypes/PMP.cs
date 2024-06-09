@@ -87,9 +87,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return path;
         }
 
-        public static async Task<(PMPJson pmp, string path)> LoadPMP(string path, bool jsonOnly = false)
+        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeHeaderImage = false)
         {
             var gameDir = XivCache.GameInfo.GameDirectory;
+
+            var originalPath = path;
+
+            var alreadyUnzipped = !path.ToLower().EndsWith(".pmp");
 
             path = await ResolvePMPBasePath(path, jsonOnly);
             var defModPath = Path.Combine(path, "default_mod.json");
@@ -97,6 +101,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             var text = File.ReadAllText(metaPath);
             var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text);
+
+            string image = null;
+
 
 
             var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath));
@@ -120,7 +127,23 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 Groups = groups
             };
 
-            return (pmp, path);
+
+            if (includeHeaderImage)
+            {
+                image = pmp.GetHeaderImage();
+                if(image != null)
+                {
+                    if (!alreadyUnzipped)
+                    {
+                        await IOUtil.UnzipFile(originalPath, path, image);
+                    }
+                    image = Path.Combine(path, image);
+                }
+            }
+
+
+
+            return (pmp, path, image);
         }
 
         /// <summary>
@@ -1077,6 +1100,35 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public PMPMetaJson Meta { get; set; }
         public PMPOptionJson DefaultMod { get; set; }
         public List<PMPGroupJson> Groups { get; set; }
+
+        public string GetHeaderImage()
+        {
+            if (!string.IsNullOrWhiteSpace(Meta.Image))
+            {
+                return Meta.Image;
+            }
+
+            if (DefaultMod != null && !string.IsNullOrWhiteSpace(DefaultMod.Image))
+            {
+                return DefaultMod.Image;
+            }
+
+            foreach (var g in Groups)
+            {
+                if (!string.IsNullOrWhiteSpace(g.Image))
+                {
+                    return g.Image;
+                }
+                foreach (var o in g.Options)
+                {
+                    if (!string.IsNullOrWhiteSpace(o.Image))
+                    {
+                        return o.Image;
+                    }
+                }
+            }
+            return null;
+        }
     }
 
     public class PMPMetaJson

@@ -989,6 +989,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var modpack = new ModPack();
             var description = "";
+            string image = null;
             if (modpackFile.EndsWith(".ttmp2") || modpackFile.EndsWith(".ttmp")) {
                 var mpl = await GetModpackList(modpackFile);
                 modpack.Author = mpl.Author;
@@ -999,7 +1000,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             } else if(modpackFile.EndsWith(".pmp") || modpackFile.EndsWith(".json") || modpackFile.EndsWith("/"))
             {
-                var pmpAndPath = await PMP.PMP.LoadPMP(modpackFile, true);
+                var pmpAndPath = await PMP.PMP.LoadPMP(modpackFile, true, true);
                 var pmp = pmpAndPath.pmp;
 
                 modpack.Name = pmp.Meta.Name;
@@ -1007,8 +1008,9 @@ namespace xivModdingFramework.Mods.FileTypes
                 modpack.Url = pmp.Meta.Website;
                 modpack.Version = pmp.Meta.Version;
                 description = pmp.Meta.Description;
+                image = pmpAndPath.headerImage;
             }
-            return (modpack, description, null);
+            return (modpack, description, image);
         }
 
         /// <summary>

@@ -558,6 +558,11 @@ namespace xivModdingFramework.Helpers
             return info;
         }
 
+        public static async Task UnzipFile(string zipLocation, string destination, string file)
+        {
+            await UnzipFiles(zipLocation, destination, new List<string>() { file });
+        }
+
         public  static async Task UnzipFiles(string zipLocation, string destination, IEnumerable<string> files = null)
         {
             HashSet<string> filesToUnzip = null;
