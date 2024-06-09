@@ -16,6 +16,7 @@
 
 using SharpDX;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
@@ -805,7 +806,9 @@ namespace xivModdingFramework.Textures.FileTypes
             var input = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".tga");
             using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
             {
-                img.SaveAsTga(input);
+                var encoder = new TgaEncoder();
+                encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
+                img.SaveAsTga(input,encoder);
             }
 
             try
