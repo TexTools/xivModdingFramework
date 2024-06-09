@@ -227,7 +227,7 @@ namespace xivModdingFramework.Mods.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             foreach(var file in files)
@@ -302,7 +302,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 if (tx == null)
                 {
                     // Readonly TX if we don't have one already.
-                    tx = ModTransaction.BeginTransaction();
+                    tx = ModTransaction.BeginReadonlyTransaction();
                 }
 
                 using var writer = new TTMPWriter(modPackData, _typeCodeSimple);
@@ -341,7 +341,7 @@ namespace xivModdingFramework.Mods.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one already.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             return await Task.Run(async () =>
             {
@@ -617,7 +617,8 @@ namespace xivModdingFramework.Mods.FileTypes
             var progress = settings.ProgressReporter;
             var GetRootConversionsFunction = settings.RootConversionFunction;
 
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx, true);
+            tx = boiler.Transaction;
             Dictionary<string, TxFileState> originalStates = new Dictionary<string, TxFileState>();
             try
             {
@@ -1025,7 +1026,8 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
             var originalStates = new Dictionary<string, TxFileState>();
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 tx.ModPack = modpack;

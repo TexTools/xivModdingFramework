@@ -189,7 +189,7 @@ namespace xivModdingFramework.Mods
             if(tx == null)
             {
                 // Read only TX so we can be lazy about manually disposing it.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var modList = await tx.GetModList();
 
@@ -259,7 +259,8 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Mod State to Invalid.");
             }
 
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var nMod = await tx.GetMod(path);
@@ -381,7 +382,8 @@ namespace xivModdingFramework.Mods
                 throw new ArgumentException("Deleted Mod Path cannot be blank.");
             }
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var modList = await tx.GetModList();
@@ -437,7 +439,8 @@ namespace xivModdingFramework.Mods
         public static async Task SetModpackState(EModState state, string modPackName, ModTransaction tx = null)
         {
 
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var ml = await tx.GetModList();
@@ -501,7 +504,8 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Invalid Mod State.");
             }
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var modList = await tx.GetModList();
@@ -547,7 +551,8 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task SetModStates(EModState state, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var total = 0;
@@ -600,7 +605,7 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var ml = await tx.GetModList();
 
@@ -629,7 +634,7 @@ namespace xivModdingFramework.Mods
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var ml = await tx.GetModList();
             var mods = ml.GetMods().ToList();
@@ -663,7 +668,8 @@ namespace xivModdingFramework.Mods
 
             progressReporter?.Report((0, 0, "Loading Modlist file..."));
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var modlist = await tx.GetModList();
@@ -798,7 +804,7 @@ namespace xivModdingFramework.Mods
                     if (tx == null)
                     {
                         // Read only TX if none supplied.
-                        tx = ModTransaction.BeginTransaction();
+                        tx = ModTransaction.BeginReadonlyTransaction();
                     }
 
                     imcEntries = await Imc.GetEntries(await root.GetImcEntryPaths(), false, tx);

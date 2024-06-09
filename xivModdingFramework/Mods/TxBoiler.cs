@@ -20,8 +20,7 @@ namespace xivModdingFramework.Mods
         private ModPack? originalModpack;
         private ModPack? ownModpack;
 
-        public ModTransaction Transaction
-        {
+        public ModTransaction Transaction {
             get => tx;
         }
         public bool OwnTx
@@ -79,7 +78,7 @@ namespace xivModdingFramework.Mods
         {
             if (ownTx)
             {
-                ModTransaction.CancelTransaction(tx, graceful);
+                await ModTransaction.CancelTransaction(tx, graceful);
             }
             else
             {
@@ -145,56 +144,59 @@ namespace xivModdingFramework.Mods
         }
 
 
-        public static TxBoiler BeginWrite(ref ModTransaction tx, bool doBatch = true, ModPack? modpack = null, bool throwawayTx = false)
+        public static async Task<TxBoiler> BeginWrite(ModTransaction tx, bool doBatch = true, ModPack? modpack = null, bool throwawayTx = false)
         {
-            var ownTx = false;
-            ModPack? originalModpack = null;
-            ModPack? ownModpack = null;
-            if (tx == null)
+            return await Task.Run(async () =>
             {
-                ownTx = true;
-                ModTransactionSettings? settings = null;
-                if (throwawayTx)
+                var ownTx = false;
+                ModPack? originalModpack = null;
+                ModPack? ownModpack = null;
+                if (tx == null)
                 {
-                    var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-                    Directory.CreateDirectory(tempPath);
-                    settings = new ModTransactionSettings()
+                    ownTx = true;
+                    ModTransactionSettings? settings = null;
+                    if (throwawayTx)
                     {
-                        StorageType = SqPack.FileTypes.EFileStorageType.UncompressedIndividual,
-                        Target = ETransactionTarget.FolderTree,
-                        TargetPath = tempPath,
-                        Unsafe = false,
-                    };
+                        var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                        Directory.CreateDirectory(tempPath);
+                        settings = new ModTransactionSettings()
+                        {
+                            StorageType = SqPack.FileTypes.EFileStorageType.UncompressedIndividual,
+                            Target = ETransactionTarget.FolderTree,
+                            TargetPath = tempPath,
+                            Unsafe = false,
+                        };
+                    }
+                    tx = await ModTransaction.BeginTransaction(true, modpack, settings);
                 }
-                tx = ModTransaction.BeginTransaction(true, modpack, settings);
-            }
-            else
-            {
-                originalModpack = tx.ModPack;
-            }
+                else
+                {
+                    originalModpack = tx.ModPack;
+                }
 
-            if(modpack != null && tx.ModPack == null)
-            {
-                tx.ModPack = modpack;
-            }
+                if (modpack != null && tx.ModPack == null)
+                {
+                    tx.ModPack = modpack;
+                }
 
-            var ownBatch = false;
-            if (doBatch && !tx.IsBatchingNotifications)
-            {
-                ownBatch = true;
-                tx.INTERNAL_BeginBatchingNotifications();
-            }
-            var boiler = new TxBoiler()
-            {
-                tx = tx,
-                ownBatch = ownBatch,
-                ownTx = ownTx,
-                ownModpack = ownModpack,
-                originalModpack = originalModpack,
-            };
-            boiler.BindEvents();
+                var ownBatch = false;
+                if (doBatch && !tx.IsBatchingNotifications)
+                {
+                    ownBatch = true;
+                    tx.INTERNAL_BeginBatchingNotifications();
+                }
+                var boiler = new TxBoiler()
+                {
+                    tx = tx,
+                    ownBatch = ownBatch,
+                    ownTx = ownTx,
+                    ownModpack = ownModpack,
+                    originalModpack = originalModpack,
+                };
+                boiler.BindEvents();
 
-            return boiler;
+                return boiler;
+            });
         }
     }
 }

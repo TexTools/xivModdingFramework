@@ -294,7 +294,7 @@ namespace xivModdingFramework.Items.Categories
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var availableRacesAndNumbers = new Dictionary<XivRace, int[]>();

@@ -52,13 +52,6 @@ namespace xivModdingFramework.Cache
                 return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
             }
         }
-        internal static string ReadOnlyCacheConnectionString
-        {
-            get
-            {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;Read Only=True";
-            }
-        }
         internal static string RootsCacheConnectionString
         {
             get
@@ -109,7 +102,7 @@ namespace xivModdingFramework.Cache
             {
                 return _cacheWorker != null;
             }
-            set
+            private set
             {
                 // State cannot be changed during a rebuild.
                 // This shouldn't normally ever occur anyways, but
@@ -131,25 +124,21 @@ namespace xivModdingFramework.Cache
                 {
                     // Sleep until the cache worker actually stops.
                     _cacheWorker.CancelAsync();
-                    while (_cacheWorker != null)
-                    {
-                        Thread.Sleep(10);
-                    }
                 }
             }
         }
 
-        public static async Task WaitForWorkerStop()
+        public static async Task SetCacheWorkerState(bool state)
         {
-            await Task.Run(() =>
+            return;
+            CacheWorkerEnabled = state;
+            if(state == false)
             {
-                var duration = 0;
-                while (_cacheWorker != null)
+                while(_cacheWorker != null)
                 {
-                    Thread.Sleep(10);
-                    duration += 10;
+                    await Task.Delay(10);
                 }
-            });
+            }
         }
 
         public enum CacheRebuildReason
@@ -181,7 +170,7 @@ namespace xivModdingFramework.Cache
             var gi = new GameInfo(gameDirectory, language);
             SetGameInfo(gi, enableCacheWorker);
         }
-        public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
+        public static async void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
         {
             if(ModTransaction.ActiveTransaction != null)
             {
@@ -238,11 +227,10 @@ namespace xivModdingFramework.Cache
 						reason == CacheRebuildReason.CacheVersionUpdate 
 							? new Version(GetMetaValue("cache_version")) : CacheVersion;
 
-					RebuildCache(ver, reason);
+					await RebuildCache(ver, reason);
                 }
             }
-
-            CacheWorkerEnabled = enableCacheWorker;
+            await SetCacheWorkerState(enableCacheWorker);
 
         }
 
@@ -321,10 +309,10 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest, ModTransaction tx = null)
+        public static async Task RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest, ModTransaction tx = null)
         {
             var workerStatus = CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
+            await SetCacheWorkerState(false);
             _REBUILDING = true;
             try
             {
@@ -346,7 +334,7 @@ namespace xivModdingFramework.Cache
 
                     if (tx == null)
                     {
-                        tx = ModTransaction.BeginTransaction();
+                        tx = ModTransaction.BeginReadonlyTransaction();
                     }
 
                     try
@@ -405,7 +393,7 @@ namespace xivModdingFramework.Cache
             } finally
             {
                 _REBUILDING = false;
-                XivCache.CacheWorkerEnabled = workerStatus;
+                await XivCache.SetCacheWorkerState(workerStatus);
             }
         }
 
@@ -910,7 +898,7 @@ namespace xivModdingFramework.Cache
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var modList = await tx.GetModList();
             var paths = modList.Mods.Keys.ToList();
@@ -1379,7 +1367,7 @@ namespace xivModdingFramework.Cache
         public static string GetMetaValue(string key)
         {
             string val = null;
-            using (var db = new SQLiteConnection(ReadOnlyCacheConnectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
                 var query = "select value from meta where key = $key";
@@ -1513,7 +1501,7 @@ namespace xivModdingFramework.Cache
 
             if(allRoots.Count == 0)
             {
-                using (var db = new SQLiteConnection(ReadOnlyCacheConnectionString))
+                using (var db = new SQLiteConnection(CacheConnectionString))
                 {
                     // Gotta do this for all the supporting types...
                     var query = "select root from items";
@@ -1731,7 +1719,7 @@ namespace xivModdingFramework.Cache
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var modList = await tx.GetModList();
@@ -1762,7 +1750,7 @@ namespace xivModdingFramework.Cache
             query = query.Substring(0, query.Length - 1);
             query += ") order by child";
 
-            using (var db = new SQLiteConnection(ReadOnlyCacheConnectionString))
+            using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
                 using (var cmd = new SQLiteCommand(query, db))
@@ -2069,6 +2057,8 @@ namespace xivModdingFramework.Cache
 
             try
             {
+                // This is required because our SQL library is stupid.
+                GC.WaitForPendingFinalizers();
                 using (var db = new SQLiteConnection(CacheConnectionString))
                 {
                     db.BusyTimeout = 3;
@@ -2303,7 +2293,7 @@ namespace xivModdingFramework.Cache
                             // The get call will automatically cache the data, if it needs updating.
 
                             // Use a temporary readonly TX for perf.
-                            var tx = ModTransaction.BeginTransaction();
+                            var tx = ModTransaction.BeginReadonlyTransaction();
                             await GetChildFiles(file, tx);
                         }
                         finally
@@ -2337,7 +2327,7 @@ namespace xivModdingFramework.Cache
                             try
                             {
                                 // Use a temporary readonly TX for perf.
-                                var tx = ModTransaction.BeginTransaction();
+                                var tx = ModTransaction.BeginReadonlyTransaction();
 
                                 // The get call will automatically cache the data, if it needs updating.
                                 await GetParentFiles(file, tx);
@@ -2366,12 +2356,25 @@ namespace xivModdingFramework.Cache
             // But the SQlite library sometimes hangs indefinitely if you call it.
             // So instead...
 
+            bool accessFailed = true;
+            while (accessFailed)
+            {
+
+                try
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    var fs = File.OpenWrite(_dbPath.FullName);
+                    fs.Dispose();
+                    accessFailed = false;
+                }
+                catch
+                {
+                    await Task.Delay(50);
+                }
+            }
             _cacheWorker = null;
 
-            await Task.Delay(50);
-
-            // We commit sudoku.
-            Thread.CurrentThread.Abort();
         }
 
 
@@ -2416,9 +2419,9 @@ namespace xivModdingFramework.Cache
         public static async Task<int> GetDependencyQueueLength()
         {
             int length = 0;
-            await Task.Run(async () =>
+            await Task.Run((Func<Task>)(async () =>
             {
-                using (var db = new SQLiteConnection(CacheConnectionString))
+                using (var db = new SQLiteConnection((string)XivCache.CacheConnectionString))
                 {
                     db.Open();
 
@@ -2444,13 +2447,13 @@ namespace xivModdingFramework.Cache
                         }
                     }
                 }
-            });
+            }));
             return length;
         }
 
         private static async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
         {
-            return await BuildListFromTable<T>(ReadOnlyCacheConnectionString, table, where, func);
+            return await BuildListFromTable<T>(CacheConnectionString, table, where, func);
         }
 
         /// <summary>

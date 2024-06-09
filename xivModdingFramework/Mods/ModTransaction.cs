@@ -460,7 +460,7 @@ namespace xivModdingFramework.Mods
         #region Constructor/Disposable Pattern
         public ModTransaction()
         {
-            throw new NotImplementedException("Mod Transactions must be created via ModTransaction.BeginTransaction()");
+            throw new NotImplementedException("Mod Transactions must be created via ModTransaction.BeginReadonlyTransaction()");
         }
         private ModTransaction(bool writeEnabled, ModPack? modpack, ModTransactionSettings? settings, bool waitToStart, bool safe)
         {
@@ -536,14 +536,14 @@ namespace xivModdingFramework.Mods
                 {
                     if (State != ETransactionState.Closed)
                     {
-                        // If we haven't been cancelled or committed, do so.
                         if (ActiveTransaction == this)
                         {
-                            ModTransaction.CancelTransaction(this);
-                        } else
-                        {
                             // Skip the check if we're in a weird state and just make sure we close as best we can.
-                            CancelTransaction(this);
+                            var t = Task.Run(async () =>
+                            {
+                                await CancelTransaction(this);
+                            });
+                            t.Wait();
                             State = ETransactionState.Closed;
                         }
                     }
@@ -584,21 +584,25 @@ namespace xivModdingFramework.Mods
             State = ETransactionState.Open;
         }
 
+        public static ModTransaction BeginReadonlyTransaction()
+        {
+            var readonlyTx = new ModTransaction(false, null, null, false, true);
+            return readonlyTx;
+        }
         /// <summary>
         /// Opens a new mod transaction.
         /// Transactions will still write data to DATs in real time, but will cache index and modlist changes until they are committed.
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static ModTransaction BeginTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false, bool safe = true)
+        public static async Task<ModTransaction> BeginTransaction(bool writeEnabled = false, ModPack? modpack = null, ModTransactionSettings? settings = null, bool waitToStart = false, bool safe = true)
         {
 
             if (!writeEnabled)
             {
                 // Read-Only Transactions don't block anything else, and really just serve as
                 // caches for index/modlist data.
-                var readonlyTx = new ModTransaction(writeEnabled, modpack, null, false, true);
-                return readonlyTx;
+                return BeginReadonlyTransaction();
             }
 
             if (_ActiveTransaction != null)
@@ -608,7 +612,7 @@ namespace xivModdingFramework.Mods
 
             // Disable the cache worker during transactions.
             _WorkerStatus = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
+            await XivCache.SetCacheWorkerState(false);
 
 
             if (writeEnabled)
@@ -670,7 +674,7 @@ namespace xivModdingFramework.Mods
                     _ActiveTransaction = null;
                     _CANCEL_BLOCKED_TX = false;
                     tx.Dispose();
-                    XivCache.CacheWorkerEnabled = _WorkerStatus;
+                    await XivCache.SetCacheWorkerState(_WorkerStatus);
                 }
                 else
                 {
@@ -725,7 +729,7 @@ namespace xivModdingFramework.Mods
 
             if(Settings.Target == ETransactionTarget.GameFiles)
             {
-                var cancelled = await Task.Run(() =>
+                var cancelled = await Task.Run(async () =>
                 {
                     _ACTIVE_TX_BLOCKED = false;
                     _CANCEL_BLOCKED_TX = false;
@@ -742,7 +746,7 @@ namespace xivModdingFramework.Mods
                             _ACTIVE_TX_BLOCKED = false;
                             _CANCEL_BLOCKED_TX = false;
                             State = ETransactionState.Open;
-                            ModTransaction.CancelTransaction(this, true);
+                            await ModTransaction.CancelTransaction(this, true);
                             return true;
                         }
                         Thread.Sleep(1000);
@@ -888,7 +892,7 @@ namespace xivModdingFramework.Mods
         /// This discards the internal cached index and modlist pointers and truncates the .DAT files back to their pre-transaction states.
         /// </summary>
         /// <param name="tx"></param>
-        public static void CancelTransaction(ModTransaction tx, bool graceful = false)
+        public static async Task CancelTransaction(ModTransaction tx, bool graceful = false)
         {
             if (tx.State == ETransactionState.Closed)
             {
@@ -904,7 +908,7 @@ namespace xivModdingFramework.Mods
             // Readonly transactions don't really have a true cancel, or need to be cancelled, but we can at least mark them done.
             if (tx._ReadOnly)
             {
-                tx.CancelTransaction();
+                await tx.CancelTransaction();
                 tx.State = ETransactionState.Closed;
                 _CANCEL_BLOCKED_TX = false;
                 return;
@@ -912,17 +916,17 @@ namespace xivModdingFramework.Mods
 
             try
             {
-                tx.CancelTransaction(graceful);
+                await tx.CancelTransaction(graceful);
             }
             finally
             {
                 tx.State = ETransactionState.Closed;
                 _ActiveTransaction = null;
                 tx.Dispose();
-                XivCache.CacheWorkerEnabled = _WorkerStatus;
+                await XivCache.SetCacheWorkerState(_WorkerStatus);
             }
         }
-        private async void CancelTransaction(bool graceful = false)
+        private async Task CancelTransaction(bool graceful = false)
         {
             if (!_ReadOnly && State != ETransactionState.Closed)
             {
@@ -958,7 +962,7 @@ namespace xivModdingFramework.Mods
                     try
                     {
                         // Awkwardly, we need a readonly TX for this, as we're restoring to the live system state.
-                        var rtx = ModTransaction.BeginTransaction();
+                        var rtx = ModTransaction.BeginReadonlyTransaction();
                         foreach (var file in files)
                         {
                             FileChanged?.Invoke(file, await rtx.Get8xDataOffset(file));

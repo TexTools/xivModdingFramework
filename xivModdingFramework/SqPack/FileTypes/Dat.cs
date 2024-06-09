@@ -937,7 +937,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             return await tx.ReadFile(filePath, forceOriginal, false);
@@ -951,7 +951,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             return await tx.ReadFile(dataFile, offset8x, false);
@@ -1118,7 +1118,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<long> CopyFile(string sourcePath, string targetPath, string source = "Unknown", bool overwrite = false, IItem referenceItem = null, ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var exists = await tx.FileExists(targetPath);
@@ -1202,7 +1203,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 }
 
                 doDatSave = true;
-                tx = ModTransaction.BeginTransaction(true);
+                tx = await ModTransaction.BeginTransaction(true);
             }
 
             var ownBatch = false;
@@ -1322,7 +1323,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             {
                 if (doDatSave)
                 {
-                    ModTransaction.CancelTransaction(tx);
+                    await ModTransaction.CancelTransaction(tx);
                 }
                 throw;
             }
@@ -1444,7 +1445,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             var slots = new Dictionary<long, uint>();
 
             // Readonly TX against base file system state.
-            var tx = ModTransaction.BeginTransaction();
+            var tx = ModTransaction.BeginReadonlyTransaction();
 
             var allModsByOffset = modlist.GetModsByOffset();
             if (!allModsByOffset.ContainsKey(df))
@@ -1629,7 +1630,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
 
             var workerStatus = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
+            await XivCache.SetCacheWorkerState(false);
             try
             {
                 var newMods = new List<Mod>();
@@ -1725,7 +1726,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     temp.Delete();
                 }
 
-                XivCache.CacheWorkerEnabled = workerStatus;
+                await XivCache.SetCacheWorkerState(workerStatus);
             }
 
         }
@@ -1856,7 +1857,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var offset = await tx.Get8xDataOffset(path, forceOrginal);
             var df = IOUtil.GetDataFileFromPath(path);
@@ -1867,7 +1868,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             using (var br = await tx.GetFileStream(df, offset8x, true))
             {
@@ -1949,7 +1950,8 @@ namespace xivModdingFramework.SqPack.FileTypes
         public static async Task<bool> UpdateType4UncompressedSize(string path, XivDataFile dataFile, long offset, ModTransaction tx = null, string sourceApplication = "Unknown")
         {
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var reportedSize = await tx.GetCompressedFileSize(dataFile, offset);

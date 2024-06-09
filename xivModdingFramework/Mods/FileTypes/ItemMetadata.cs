@@ -182,7 +182,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             if (tx == null) {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var path = root.Info.GetRootFile();
@@ -214,7 +214,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             if (tx == null) {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
 
@@ -262,7 +262,8 @@ namespace xivModdingFramework.Mods.FileTypes
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx, true);
+            tx = boiler.Transaction;
             try
             {
 
@@ -363,7 +364,8 @@ namespace xivModdingFramework.Mods.FileTypes
             dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var index = await tx.GetIndexFile(df);

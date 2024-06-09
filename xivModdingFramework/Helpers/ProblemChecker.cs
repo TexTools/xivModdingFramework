@@ -53,7 +53,7 @@ namespace xivModdingFramework.Helpers
             {
                 // The simplest way to do this is to just open a tx, pull every index, and save.
                 // That way all hashes/etc. will be recalculated.
-                var tx = ModTransaction.BeginTransaction(true, null, null, false, false);
+                var tx = await ModTransaction.BeginTransaction(true, null, null, false, false);
                 try
                 {
                     foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
@@ -69,7 +69,7 @@ namespace xivModdingFramework.Helpers
                 }
                 catch
                 {
-                    ModTransaction.CancelTransaction(tx);
+                    await ModTransaction.CancelTransaction(tx);
                 }
             });
 
@@ -164,7 +164,7 @@ namespace xivModdingFramework.Helpers
 
                 progress?.Report("Shutting down Cache Worker...");
                 var workerStatus = XivCache.CacheWorkerEnabled;
-                XivCache.CacheWorkerEnabled = false;
+                await XivCache.SetCacheWorkerState(false);
                 try
                 {
                     if (!Index.CanWriteAllIndexes())
@@ -184,7 +184,7 @@ namespace xivModdingFramework.Helpers
                         {
                             // Index backup failed for some reason.
                             // Try at least deleting all existing mods.
-                            using (var tx = ModTransaction.BeginTransaction(true))
+                            using (var tx = await ModTransaction.BeginTransaction(true))
                             {
                                 progress?.Report("Index restore failed, attempting to delete all mods instead...");
                                 await Modding.SetAllModStates(EModState.UnModded, null, tx);
@@ -231,12 +231,12 @@ namespace xivModdingFramework.Helpers
 
                     await Task.Run(async () =>
                     {
-                        XivCache.RebuildCache(XivCache.CacheVersion);
+                        await XivCache.RebuildCache(XivCache.CacheVersion);
                     });
                 }
                 finally
                 {
-                    XivCache.CacheWorkerEnabled = workerStatus;
+                    await XivCache.SetCacheWorkerState(workerStatus);
                 }
             });
         }
@@ -406,7 +406,7 @@ namespace xivModdingFramework.Helpers
                 }
 
                 // Readonly TX to check stuff.
-                var rtx = ModTransaction.BeginTransaction();
+                var rtx = ModTransaction.BeginReadonlyTransaction();
                 var ml = await rtx.GetModList();
 
                 List<Mod> enabledMods = new List<Mod>();
@@ -418,7 +418,7 @@ namespace xivModdingFramework.Helpers
                         throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
                     }
 
-                    using (var tx = ModTransaction.BeginTransaction(true))
+                    using (var tx = await ModTransaction.BeginTransaction(true))
                     {
                         enabledMods = await Modding.GetActiveMods(tx);
                         await Modding.SetAllModStates(EModState.Disabled, null, tx);
@@ -479,7 +479,7 @@ namespace xivModdingFramework.Helpers
                     if (enabledMods.Count > 0)
                     {
                         // Re-Enable mods.
-                        using (var tx = ModTransaction.BeginTransaction(true))
+                        using (var tx = await ModTransaction.BeginTransaction(true))
                         {
                             var paths = enabledMods.Select(x => x.FilePath);
                             await Modding.SetModStates(EModState.Enabled, paths, null, tx);
@@ -509,7 +509,7 @@ namespace xivModdingFramework.Helpers
 
         public static async Task AssertIndexIsClean(XivDataFile dataFile)
         {
-            var rtx = ModTransaction.BeginTransaction();
+            var rtx = ModTransaction.BeginReadonlyTransaction();
             var iFile = await rtx.GetIndexFile(XivDataFile._04_Chara);
 
             var offsets = iFile.GetAllIndex2Offsets();

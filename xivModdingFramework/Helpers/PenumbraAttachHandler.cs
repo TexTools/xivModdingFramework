@@ -106,7 +106,7 @@ namespace xivModdingFramework.Helpers
 
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction(true, null, settings);
+                tx = await ModTransaction.BeginTransaction(true, null, settings);
             } else if(tx.State == ETransactionState.Preparing)
             {
                 tx.Settings = settings;
@@ -169,7 +169,7 @@ namespace xivModdingFramework.Helpers
 
             if (closeTransaction && Transaction.State != ETransactionState.Closed)
             {
-                ModTransaction.CancelTransaction(Transaction, true);
+                await ModTransaction.CancelTransaction(Transaction, true);
             }
 
             if (Watcher != null)

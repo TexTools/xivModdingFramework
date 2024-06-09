@@ -285,7 +285,7 @@ namespace xivModdingFramework.Cache
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             if((int) race < 100)
             {
@@ -607,7 +607,7 @@ namespace xivModdingFramework.Cache
 
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             ItemMetadata originalMetadata = await ItemMetadata.GetMetadata(this, false, tx);
@@ -699,7 +699,7 @@ namespace xivModdingFramework.Cache
             {
                 // Use a read only transaction if we don't have an open one.
                 // If we're not transacting that also means we can just use whatever's in the main state cache.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
                 useCache = true;
             }
 
@@ -814,7 +814,7 @@ namespace xivModdingFramework.Cache
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             List<string> mdlMats = null;
@@ -874,7 +874,7 @@ namespace xivModdingFramework.Cache
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var keptFiles = await GetAllFiles(tx, false);
@@ -900,7 +900,7 @@ namespace xivModdingFramework.Cache
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var materials = new HashSet<string>();
 
@@ -980,7 +980,7 @@ namespace xivModdingFramework.Cache
 
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             try
@@ -1072,7 +1072,7 @@ namespace xivModdingFramework.Cache
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             // We need to locate and open the IMC file, and then check how many
@@ -1094,7 +1094,7 @@ namespace xivModdingFramework.Cache
             if (tx == null)
             {
                 // Readonly Tx if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             if (!await tx.FileExists(imcPath))
@@ -1176,7 +1176,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         public IItemModel GetFirstItem(int defaultImcSubset = -1)
         {
-            using (var db = new SQLiteConnection(XivCache.ReadOnlyCacheConnectionString))
+            using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
             {
                 db.Open();
                 var rootString = Info.ToString();
@@ -1253,7 +1253,7 @@ namespace xivModdingFramework.Cache
         {
 
             var items = new List<IItemModel>();
-            using (var db = new SQLiteConnection(XivCache.ReadOnlyCacheConnectionString))
+            using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
             {
                 db.Open();
                 var rootString = Info.ToString();

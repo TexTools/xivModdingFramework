@@ -171,7 +171,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
 
             var imported = new Dictionary<string, TxFileState>();
-            var boiler = TxBoiler.BeginWrite(ref tx, true);
+            var boiler = await TxBoiler.BeginWrite(tx, true);
+            tx = boiler.Transaction;
             try
             {
 
@@ -838,7 +839,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             if (tx == null)
             {
                 // Grab a readonly TX here to read base game files when needed.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
 
@@ -876,14 +877,20 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     continue;
                 }
 
+                var df = IOUtil.GetDataFileFromPath(src);
+                var offset = await tx.Get8xDataOffset(src, true);
+                if (offset <= 0)
+                {
+                    // Invalid game file swap.
+                    continue;
+                }
+
                 if (!includeData)
                 {
                     ret.Add(src, new FileStorageInformation());
                     continue;
                 }
 
-                var df = IOUtil.GetDataFileFromPath(src);
-                var offset = await tx.Get8xDataOffset(src, true);
                 var fileInfo = IOUtil.MakeGameStorageInfo(df, offset);
 
                 ret.Add(src, fileInfo);

@@ -162,7 +162,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var exists = (await tx.FileExists(path, forceOriginal));
@@ -204,7 +204,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             if (iconItem.IconId <= 0)
             {
@@ -241,7 +241,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             if (iconId <= 0)
             {

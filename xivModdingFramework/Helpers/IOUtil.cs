@@ -539,6 +539,11 @@ namespace xivModdingFramework.Helpers
 
         public static FileStorageInformation MakeGameStorageInfo(XivDataFile df, long offset8x)
         {
+            if(offset8x <= 0)
+            {
+                throw new InvalidDataException("Cannot make game storage handle for invalid offset.");
+            }
+
             // Create standard Game DAT file request info.
             var info = new FileStorageInformation();
             var parts = IOUtil.Offset8xToParts(offset8x);

@@ -903,6 +903,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                             continue;
                         }
 
+                        if (file.IsCompressed)
+                        {
+                            Trace.WriteLine("DEBUG");
+                        }
+
                         dict.Add(path, file);
                     }
                 }

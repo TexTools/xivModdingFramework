@@ -147,7 +147,7 @@ namespace xivModdingFramework.Materials.FileTypes
             if (tx == null)
             {
                 // Readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             if(!await tx.FileExists(mtrlPath, forceOriginal))
@@ -746,7 +746,8 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new offset</returns>
         public static async Task<long> ImportMtrl(XivMtrl xivMtrl, IItem item = null, string source = "Unknown", bool validateTextures = true, ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var mtrlBytes = XivMtrlToUncompressedMtrl(xivMtrl);
@@ -817,7 +818,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static async Task ImportMtrlToAllVersions(XivMtrl mtrl, IItemModel item = null, string source = "Unknown", ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var version = (int)mtrl.GetVersion();
@@ -1200,7 +1202,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 return;
             }
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 await UpdateEndwalkerMaterial(mtrl, source, tx);
@@ -2118,7 +2121,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var OffsetToIndex2Dictionary = new Dictionary<uint, uint>();
             var gameDirectory = XivCache.GameInfo.GameDirectory;
 
-            var tx = ModTransaction.BeginTransaction();
+            var tx = ModTransaction.BeginReadonlyTransaction();
 
             var index = await tx.GetIndexFile(dataFile);
 

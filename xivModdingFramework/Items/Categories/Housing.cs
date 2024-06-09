@@ -159,7 +159,7 @@ namespace xivModdingFramework.Items.Categories
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var format = "bgcommon/hou/indoor/pic/ta/{0}/material/pic_ta_2{0}a.mtrl";
@@ -202,7 +202,7 @@ namespace xivModdingFramework.Items.Categories
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var formatS  = "bgcommon/hou/indoor/gyo/sm/{0}/asset/fsh_sm_m{0}.sgb";
@@ -387,7 +387,7 @@ namespace xivModdingFramework.Items.Categories
             if(tx == null)
             {
                 // Readonly TX if we don't have one;
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var id = modelID.ToString().PadLeft(4, '0');
@@ -511,7 +511,7 @@ namespace xivModdingFramework.Items.Categories
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
 

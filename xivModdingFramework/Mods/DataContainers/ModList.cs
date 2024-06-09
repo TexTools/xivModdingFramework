@@ -457,7 +457,7 @@ namespace xivModdingFramework.Mods.DataContainers
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction(true);
+                tx = await ModTransaction.BeginTransaction(true);
             }
             var activeOffset = await tx.Get8xDataOffset(FilePath);
 
@@ -542,7 +542,7 @@ namespace xivModdingFramework.Mods.DataContainers
             if(tx == null)
             {
                 // Readonly TX against base file system state, though a passed in TX is fine too.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             return await tx.GetCompressedFileSize(DataFile, ModOffset8x);

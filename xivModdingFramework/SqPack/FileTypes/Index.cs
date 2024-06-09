@@ -86,7 +86,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var ret = new SortedSet<int>();
@@ -139,7 +139,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var index = await tx.GetIndexFile(dataFile);
             return index.GetAllHashes();

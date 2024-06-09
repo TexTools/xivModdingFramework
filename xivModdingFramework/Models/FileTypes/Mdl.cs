@@ -325,7 +325,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't already have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             if (!await tx.FileExists(mdlPath))
@@ -1121,7 +1121,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             // Read the raw Material names from the file.
@@ -1270,7 +1270,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // No Tx, use a simple readonly one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var mdlData = await Dat.ReadFile(mdlPath, getOriginal, tx);
@@ -1496,7 +1496,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly tx if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var modelName = Path.GetFileNameWithoutExtension(model.Source);
             var directory = Path.GetDirectoryName(outputFilePath);
@@ -1804,7 +1804,7 @@ namespace xivModdingFramework.Models.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
             var modlist = await tx.GetModList();
             var mod = modlist.GetMod(internalPath);
@@ -2307,7 +2307,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var xivMdl = await Mdl.GetXivMdl(targetPath, useOriginal, tx);
@@ -4072,7 +4072,8 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task<int> CheckAllModsSkinAssignments(ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try {  
                 var modList = await tx.GetModList();
                 var mods = modList.GetMods();
@@ -4462,7 +4463,8 @@ namespace xivModdingFramework.Models.FileTypes
         /// <returns></returns>
         public static async Task AddRacialModel(int setId, string slot, XivRace newRace, string source, ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
 
@@ -4545,7 +4547,7 @@ namespace xivModdingFramework.Models.FileTypes
             if(rtx == null)
             {
                 // Readonly tx for step 1 if we don't have one.
-                rtx = ModTransaction.BeginTransaction();
+                rtx = ModTransaction.BeginReadonlyTransaction();
             }
 
                 
@@ -4568,7 +4570,8 @@ namespace xivModdingFramework.Models.FileTypes
             var allRootMaterials = await root.GetMaterialFiles(-1, tx, true);
 
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 foreach(var path in missingPaths)
@@ -4605,7 +4608,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(originalPath);
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
 
@@ -4795,7 +4799,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             var df = IOUtil.GetDataFileFromPath(primaryModel);
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
 
@@ -5009,7 +5014,7 @@ namespace xivModdingFramework.Models.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var root = await XivCache.GetFirstRoot(model.Source);

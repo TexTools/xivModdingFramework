@@ -382,7 +382,7 @@ namespace xivModdingFramework.Cache
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             if(string.IsNullOrEmpty(internalFilePath) || !await tx.FileExists(internalFilePath))
@@ -563,7 +563,7 @@ namespace xivModdingFramework.Cache
             // We specifically just want to know what cached files have us listed as childern; not what we have in the 
             // parents dependencies cache.
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var cachedParents = await XivCache.BuildListFromTable(XivCache.ReadOnlyCacheConnectionString, "dependencies_children", wc, async (reader) =>
+            var cachedParents = await XivCache.BuildListFromTable(XivCache.CacheConnectionString, "dependencies_children", wc, async (reader) =>
             {
                 return reader.GetString("parent");
             });
@@ -1018,7 +1018,7 @@ namespace xivModdingFramework.Cache
         public static async Task CacheAllRealRoots()
         {
             var workerStatus = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
+            await XivCache.SetCacheWorkerState(false);
 
             try
             {
@@ -1027,7 +1027,7 @@ namespace xivModdingFramework.Cache
                 // Stop the worker, in case it was reading from the file for some reason.
 
                 // Readonly TX
-                var tx = ModTransaction.BeginTransaction();
+                var tx = ModTransaction.BeginReadonlyTransaction();
 
 
                 var hashes = await Index.GetAllHashes(XivDataFile._04_Chara, tx);
@@ -1108,7 +1108,7 @@ namespace xivModdingFramework.Cache
             }
             finally
             {
-                XivCache.CacheWorkerEnabled = workerStatus;
+                await XivCache.SetCacheWorkerState(workerStatus);
             }
         }
 

@@ -110,7 +110,7 @@ namespace xivModdingFramework.Exd.FileTypes
             LanguageList = new List<int>();
 
             // Readonly TX.  We don't allow live modification of exd/exh files.
-            var tx = ModTransaction.BeginTransaction();
+            var tx = ModTransaction.BeginReadonlyTransaction();
 
             var file = "exd/" + exFile + ExhExtension;
 
@@ -196,7 +196,7 @@ namespace xivModdingFramework.Exd.FileTypes
 
             if (tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             await Task.Run(async () =>

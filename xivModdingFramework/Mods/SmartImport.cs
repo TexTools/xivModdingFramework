@@ -62,7 +62,7 @@ namespace xivModdingFramework.Mods
                 Version = "1.0"
             };
 
-            var tx = ModTransaction.BeginTransaction(true, modPack, settings);
+            var tx = await ModTransaction.BeginTransaction(true, modPack, settings);
             try
             {
                 await ImportBatch(files, sourceApplication, tx);
@@ -70,7 +70,7 @@ namespace xivModdingFramework.Mods
             }
             catch
             {
-                ModTransaction.CancelTransaction(tx);
+                await ModTransaction.CancelTransaction(tx);
             }
         }
 
@@ -92,7 +92,8 @@ namespace xivModdingFramework.Mods
                 Version = "1.0",
             };
 
-            var boiler = TxBoiler.BeginWrite(ref tx, true, modPack);
+            var boiler = await TxBoiler.BeginWrite(tx, true, modPack);
+            tx = boiler.Transaction;
             try
             {
                 foreach(var file in files)

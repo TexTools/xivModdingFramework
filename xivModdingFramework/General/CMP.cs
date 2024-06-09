@@ -66,7 +66,8 @@ namespace xivModdingFramework.General
         /// <returns></returns>
         public static async Task DisableRgspMod(XivSubRace race, XivGender gender, ModTransaction tx = null)
         {
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var path = GetRgspPath(race, gender);

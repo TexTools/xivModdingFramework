@@ -151,7 +151,7 @@ namespace xivModdingFramework.Variants.FileTypes
             if (tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var imcPath = await GetImcPath(item, tx);
@@ -239,7 +239,7 @@ namespace xivModdingFramework.Variants.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var exists = await tx.FileExists(path);

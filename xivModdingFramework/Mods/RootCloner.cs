@@ -60,7 +60,8 @@ namespace xivModdingFramework.Mods
                 ProgressReporter.Report("Stopping Cache Worker...");
             }
 
-            var boiler = TxBoiler.BeginWrite(ref tx);
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
                 var destItem = Destination.GetFirstItem();
@@ -580,7 +581,7 @@ namespace xivModdingFramework.Mods
         {
             if(tx == null)
             {
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             var metaPath = root.Info.GetRootFile();

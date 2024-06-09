@@ -105,7 +105,7 @@ namespace xivModdingFramework.Items.DataContainers
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             if(SecondaryCategory == XivStrings.Face_Paint)

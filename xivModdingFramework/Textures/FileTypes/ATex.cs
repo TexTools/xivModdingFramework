@@ -61,7 +61,7 @@ namespace xivModdingFramework.Textures.FileTypes
             if(tx == null)
             {
                 // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginTransaction();
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
             if (!await tx.FileExists(vfxPath))
