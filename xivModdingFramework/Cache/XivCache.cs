@@ -130,7 +130,6 @@ namespace xivModdingFramework.Cache
 
         public static async Task SetCacheWorkerState(bool state)
         {
-            return;
             CacheWorkerEnabled = state;
             if(state == false)
             {
@@ -2352,7 +2351,7 @@ namespace xivModdingFramework.Cache
             SQLiteConnection.ClearAllPools();
 
             // It'd be nice to be able to use this...
-            //GC.WaitForPendingFinalizers();
+            GC.WaitForPendingFinalizers();
             // But the SQlite library sometimes hangs indefinitely if you call it.
             // So instead...
 
