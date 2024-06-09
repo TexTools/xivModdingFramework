@@ -613,7 +613,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     return new ShaderMapperResult()
                     {
-                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f),
+                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, diffuse.Alpha),
                         Normal = new Color4(0.5f, 0.5f, 1.0f, 1.0f),
                         Specular = new Color4(multi.Red, multi.Red, multi.Red, 1.0f) * 0.25f, // Hard-coded reduction in specular for skin
                         Alpha = new Color4(diffuse.Alpha)
@@ -635,7 +635,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     return new ShaderMapperResult()
                     {
-                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f),
+                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, diffuse.Alpha),
                         Normal = new Color4(0.5f, 0.5f, 1.0f, 1.0f),
                         Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f) * 0.25f, // Hard-coded reduction in specular for skin
                         Alpha = new Color4(diffuse.Alpha)
@@ -653,6 +653,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi) => {
                     float highlightInfluence = normal.Blue;
                     diffuse = Color4.Lerp(hairColor, hairColor * highlightColor, highlightInfluence);
+                    diffuse.Alpha = normal.Alpha;
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
@@ -669,6 +670,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi) => {
                     float tattooInfluence = normal.Blue;
                     diffuse = Color4.Lerp(diffuse, tattooColor, tattooInfluence);
+                    diffuse.Alpha = normal.Alpha;
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
@@ -714,7 +716,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi) => {
                     return new ShaderMapperResult()
                     {
-                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f),
+                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Alpha),
                         Normal = new Color4(normal.Red, normal.Green, 0.0f, 1.0f),
                         Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f),
                         Alpha = new Color4(normal.Alpha)
@@ -728,7 +730,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     float colorInfluence = diffuse.Alpha;
                     return new ShaderMapperResult()
                     {
-                        Diffuse = Color4.Lerp(new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f), furnitureColor, colorInfluence),
+                        Diffuse = Color4.Lerp(new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Alpha), furnitureColor, colorInfluence),
                         Normal = new Color4(normal.Red, normal.Green, 0.0f, 1.0f),
                         Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f),
                         Alpha = new Color4(normal.Alpha)
