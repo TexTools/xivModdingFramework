@@ -524,28 +524,32 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 if (hasMulti && shaderPack != EShaderPack.CharacterLegacy)
                 {
-                    // Cheap specularity adjustments based on the material type
-                    // These were chosen based on nothing except what looked nice
-                    var discountSpecularMaterialScale = new float[4]{
-                        0.40f, // Default
-                        0.80f, // Metal
-                        0.20f, // Leather
-                        0.10f, // Cloth
-                    };
 
                     return (Color4 diffuse, Color4 normal, Color4 multi) => {
                         // Select a specular intensity based on the material type
-                        var specScale = discountSpecularMaterialScale[(int)(multi.Green / 64.0f) & 3];
                         // Invert the cavity map to use as a specular texture
-                        var discountSpecular = (1.0f - multi.Red) * specScale;
-                        // Use AO (?) as the diffuse if there is no diffuse texture
+
+                        var roughness = new Color4(multi.Green, multi.Green, multi.Green, 1.0f);
+                        var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                        var metalness = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
+
+
+                        var discountSpecular = Color4.Modulate(Color4.Modulate(roughness, occlusion), metalness);
+                        var half = new Color4(0.5f, 0.5f, 0.5f, 1.0f);
+                        discountSpecular = Color4.Modulate(discountSpecular, half);
+
+                        // Start from full white if there is no diffuse.
                         if (!hasDiffuse)
-                            diffuse = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
+                            diffuse = new Color4(1.0f);
+
+
+                        diffuse = Color4.Modulate(diffuse, occlusion);
+
                         return new ShaderMapperResult()
                         {
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, normal.Blue),
                             Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = new Color4(discountSpecular, discountSpecular, discountSpecular, 1.0f),
+                            Specular = discountSpecular,
                             Alpha = new Color4(normal.Blue)
                         };
                     };
@@ -652,13 +656,20 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 return (Color4 diffuse, Color4 normal, Color4 multi) => {
                     float highlightInfluence = normal.Blue;
+
+                    var occlusion = new Color4(multi.Alpha, multi.Alpha, multi.Alpha, 1.0f);
                     diffuse = Color4.Lerp(hairColor, hairColor * highlightColor, highlightInfluence);
+                    diffuse = Color4.Modulate(diffuse,occlusion);
                     diffuse.Alpha = normal.Alpha;
+
+                    var spec = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                    spec = Color4.Modulate(spec, occlusion);
+
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                        Specular = new Color4(multi.Red, multi.Red, multi.Red, 1.0f) * 0.5f, // Hard-coded reduction in specular for hair
+                        Specular = spec,
                         Alpha = new Color4(normal.Alpha)
                     };
                 };
