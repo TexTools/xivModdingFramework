@@ -45,18 +45,27 @@ namespace xivModdingFramework.Cache
 
         public delegate void WriteStateChangedEventHandler(bool newState);
         public static event WriteStateChangedEventHandler GameWriteStateChanged;
+
+        internal static void SetPragmas(SQLiteConnection db)
+        {
+            using (var cmd = new SQLiteCommand("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;", db))
+            {
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         internal static string CacheConnectionString
         {
             get
             {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
             }
         }
         internal static string RootsCacheConnectionString
         {
             get
             {
-                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
+                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100;";
             }
         }
 
@@ -441,6 +450,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", creationScript));
                 var sqlCmd = String.Join("\n", lines);
 
@@ -472,6 +484,9 @@ namespace xivModdingFramework.Cache
                     using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
                         db.Open();
+
+                        SetPragmas(db);
+
                         var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                         var sqlCmd = String.Join("\n", lines);
 
@@ -540,6 +555,9 @@ namespace xivModdingFramework.Cache
                 }
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -594,6 +612,9 @@ namespace xivModdingFramework.Cache
                 var list = await _housing.GetUncachedFurnitureList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -646,6 +667,9 @@ namespace xivModdingFramework.Cache
                 }
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -699,6 +723,9 @@ namespace xivModdingFramework.Cache
                 var list = await _companions.GetUncachedPetList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -753,6 +780,9 @@ namespace xivModdingFramework.Cache
                 var list = await _companions.GetUncachedMinionList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -799,6 +829,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in items)
@@ -854,6 +887,9 @@ namespace xivModdingFramework.Cache
                 var items = await gear.GetUnCachedGearList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in items)
@@ -1334,6 +1370,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var query = "insert into meta(key, value) values($key,$value) on conflict(key) do update set value = excluded.value";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
@@ -1369,6 +1408,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var query = "select value from meta where key = $key";
 
                 // Double Using statements are important here to ensure
@@ -1470,6 +1512,8 @@ namespace xivModdingFramework.Cache
                     var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
                     db.Open();
 
+                    SetPragmas(db);
+
                     using (var cmd = new SQLiteCommand(query, db))
                     {
                         using (var reader = new CacheReader(cmd.ExecuteReader()))
@@ -1505,6 +1549,8 @@ namespace xivModdingFramework.Cache
                     // Gotta do this for all the supporting types...
                     var query = "select root from items";
                     db.Open();
+
+                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1656,6 +1702,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                 var sqlCmd = String.Join("\n", lines);
 
@@ -1752,6 +1801,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(cmd.ExecuteReader()))
@@ -1874,6 +1926,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     // Clear out our old children.
@@ -1991,6 +2046,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     // Clear out all old parents
@@ -2062,6 +2120,9 @@ namespace xivModdingFramework.Cache
                 {
                     db.BusyTimeout = 3;
                     db.Open();
+
+                    SetPragmas(db);
+
                     using (var transaction = db.BeginTransaction())
                     {
                         foreach (var file in files)
@@ -2136,6 +2197,9 @@ namespace xivModdingFramework.Cache
                 using (var db = new SQLiteConnection(RootsCacheConnectionString))
                 {
                     db.Open();
+
+                    SetPragmas(db);
+
                     using (var transaction = db.BeginTransaction())
                     {
                         HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
@@ -2177,6 +2241,8 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
+                SetPragmas(db);
+
                 var query = "select position, file from dependencies_children_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
                 {
@@ -2202,6 +2268,8 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
+                SetPragmas(db);
+
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_children_queue where file = $file";
                 using (var deleteCmd = new SQLiteCommand(query, db))
@@ -2219,6 +2287,8 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
 
                 var query = "select position, file from dependencies_parents_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2243,6 +2313,8 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
 
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_parents_queue where file = $file";
@@ -2424,6 +2496,8 @@ namespace xivModdingFramework.Cache
                 {
                     db.Open();
 
+                    SetPragmas(db);
+
                     var query = "select count(file) as cnt from dependencies_parents_queue";
                     using (var selectCmd = new SQLiteCommand(query, db))
                     {
@@ -2471,6 +2545,9 @@ namespace xivModdingFramework.Cache
             {
                 db.BusyTimeout = 3;
                 db.Open();
+
+                SetPragmas(db);
+
                 // Check how large the result set will be so we're not constantly
                 // Reallocating the array.
                 var query = "select count(*) from " + table + " ";
