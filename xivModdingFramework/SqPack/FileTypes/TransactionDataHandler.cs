@@ -108,7 +108,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (DefaultPathRoot == null)
                 {
                     // Create a temp folder if we weren't supplied one.
-                    var tempFolder = Path.Combine(Path.GetTempPath(),"TT_Tx_" + Guid.NewGuid().ToString());
+                    var tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), "TT_Tx_" + Guid.NewGuid().ToString());
                     DefaultPathRoot = tempFolder;
                 }
                 Directory.CreateDirectory(DefaultPathRoot);
@@ -742,7 +742,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var mList = await tx.GetModList();
 
-            var tempFile = Path.GetTempFileName();
+            var tempFile = IOUtil.GetFrameworkTempFile();
 
             using (var bw = new BinaryWriter(File.Open(tempFile, FileMode.Create)))
             {

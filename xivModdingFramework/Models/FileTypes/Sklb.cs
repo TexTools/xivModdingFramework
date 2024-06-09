@@ -248,8 +248,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // Unicode path and we don't have AssetCC2.
                     // Check if a temp path has unicode in it.
-                    var tempFileXml = Path.GetTempFileName();
-                    var tempFileRaw = Path.GetTempFileName();
+                    var tempFileXml = IOUtil.GetFrameworkTempFile();
+                    var tempFileRaw = IOUtil.GetFrameworkTempFile();
 
                     if (!ContainsUnicodeCharacter(tempFileXml) && !ContainsUnicodeCharacter(tempFileRaw))
                     {

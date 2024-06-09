@@ -675,5 +675,20 @@ namespace xivModdingFramework.Helpers
                 return ms.ToArray();
             }
         }
+
+        public static string GetFrameworkTempFolder()
+        {
+            return Path.Combine(Path.GetTempPath(), "xivmoddingframework_temp");
+        }
+        public static string GetFrameworkTempFile()
+        {
+            return Path.Combine(GetFrameworkTempFolder(), Guid.NewGuid().ToString());
+        }
+
+        public static void ClearTempFolder()
+        {
+            var path = GetFrameworkTempFolder();
+            DeleteTempDirectory(path);
+        }
     }
 }

@@ -76,7 +76,7 @@ namespace xivModdingFramework.Mods
                 _modPackJson.SimpleModsList = new();
 
             var guid = Guid.NewGuid();
-            _tmpDir = Path.Combine(Path.GetTempPath(), guid.ToString());
+            _tmpDir = Path.Combine(IOUtil.GetFrameworkTempFolder(), guid.ToString());
             Directory.CreateDirectory(_tmpDir);
         }
 

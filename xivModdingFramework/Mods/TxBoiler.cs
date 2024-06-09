@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime;
 using System.Text;
 using System.Threading.Tasks;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 
 namespace xivModdingFramework.Mods
@@ -157,7 +158,7 @@ namespace xivModdingFramework.Mods
                     ModTransactionSettings? settings = null;
                     if (throwawayTx)
                     {
-                        var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                        var tempPath = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
                         Directory.CreateDirectory(tempPath);
                         settings = new ModTransactionSettings()
                         {

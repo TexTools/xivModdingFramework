@@ -490,7 +490,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
 
                 // Write the new DDS file to disk.
-                var tempFile = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".dds");
+                var tempFile = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString() + ".dds");
                 ddsContainer.Write(tempFile, DDSFlags.None);
                 return tempFile;
             }

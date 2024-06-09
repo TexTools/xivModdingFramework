@@ -480,7 +480,7 @@ namespace xivModdingFramework.Mods.FileTypes
             {
                 if (targetPath == null)
                 {
-                    targetPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    targetPath = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
                 }
 
                 var mpl = await GetModpackList(path);
@@ -524,7 +524,7 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             return await Task.Run(() =>
             {
-                var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                var tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
                 using (var zf = ZipFile.Read(path))
                 {
                     Directory.CreateDirectory(tempFolder);
@@ -980,7 +980,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
 
-        public static async Task<(ModPack ModPack, string Description)> GetModpackInfo(string modpackFile)
+        public static async Task<(ModPack ModPack, string Description, string HeaderImage)> GetModpackInfo(string modpackFile)
         {
             if (!File.Exists(modpackFile))
             {
@@ -1008,7 +1008,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 modpack.Version = pmp.Meta.Version;
                 description = pmp.Meta.Description;
             }
-            return (modpack, description);
+            return (modpack, description, null);
         }
 
         /// <summary>
@@ -1238,7 +1238,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                     else
                     {
-                        tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                        tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
                     }
 
                     // First, unzip the TTMP into our transaction data store folder.
@@ -1277,7 +1277,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     }
                     else
                     {
-                        tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                        tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
                     }
 
                     var mpdName = Guid.NewGuid().ToString() + ".mpd";

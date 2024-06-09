@@ -61,7 +61,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             else if (path.EndsWith(".pmp"))
             {
                 // Compressed PMP file.  Decompress it first.
-                var tempFolder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                var tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
 
                 // Run Zip extract on a new thread.
                 await Task.Run(async () =>
@@ -580,7 +580,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var workingPath = destination;
             if (zip)
             {
-                workingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                workingPath = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
             }
             try
             {
@@ -817,7 +817,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 } else
                 {
                     // Make our own temp path.
-                    unzipPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                    unzipPath = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
                 }
             }
 
@@ -910,7 +910,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                         // These are a bit weird, and basically have to be written to disk or some kind of memory store.
                         var data = await ItemMetadata.Serialize(meta);
-                        var tempFilePath = Path.GetTempFileName();
+                        var tempFilePath = IOUtil.GetFrameworkTempFile();
                         File.WriteAllBytes(tempFilePath, data);
 
                         var fileInfo = new FileStorageInformation()
@@ -929,7 +929,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         var path = CMP.GetRgspPath(rgsp.Race, rgsp.Gender);
                         // These are a bit weird, and basically have to be written to disk or some kind of memory store.
                         var data = rgsp.GetBytes();
-                        var tempFilePath = Path.GetTempFileName();
+                        var tempFilePath = IOUtil.GetFrameworkTempFile();
                         File.WriteAllBytes(tempFilePath, data);
 
                         var fileInfo = new FileStorageInformation()

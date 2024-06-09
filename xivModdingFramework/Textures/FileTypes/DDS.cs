@@ -803,7 +803,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns></returns>
         public static async Task<string> TexConv(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false)
         {
-            var input = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".tga");
+            var input = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString() + ".tga");
             using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
             {
                 var encoder = new TgaEncoder();
@@ -845,7 +845,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 {
 
                     var outFile = Path.Combine(workingDirectory, output);
-                    var outTemp = Path.Combine(Path.GetTempPath(), output);
+                    var outTemp = Path.Combine(IOUtil.GetFrameworkTempFolder(), output);
 
                     var args = $"{formatArg} {mipArg} -sepalpha -y {input}";
 
