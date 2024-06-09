@@ -634,7 +634,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             for(int i = 0; i < pmp.Groups.Count; i++)
             {
-                var gName = pmp.Groups[i].Name.ToLower();
+                var gName = IOUtil.MakePathSafe(pmp.Groups[i].Name.ToLower());
                 var groupPath = Path.Combine(workingDirectory, "group_" + i.ToString("D3") + "_" + gName + ".json");
                 var groupString = JsonConvert.SerializeObject(pmp.Groups[i], Formatting.Indented);
                 File.WriteAllText(groupPath, groupString);
