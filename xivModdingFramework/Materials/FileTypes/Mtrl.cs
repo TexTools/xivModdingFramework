@@ -1448,11 +1448,13 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             // Disabled for now.  SkinLegacy causes the Benchmark to crash in Benchmark 1.1
             return;
-
+            
             // ShaderPack update is all we have for this one for now.
+            /*
             mtrl.ShaderPack = EShaderPack.SkinLegacy;
             var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
             await Dat.WriteModFile(mtrlData, mtrl.MTRLPath, source, null, tx, false);
+            */
 
         }
         private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx)
@@ -2321,6 +2323,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     var ff = file as FileIndex2Entry;
 
                     var material = GetXivMtrl(mtrlData);
+
                     materials.Add(new SimplifiedMtrlInfo(dataFile, file, material, index1Dict, index2Dict));
                     count++;
                 }

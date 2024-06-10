@@ -241,7 +241,10 @@ namespace xivModdingFramework.Materials.DataContainers
                                     }
 
                                     var info = new ShaderConstantInfo((uint)key, name, def);
-                                    ShaderConstants[shpk].Add((uint)key, info);
+                                    if (!ShaderConstants[shpk].ContainsKey((uint)key))
+                                    {
+                                        ShaderConstants[shpk].Add((uint)key, info);
+                                    }
                                 }
                             }
                         }
@@ -508,8 +511,6 @@ namespace xivModdingFramework.Materials.DataContainers
             CharacterInc,
             [Description("skin.shpk")]
             Skin,
-            [Description("skinlegacy.shpk")]
-            SkinLegacy,
             [Description("hair.shpk")]
             Hair,
             [Description("iris.shpk")]

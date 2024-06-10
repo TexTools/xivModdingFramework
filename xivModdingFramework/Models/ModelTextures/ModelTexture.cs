@@ -658,29 +658,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (shaderPack == EShaderPack.SkinLegacy)
-            {
-                // Meaning of the skinlegacy Mask texture is the same as it was pre-Dawntrail
-                var skinColor = (Color4)colors.SkinColor;
-                var lipColor = (Color4)colors.LipColor;
-
-                return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                    float skinInfluence = multi.Red;
-                    diffuse = Color4.Lerp(diffuse, diffuse * skinColor, skinInfluence);
-
-                    float lipsInfluence = multi.Blue;
-                    diffuse = Color4.Lerp(diffuse, diffuse * lipColor, 1.0f - lipsInfluence);
-
-                    var alpha = diffuse.Alpha * alphaMultiplier;
-                    return new ShaderMapperResult()
-                    {
-                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                        Normal = new Color4(0.5f, 0.5f, 1.0f, 1.0f),
-                        Specular = new Color4(multi.Green, multi.Green, multi.Green, 1.0f) * 0.25f, // Hard-coded reduction in specular for skin
-                        Alpha = new Color4(alpha)
-                    };
-                };
-            }
             else if (shaderPack == EShaderPack.Hair)
             {
                 var hairColor = (Color4)colors.HairColor;
