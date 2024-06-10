@@ -14,6 +14,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Mods.FileTypes.PMP;
+using xivModdingFramework.Helpers;
 
 namespace xivModdingFramework.Mods.FileTypes
 {
@@ -473,11 +474,13 @@ namespace xivModdingFramework.Mods.FileTypes
             // Sha Key => Out File.
             var seenFiles = new Dictionary<TTMPWriter.SHA1HashKey, string>();
 
+            var useCompressed = defaultStorageType == EFileStorageType.CompressedIndividual || defaultStorageType == EFileStorageType.CompressedBlob;
             var idx = 1;
+            var tasks = new List<Task>();
+            var _lock = new object();
             foreach (var fkv in files)
             {
                 var f = fkv.Value;
-                var path = f.Path;
                 var info = f.Info;
                 var id = f.Id;
 
@@ -488,19 +491,26 @@ namespace xivModdingFramework.Mods.FileTypes
                     continue;
                 }
 
-                byte[] data;
-                if (defaultStorageType == EFileStorageType.CompressedIndividual || defaultStorageType == EFileStorageType.CompressedBlob)
+                tasks.Add(Task.Run(async () =>
                 {
-                    // Which we use here doesn't ultimately matter, but one will be faster than the other, depending on the way *most* files were stored.
-                    data = await TransactionDataHandler.GetCompressedFile(info);
-                }
-                else
-                {
-                    data = await TransactionDataHandler.GetUncompressedFile(info);
-                }
+                    var dedupeHash = await GetHashKey(info, useCompressed);
+                    lock (_lock)
+                    {
+                        guidHashDict.Add(id, dedupeHash);
+                    }
+                }));
+            }
 
-                var dedupeHash = new SHA1HashKey(sha1.ComputeHash(data));
+            await Task.WhenAll(tasks);
+
+            foreach (var fkv in files)
+            {
+                var f = fkv.Value;
+                var path = f.Path;
+                var info = f.Info;
+                var id = f.Id;
                 var pmpPath = f.OptionPrefix + path;
+                var dedupeHash = guidHashDict[id];
 
                 if (seenFiles.ContainsKey(dedupeHash))
                 {
@@ -516,7 +526,6 @@ namespace xivModdingFramework.Mods.FileTypes
                     seenFiles.Add(dedupeHash, pmpPath);
                 }
                 pmpPath = seenFiles[dedupeHash];
-                guidHashDict.Add(id, dedupeHash);
             }
 
 
@@ -533,7 +542,25 @@ namespace xivModdingFramework.Mods.FileTypes
                 files[fkv.Key].PmpPath = pmpPath;
             }
         }
+
+        internal static async Task<SHA1HashKey> GetHashKey(FileStorageInformation info, bool useCompressed)
+        {
+            byte[] data;
+            var sha1 = SHA1.Create();
+            if (useCompressed)
+            {
+                // Which we use here doesn't ultimately matter, but one will be faster than the other, depending on the way *most* files were stored.
+                data = await TransactionDataHandler.GetCompressedFile(info);
+            }
+            else
+            {
+                data = await TransactionDataHandler.GetUncompressedFile(info);
+            }
+            return new SHA1HashKey(sha1.ComputeHash(data));
+        }
     }
+
+
     public class FileIdentifier
     {
         public FileStorageInformation Info;
