@@ -80,6 +80,41 @@ namespace xivModdingFramework.Textures
             }, width, height);
         }
 
+        /// <summary>
+        /// Merges a greyscale alpha overlay into the base image's alpha channel.
+        /// </summary>
+        /// <param name="baseImage"></param>
+        /// <param name="overlayImage"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidDataException"></exception>
+        public static async Task AddAlphaOverlay(byte[] baseImage, byte[] overlayImage, int width, int height)
+        {
+            var expectedSize = width * height * 4;
+            if (expectedSize != baseImage.Length
+                || expectedSize != overlayImage.Length)
+            {
+                throw new InvalidDataException("Images were not the expected size.");
+            }
+
+            await ModifyPixels((int offset) =>
+            {
+                var overlayAlpha = overlayImage[offset + 3] / 255f;
+
+
+                // Use red channel as base.
+                var ov = overlayImage[offset + 0];
+
+                // Target is alpha channel
+                var bv = baseImage[offset + 3];
+
+                var c0 = ((ov * overlayAlpha) + (bv * (1 - overlayAlpha)));
+
+                baseImage[offset + 3] = (byte)c0;
+            }, width, height);
+        }
+
 
         internal static async Task FillChannel(byte[] data, int width, int height, int channel, byte value)
         {
