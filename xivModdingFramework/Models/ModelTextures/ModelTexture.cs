@@ -299,20 +299,23 @@ namespace xivModdingFramework.Models.ModelTextures
             return texMapData;
         }
 
-        private static void ResizeTexture(TexInfo texInfo, int width, int height)
+        private static void ResizeTexture(TexInfo texInfo, int width, int height, bool nearestNeighbor = false)
         {
             using var img = Image.LoadPixelData<Rgba32>(texInfo.Data, texInfo.Width, texInfo.Height);
 
+            var options = new ResizeOptions
+                {
+                    Size = new Size(width, height),
+                    PremultiplyAlpha = false
+                };
+            if (nearestNeighbor)
+            {
+                options.Sampler = KnownResamplers.NearestNeighbor;
+            }
             // ImageSharp pre-multiplies the RGB by the alpha component during resize, if alpha is 0 (colourset row 0)
             // this ends up causing issues and destroying the RGB values resulting in an invisible preview model
             // https://github.com/SixLabors/ImageSharp/issues/1498#issuecomment-757519563
-            img.Mutate(x => x.Resize(
-                new ResizeOptions
-                {
-                    Size = new Size(width, height),
-                    PremultiplyAlpha = false,
-                })
-            );
+            img.Mutate(x => x.Resize(options));
 
             texInfo.Data = new byte[width * height * 4];
             img.CopyPixelDataTo(texInfo.Data.AsSpan());
@@ -424,7 +427,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         ResizeTexture(texMapData.Multi, width, height);
                 }, () => {
                     if (texMapData.Index != null && (largestSize > texMapData.Index.Width * texMapData.Index.Height || scaleDown))
-                        ResizeTexture(texMapData.Index, width, height);
+                        ResizeTexture(texMapData.Index, width, height, true);
                 });
             });
 
@@ -567,7 +570,8 @@ namespace xivModdingFramework.Models.ModelTextures
                                 var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
                                 metalPixel += new Color4(metalFloor);
                                 specular *= metalPixel;
-                            } else
+                            }
+                            else
                             {
                                 // Arbitrary estimation for SE-gloss to inverse roughness.
                                 invRough = row[3] / 16;
