@@ -465,7 +465,7 @@ namespace xivModdingFramework.Models.ModelTextures
             bool hasSpecular = mtrl.GetTexture(XivTexType.Specular) != null;
             bool hasMulti = mtrl.GetTexture(XivTexType.Mask) != null;
 
-            // Arbitrary floor used for allowing non-metals to have specula reflections.
+            // Arbitrary floor used for allowing non-metals to have specular reflections.
             const float metalFloor = 0.1f;
 
             bool useTextures = settings.UseTextures;
