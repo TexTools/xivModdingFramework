@@ -306,8 +306,9 @@ namespace xivModdingFramework.Models.ModelTextures
             var options = new ResizeOptions
                 {
                     Size = new Size(width, height),
-                    PremultiplyAlpha = false
-                };
+                    PremultiplyAlpha = false,
+                    Mode = ResizeMode.Stretch,
+            };
             if (nearestNeighbor)
             {
                 options.Sampler = KnownResamplers.NearestNeighbor;

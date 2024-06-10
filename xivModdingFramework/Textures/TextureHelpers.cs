@@ -4,6 +4,7 @@ using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Materials;
@@ -27,15 +28,16 @@ namespace xivModdingFramework.Textures
         /// <returns></returns>
         public static async Task ModifyPixels(Action<int> action, int width, int height)
         {
-            List<Task> tasks = new List<Task>();
+            List<Task> tasks = new List<Task>(height);
             for (int i = 0; i < height; i++)
             {
-                var h = i;
+                // Reassign necessary to prevent threading shenanigans.
+                var y = i;
                 tasks.Add(Task.Run(() =>
                 {
                     for (int x = 0; x < width; x++)
                     {
-                        var offset = ((width * h) + x) * 4;
+                        var offset = ((width * y) + x) * 4;
                         action(offset);
                     }
                 }));
@@ -43,6 +45,40 @@ namespace xivModdingFramework.Textures
             await Task.WhenAll(tasks);
         }
 
+
+        /// <summary>
+        /// Overlay an image onto a base image, while ignoring the base image's alpha channel/treating it as if it is 1.0.
+        /// </summary>
+        /// <param name="baseImage"></param>
+        /// <param name="overlayImage"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns></returns>
+        public static async Task OverlayImagePreserveAlpha(byte[] baseImage, byte[] overlayImage, int width, int height)
+        {
+            var expectedSize = width * height * 4;
+            if (expectedSize != baseImage.Length
+                || expectedSize != overlayImage.Length)
+            {
+                throw new InvalidDataException("Images were not the expected size.");
+            }
+
+            await ModifyPixels((int offset) =>
+            {
+                var overlayAlpha = overlayImage[offset + 3] / 255f;
+
+
+                for(int i = 0; i < 3; i++)
+                {
+                    var ov = overlayImage[offset + i];
+                    var bv = baseImage[offset + i];
+
+                    var c0 = ((ov * overlayAlpha) + (bv * (1 - overlayAlpha)));
+
+                    baseImage[offset + i] = (byte)c0;
+                }
+            }, width, height);
+        }
 
 
         internal static async Task FillChannel(byte[] data, int width, int height, int channel, byte value)
@@ -175,6 +211,7 @@ namespace xivModdingFramework.Textures
                     {
                         Size = new Size(newWidth, newHeight),
                         PremultiplyAlpha = false,
+                        Mode = ResizeMode.Stretch,
                     })
                 );
                 var data = new byte[newWidth * newHeight * 4];

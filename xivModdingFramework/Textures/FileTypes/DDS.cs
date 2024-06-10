@@ -843,11 +843,8 @@ namespace xivModdingFramework.Textures.FileTypes
                 var output = guid + ".dds";
                 var inFull = Path.Combine(workingDirectory, input);
 
-                var bcq = "-bc q";
-                if (IOUtil.DoesRealGfxCardExist())
-                {
-                    bcq = "";
-                }
+                //var bcq = "-bc q";
+                var bcq = "";
 
                 File.Copy(file, inFull);
                 try
