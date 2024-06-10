@@ -469,6 +469,9 @@ namespace xivModdingFramework.Models.ModelTextures
             // Arbitrary floor used for allowing non-metals to have specular reflections.
             const float metalFloor = 0.1f;
 
+            // Arbitrary multplier used to enhance metal specular strength.
+            const float metalMultiplier = 1.5f;
+
             bool useTextures = settings.UseTextures;
             bool useColorset = settings.UseColorset;
             bool visualizeColorset = settings.VisualizeColorset;
@@ -514,7 +517,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                         
 
-                        Color4 specular;
+                        Color4 specular = new Color4(1.0f);
                         if (useTextures)
                         {
                             if (!hasDiffuse)
@@ -525,13 +528,13 @@ namespace xivModdingFramework.Models.ModelTextures
 
                             if (!hasSpecular)
                             {
-                                var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                                diffuse *= occlusion;
-                                specular = occlusion;
 
                                 // Construct specular from mask
                                 if (shaderPack == EShaderPack.CharacterLegacy)
                                 {
+                                    var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                                    diffuse *= occlusion;
+                                    specular *= occlusion;
                                     // Specular/Gloss flow
                                     var specPower = new Color4(multi.Green, multi.Green, multi.Green, 1.0f);
                                     var gloss = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
@@ -539,11 +542,11 @@ namespace xivModdingFramework.Models.ModelTextures
                                 }
                                 else
                                 {
-                                    // Roughness/Metalness Flow
+                                    specular *= new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                                    diffuse *= new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
+
                                     var invRoughness = new Color4(1 - multi.Green, 1 - multi.Green, 1 - multi.Green, 1.0f);
-                                    var metalness = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
-                                    metalness += new Color4(metalFloor);
-                                    specular *= invRoughness * metalness;
+                                    specular *= invRoughness;
                                 }
                             } else
                             {
@@ -568,9 +571,14 @@ namespace xivModdingFramework.Models.ModelTextures
                             if (shaderPack != EShaderPack.CharacterLegacy)
                             {
                                 invRough = 1 - Math.Max(Math.Min(row[16], 1), 0);
-                                var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
-                                metalPixel += new Color4(metalFloor);
-                                specular *= metalPixel;
+
+                                var metalness = row[18];
+                                //var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
+
+                                diffuse = Color4.Lerp(diffuse, specular, metalness);
+
+
+                                specular *= metalFloor + (metalness * metalMultiplier);
                             }
                             else
                             {
