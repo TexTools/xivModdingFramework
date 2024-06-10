@@ -809,6 +809,7 @@ namespace xivModdingFramework.Textures.FileTypes
             using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
             {
                 var encoder = new TgaEncoder();
+                encoder.Compression = TgaCompression.None;
                 encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
                 img.SaveAsTga(input,encoder);
             }
