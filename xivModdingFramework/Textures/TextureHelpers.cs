@@ -106,6 +106,17 @@ namespace xivModdingFramework.Textures
                 // Use red channel as base.
                 var ov = overlayImage[offset + 0];
 
+                if(overlayImage[offset + 0] != overlayImage[offset + 1]
+                || overlayImage[offset + 0] != overlayImage[offset + 2])
+                {
+                    // Image is not already greyscaled.  Just take a simple naive greyscale of it.
+                    ov = (byte) Math.Round((overlayImage[offset + 0] * (1f / 3f)) 
+                    + (overlayImage[offset + 1] * (1f / 3f))
+                    + (overlayImage[offset + 2] * (1f / 3f)));
+                                
+                }
+
+
                 // Target is alpha channel
                 var bv = baseImage[offset + 3];
 
