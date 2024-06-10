@@ -843,6 +843,12 @@ namespace xivModdingFramework.Textures.FileTypes
                 var output = guid + ".dds";
                 var inFull = Path.Combine(workingDirectory, input);
 
+                var bcq = "-bc q";
+                if (IOUtil.DoesRealGfxCardExist())
+                {
+                    bcq = "";
+                }
+
                 File.Copy(file, inFull);
                 try
                 {
@@ -852,7 +858,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     Directory.CreateDirectory(tmpDir);
                     var outTemp = Path.Combine(tmpDir, output);
 
-                    var args = $"{formatArg} {mipArg} -bc q -tgazeroalpha -sepalpha -y {input}";
+                    var args = $"{formatArg} {mipArg} {bcq} -tgazeroalpha -sepalpha -y {input}";
 
                     var proc = new Process
                     {

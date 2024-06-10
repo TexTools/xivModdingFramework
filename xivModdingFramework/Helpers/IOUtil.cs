@@ -34,6 +34,8 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
+using System.Management;
+using System.Diagnostics;
 
 namespace xivModdingFramework.Helpers
 {
@@ -694,6 +696,40 @@ namespace xivModdingFramework.Helpers
         {
             var path = GetFrameworkTempFolder();
             DeleteTempDirectory(path);
+        }
+
+
+        public static bool DoesRealGfxCardExist()
+        {
+            try
+            {
+                ManagementObjectSearcher objvida = new ManagementObjectSearcher("select * from Win32_VideoController ");
+
+                string VC = String.Empty;
+
+                string DI = String.Empty;
+
+                foreach (ManagementObject obj in objvida.Get())
+                {
+
+                    if (obj["CurrentBitsPerPixel"] != null && obj["CurrentHorizontalResolution"] != null)
+                    {
+                        DI = obj["DeviceID"].ToString();
+                        VC = obj["Description"].ToString();
+
+                        if (VC.ToLower().Contains("nvidia") || VC.ToLower().Contains("amd"))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine(ex);
+                return false;
+            }
         }
     }
 }
