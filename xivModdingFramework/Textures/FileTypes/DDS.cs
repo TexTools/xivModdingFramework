@@ -852,7 +852,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     Directory.CreateDirectory(tmpDir);
                     var outTemp = Path.Combine(tmpDir, output);
 
-                    var args = $"{formatArg} {mipArg} -tgazeroalpha -sepalpha -y {input}";
+                    var args = $"{formatArg} {mipArg} -bc q -tgazeroalpha -sepalpha -y {input}";
 
                     var proc = new Process
                     {
