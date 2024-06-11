@@ -916,7 +916,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 var fileInfo = IOUtil.MakeGameStorageInfo(df, offset);
 
-                ret.Add(src, fileInfo);
+                ret.Add(dest, fileInfo);
             }
 
             List<PMPManipulationWrapperJson> otherManips = null;

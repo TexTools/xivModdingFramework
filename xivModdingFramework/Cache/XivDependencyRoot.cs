@@ -990,6 +990,11 @@ namespace xivModdingFramework.Cache
                 if (variant >= 0) {
                     var entry = imc.GetEntry(variant, Info.Slot);
                     var ff = await ATex.GetVfxPath(Info, entry.Vfx);
+                    if(string.IsNullOrWhiteSpace(ff.File))
+                    {
+                        return files;
+                    }
+
                     var path = ff.Folder + "/" + ff.File;
 
                     if(await tx.FileExists(path))

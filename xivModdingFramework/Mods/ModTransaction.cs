@@ -1119,6 +1119,10 @@ namespace xivModdingFramework.Mods
             {
                 return false;
             }
+            if (!IOUtil.IsFFXIVInternalPath(path))
+            {
+                return false;
+            }
             var offset = await Get8xDataOffset(path, forceOriginal);
             return offset != 0;
         }
