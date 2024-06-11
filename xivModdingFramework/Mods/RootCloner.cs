@@ -740,6 +740,11 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, TxFileState> originalStates, string sourceApplication, IProgress<(int current, int total, string message)> progress = null)
         {
+            if (roots.Count == 0)
+            {
+                return new HashSet<string>();
+            }
+
             // We currently have all the files loaded into our in-memory indices in their default locations.
             var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
             var newModList = await tx.GetModList();
@@ -747,6 +752,12 @@ namespace xivModdingFramework.Mods
             HashSet<string> clearedFiles = new HashSet<string>();
             var total = roots.Count;
             var count = 0;
+
+            // This is a bit odd, but we need to go ahead and force clear the cache.
+            // Because we're mid-modpack install and have old data that hasn't yet been queued.
+            XivCache.QueueDependencyUpdate(importedFiles);
+
+
             foreach (var dfe in conversionsByDf)
             {
                 HashSet<string> filesToReset = new HashSet<string>();
