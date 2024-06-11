@@ -1143,6 +1143,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     await UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
                 }
 
+                XivCache.QueueDependencyUpdate(paths);
 
                 if (boiler.OwnTx)
                 {

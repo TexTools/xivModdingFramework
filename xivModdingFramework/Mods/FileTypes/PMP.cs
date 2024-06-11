@@ -513,6 +513,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
             }
 
+            XivCache.QueueDependencyUpdate(imported.Keys);
+
             return (imported, notImported);
         }
 
