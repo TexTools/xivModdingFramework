@@ -1,4 +1,5 @@
-﻿using SixLabors.ImageSharp;
+﻿using SharpDX;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using System;
@@ -124,6 +125,22 @@ namespace xivModdingFramework.Textures
 
                 baseImage[offset + 3] = (byte)c0;
             }, width, height);
+        }
+
+        public static Color4 AlphaBlendExplicit(Color4 a, Color4 b, float blend)
+        {
+            var res = new Color4(1.0f, 1.0f, 1.0f, a.Alpha);
+
+            for (int i = 0; i < 3; i++)
+            {
+                var baseValue = a[i];
+                var overlayValue = b[i];
+
+                var c0 = ((overlayValue * blend) + (baseValue * (1 - blend)));
+
+                res[i] = c0;
+            }
+            return res;
         }
 
 

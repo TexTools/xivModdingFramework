@@ -44,6 +44,7 @@ using xivModdingFramework.Mods;
 using SharpDX;
 using System.Diagnostics;
 using System.ComponentModel.Design;
+using xivModdingFramework.Textures;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -467,10 +468,13 @@ namespace xivModdingFramework.Models.ModelTextures
             bool hasMulti = mtrl.GetTexture(XivTexType.Mask) != null;
 
             // Arbitrary floor used for allowing non-metals to have specular reflections.
-            const float metalFloor = 0.1f;
+            const float _MetalFloor = 0.1f;
 
             // Arbitrary multplier used to enhance metal specular strength.
-            const float metalMultiplier = 1.5f;
+            const float _MetalMultiplier = 1.5f;
+
+            // Arbitrary multiplier used to reduce hair shininess.
+            var _HairSpecMultiplier = new Color4(_MetalFloor, _MetalFloor, _MetalFloor, 1.0f);
 
             bool useTextures = settings.UseTextures;
             bool useColorset = settings.UseColorset;
@@ -578,7 +582,7 @@ namespace xivModdingFramework.Models.ModelTextures
                                 diffuse = Color4.Lerp(diffuse, specular, metalness);
 
 
-                                specular *= metalFloor + (metalness * metalMultiplier);
+                                specular *= _MetalFloor + (metalness * _MetalMultiplier);
                             }
                             else
                             {
@@ -648,14 +652,23 @@ namespace xivModdingFramework.Models.ModelTextures
             else if (shaderPack == EShaderPack.Skin)
             {
                 var skinColor = (Color4)colors.SkinColor;
-                var lipColor = (Color4)colors.LipColor;
+                var bonusColor = GetSkinBonusColor(mtrl, colors);
 
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float skinInfluence = multi.Blue;
                     diffuse = Color4.Lerp(diffuse, diffuse * skinColor, skinInfluence);
 
-                    float lipsInfluence = multi.Alpha;
-                    diffuse = Color4.Lerp(diffuse, diffuse * lipColor, 1.0f - lipsInfluence);
+                    float bonusInfluence = normal.Alpha;
+                    if (bonusColor.Color != null)
+                    {
+                        if (bonusColor.Blend)
+                        {
+                            diffuse = TextureHelpers.AlphaBlendExplicit(diffuse, bonusColor.Color.Value, bonusInfluence);
+                        } else
+                        {
+                            diffuse = Color4.Lerp(diffuse, bonusColor.Color.Value, bonusInfluence);
+                        }
+                    }
 
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     return new ShaderMapperResult()
@@ -669,21 +682,25 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Hair)
             {
-                var hairColor = (Color4)colors.HairColor;
-                var highlightColor = hairColor;
-
-                if (colors.HairHighlightColor != null)
-                    highlightColor = (Color4)colors.HairHighlightColor;
+                var hairColor = colors.HairColor;
+                var bonusColor = GetHairBonusColor(mtrl, colors, colors.HairHighlightColor ?? colors.HairColor);
 
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                    float highlightInfluence = normal.Blue;
+                    float bonusInfluence = normal.Blue;
 
-                    var occlusion = new Color4(multi.Alpha, multi.Alpha, multi.Alpha, 1.0f);
-                    diffuse = Color4.Lerp(hairColor, highlightColor, highlightInfluence);
-                    diffuse = Color4.Modulate(diffuse,occlusion);
+                    //float 
+                    var diffuseMask = new Color4(multi.Alpha, multi.Alpha, multi.Alpha, 1.0f);
+                    var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                    var ir = 1- multi.Green;
+                    var invRough = new Color4(ir, ir, ir, 1.0f);
 
-                    var spec = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                    spec = Color4.Modulate(spec, occlusion);
+                    diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    diffuse = Color4.Modulate(diffuse, diffuseMask);
+
+
+                    var spec = Color4.Modulate(specMask, invRough);
+
+                    spec = Color4.Modulate(spec, _HairSpecMultiplier);
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     diffuse.Alpha = alpha;
@@ -698,6 +715,8 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.CharacterTattoo)
             {
+                var bonusColor = GetHairBonusColor(mtrl, colors, colors.TattooColor);
+
                 var tattooColor = (Color4)colors.TattooColor;
                 // Very similar to hair.shpk but without an extra texture
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
@@ -1089,6 +1108,74 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 #endif
 
+
+        private static Color4 GetHairBonusColor(XivMtrl mtrl, CustomModelColors colors, Color4 defaultColor)
+        {
+            var bonusColor = defaultColor;
+
+            var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x24826489);
+
+            if (bonusColorKey != null)
+            {
+                // PART_HAIR
+                if (bonusColorKey.Value == 0xF7B8956E)
+                {
+                    if (colors.HairHighlightColor != null)
+                    {
+                        bonusColor = (Color4)colors.HairHighlightColor;
+                    }
+                    else
+                    {
+                        bonusColor = (Color4)colors.HairColor;
+                    }
+                }
+                // PART_FACE
+                else if (bonusColorKey.Value == 0x6E5B8F10)
+                {
+                    bonusColor = (Color4)colors.TattooColor;
+                }
+            }
+
+            return bonusColor;
+        }
+
+
+        private static (Color4? Color, bool Blend) GetSkinBonusColor(XivMtrl mtrl, CustomModelColors colors)
+        {
+            Color4? bonusColor = null;
+
+            var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
+
+            if (bonusColorKey != null)
+            {
+                // PART_BODY
+                if (bonusColorKey.Value == 0x2BDB45F1)
+                {
+                    // Unused
+                    bonusColor = null;
+                }
+                // PART_FACE
+                else if (bonusColorKey.Value == 0xF5673524)
+                {
+                    bonusColor = (Color4)colors.LipColor;
+                    return (bonusColor, false);
+                }
+                // PART_HRO
+                else if (bonusColorKey.Value == 0x57FF3B64)
+                {
+                    // What actually goes here.
+                    bonusColor = (Color4)colors.HairColor;
+                    return (bonusColor, true);
+                }
+            } else
+            {
+                // Default usage is as face.
+                bonusColor = (Color4)colors.LipColor;
+                return (bonusColor, false);
+            }
+
+            return (bonusColor, false);
+        }
 
 
         /// <summary>
