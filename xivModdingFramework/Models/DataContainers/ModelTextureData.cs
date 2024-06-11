@@ -36,5 +36,7 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] Emissive { get; set; }
 
         public string MaterialPath { get; set; }
+
+        public bool RenderBackfaces { get; set; }
     }
 }

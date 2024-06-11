@@ -191,6 +191,11 @@ namespace xivModdingFramework.Models.ModelTextures
                 MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
             };
 
+            if((mtrl.MaterialFlags & EMaterialFlags1.HideBackfaces) == 0)
+            {
+                result.RenderBackfaces = true;
+            }
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             Color4 readInputPixel(byte[] pixels, int i, Color4 color)
             {
