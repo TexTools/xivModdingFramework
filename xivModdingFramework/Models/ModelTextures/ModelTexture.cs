@@ -532,7 +532,7 @@ namespace xivModdingFramework.Models.ModelTextures
                             }
 
 
-                            if (!hasSpecular)
+                            if (hasMulti)
                             {
 
                                 // Construct specular from mask
@@ -554,10 +554,15 @@ namespace xivModdingFramework.Models.ModelTextures
                                     var invRoughness = new Color4(1 - multi.Green, 1 - multi.Green, 1 - multi.Green, 1.0f);
                                     specular *= invRoughness;
                                 }
-                            } else
+                            } else if(hasSpecular)
                             {
                                 specular = multi;
+                            } else
+                            {
+                                // ???
+                                specular = new Color4(0.1f, 0.1f, 0.1f, 1.0f);
                             }
+
                         } else
                         {
                             specular = new Color4(1.0f);
