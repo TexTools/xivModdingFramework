@@ -35,6 +35,48 @@ using static xivModdingFramework.Materials.DataContainers.ShaderHelpers;
 
 namespace xivModdingFramework.Materials.DataContainers
 {
+
+    [Flags]
+    public enum EMaterialFlags1 : ushort
+    {
+        ShowBackfaces = 0x01,
+        Unknown0002 = 0x02,
+        Unknown0004 = 0x04,
+        Unknown0008 = 0x08,
+        EnableTranslucency = 0x10,
+        Unknown0020 = 0x020,
+        Unknown0040 = 0x040,
+        Unknown0080 = 0x080,
+        Unknown0100 = 0x100,
+        Unknown0200 = 0x200,
+        Unknown0400 = 0x400,
+        Unknown0800 = 0x800,
+        Unknown1000 = 0x1000,
+        Unknown2000 = 0x1000,
+        Unknown4000 = 0x1000,
+        Unknown8000 = 0x1000,
+    };
+    [Flags]
+    public enum EMaterialFlags2 : ushort
+    {
+        Unknown0001 = 0x01,
+        Unknown0002 = 0x02,
+        Unknown0004 = 0x04,
+        Unknown0008 = 0x08,
+        Unknown0010 = 0x10,
+        Unknown0020 = 0x20,
+        Unknown0040 = 0x40,
+        Unknown0080 = 0x80,
+        Unknown0100 = 0x100,
+        Unknown0200 = 0x200,
+        Unknown0400 = 0x400,
+        Unknown0800 = 0x800,
+        Unknown1000 = 0x1000,
+        Unknown2000 = 0x1000,
+        Unknown4000 = 0x1000,
+        Unknown8000 = 0x1000,
+    };
+
     /// <summary>
     /// This class holds the information for an MTRL file
     /// </summary>
@@ -159,32 +201,13 @@ namespace xivModdingFramework.Materials.DataContainers
 
         public List<MtrlTexture> Textures = new List<MtrlTexture>();
 
-        /// <summary>
-        /// Shader flags, only partially known:
-        /// 
-        /// 0x0001 Show Backfaces
-        /// 0x0002 
-        /// 0x0004 
-        /// 0x0008 
-        /// 0x0010 Enable Transparency 
-        /// 0x0020 
-        /// 0x0040
-        /// 0x0080
-        /// 0x0100
-        /// 0x0200
-        /// 0x0400
-        /// 0x0800
-        /// 0x1000
-        /// 0x2000
-        /// 0x4000
-        /// 0x8000
-        /// </remarks>
-        public ushort MaterialFlags { get; set; }
+        public EMaterialFlags1 MaterialFlags { get; set; }
+
 
         /// <summary>
         /// Unknown Value
         /// </summary>
-        public ushort MaterialFlags2 { get; set; }
+        public EMaterialFlags2 MaterialFlags2 { get; set; }
 
         /// <summary>
         /// The list of Type 1 data structures

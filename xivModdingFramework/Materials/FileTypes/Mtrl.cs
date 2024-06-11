@@ -327,8 +327,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 var shaderConstantsCount = br.ReadUInt16();
                 var textureSamplerCount = br.ReadUInt16();
 
-                xivMtrl.MaterialFlags = br.ReadUInt16();
-                xivMtrl.MaterialFlags2 = br.ReadUInt16();
+                xivMtrl.MaterialFlags = (EMaterialFlags1) br.ReadUInt16();
+                xivMtrl.MaterialFlags2 = (EMaterialFlags2) br.ReadUInt16();
 
                 xivMtrl.ShaderKeys = new List<ShaderKey>((int)shaderKeysCount);
                 for (var i = 0; i < shaderKeysCount; i++)
@@ -664,8 +664,8 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderConstantsCount));
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.Textures.Count(x => x.Sampler != null)));
 
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialFlags));
-            mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.MaterialFlags2));
+            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.MaterialFlags));
+            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.MaterialFlags2));
 
             foreach (var dataStruct1 in xivMtrl.ShaderKeys)
             {
