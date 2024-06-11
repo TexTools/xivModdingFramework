@@ -1584,7 +1584,11 @@ namespace xivModdingFramework.Models.DataContainers
                 var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
                 var bones = useAllBones ? null : Bones;
 
-                var boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
+                var boneDict = new Dictionary<string, SkeletonData>();
+                if (Bones.Count > 0)
+                {
+                    boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
+                }
 
                 const string creationScript = "CreateImportDB.sql";
                 // Spawn a DB connection to do the raw queries.
