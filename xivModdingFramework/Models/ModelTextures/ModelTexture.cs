@@ -476,6 +476,13 @@ namespace xivModdingFramework.Models.ModelTextures
             // Arbitrary multiplier used to reduce hair shininess.
             var _HairSpecMultiplier = new Color4(_MetalFloor, _MetalFloor, _MetalFloor, 1.0f);
 
+            // Arbitrary multiplier used to reduce skin shininess.
+            var _SkinSpecMultiplier = new Color4(_MetalFloor, _MetalFloor, _MetalFloor, 1.0f);
+
+            // Arbitrary color to use for charactertattoo.shpk base color.
+            // No clue where it comes from in game, but it's used for moles.
+            var _MoleColor = new Color4( 56 / 255f, 24 / 255f, 8 / 255f, 1.0f);
+
             bool useTextures = settings.UseTextures;
             bool useColorset = settings.UseColorset;
             bool visualizeColorset = settings.VisualizeColorset;
@@ -663,19 +670,27 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         if (bonusColor.Blend)
                         {
-                            diffuse = TextureHelpers.AlphaBlendExplicit(diffuse, bonusColor.Color.Value, bonusInfluence);
+                            diffuse = TextureHelpers.AlphaBlendExplicit(diffuse, bonusColor.Color.Value, bonusInfluence * bonusColor.Color.Value.Alpha);
                         } else
                         {
                             diffuse = Color4.Lerp(diffuse, bonusColor.Color.Value, bonusInfluence);
                         }
                     }
 
+                    var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                    var ir = 1 - multi.Green;
+                    var invRough = new Color4(ir, ir, ir, 1.0f);
+                    var spec = Color4.Modulate(specMask, invRough);
+
+                    spec = Color4.Modulate(spec, _SkinSpecMultiplier);
+
+
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     return new ShaderMapperResult()
                     {
                         Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                        Normal = new Color4(0.5f, 0.5f, 1.0f, 1.0f),
-                        Specular = new Color4(multi.Red, multi.Red, multi.Red, 1.0f) * 0.25f, // Hard-coded reduction in specular for skin
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = spec,
                         Alpha = new Color4(alpha)
                     };
                 };
@@ -717,11 +732,13 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 var bonusColor = GetHairBonusColor(mtrl, colors, colors.TattooColor);
 
+
                 var tattooColor = (Color4)colors.TattooColor;
                 // Very similar to hair.shpk but without an extra texture
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float tattooInfluence = normal.Blue;
-                    diffuse = Color4.Lerp(diffuse, tattooColor, tattooInfluence);
+
+                    diffuse = Color4.Lerp(_MoleColor, tattooColor, tattooInfluence);
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     diffuse.Alpha = alpha;
@@ -1158,20 +1175,20 @@ namespace xivModdingFramework.Models.ModelTextures
                 else if (bonusColorKey.Value == 0xF5673524)
                 {
                     bonusColor = (Color4)colors.LipColor;
-                    return (bonusColor, false);
+                    return (bonusColor, true);
                 }
                 // PART_HRO
                 else if (bonusColorKey.Value == 0x57FF3B64)
                 {
                     // What actually goes here.
                     bonusColor = (Color4)colors.HairColor;
-                    return (bonusColor, true);
+                    return (bonusColor, false);
                 }
             } else
             {
                 // Default usage is as face.
                 bonusColor = (Color4)colors.LipColor;
-                return (bonusColor, false);
+                return (bonusColor, true);
             }
 
             return (bonusColor, false);
