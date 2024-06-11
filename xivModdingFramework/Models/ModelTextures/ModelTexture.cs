@@ -228,7 +228,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Color4 normalColor = shaderResult.Normal;
                         Color4 specularColor = shaderResult.Specular;
                         Color4 alphaColor = shaderResult.Alpha;
-                        Color4 emissiveColor = Color4.Black;
+                        Color4 emissiveColor = shaderResult.Emissive;
 
                         // White out the opacity channels where appropriate.
                         specularColor.Alpha = 1.0f;
@@ -442,6 +442,7 @@ namespace xivModdingFramework.Models.ModelTextures
             public Color4 Normal;
             public Color4 Specular;
             public Color4 Alpha;
+            public Color4 Emissive;
         }
 
         private class ShaderMapperSettings
@@ -568,7 +569,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             specular = new Color4(1.0f);
                             diffuse = new Color4(1.0f);
                         }
-
+                        
+                        var emissive = new Color4(0, 0, 0, 1.0f);
                         if (useColorset)
                         {
                             var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
@@ -576,6 +578,7 @@ namespace xivModdingFramework.Models.ModelTextures
                             var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
                             var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
                             var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
+                            emissive = emissPixel;
 
                             Color4 invRoughPixel;
                             float invRough = 0.5f;
@@ -611,7 +614,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
                             Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                             Specular = specular,
-                            Alpha = new Color4(alpha)
+                            Alpha = new Color4(alpha),
+                            Emissive = emissive,
                         };
                     };
             }
@@ -875,6 +879,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             diffuse = new Color4(1.0f);
                         }
 
+
+                        var emissive = new Color4(0, 0, 0, 1.0f);
                         if (useColorset)
                         {
                             var row = GetColorsetRow(colorset, normal[3], 0.0f, visualizeColorset, highlightRow);
@@ -893,6 +899,9 @@ namespace xivModdingFramework.Models.ModelTextures
                             diffuse *= diffusePixel;
                             specular *= invRoughPixel;
                             specular *= specPixel;
+
+                            emissive = emissPixel;
+
                         }
 
                         var alpha = normal.Blue * alphaMultiplier;
@@ -902,7 +911,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
                             Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                             Specular = specular,
-                            Alpha = new Color4(alpha)
+                            Alpha = new Color4(alpha),
+                            Emissive = emissive
                         };
                     };
                 }
