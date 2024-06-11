@@ -510,8 +510,6 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 // Clone the list in case the data is accessed or changed while we're working.
                 colorset = mtrl.ColorSetData.ToList();
-
-                // TODO: If gamma adjustment on CSet needs to happen it should happen here.
             } else
             {
                 useColorset = false;
@@ -804,6 +802,16 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 #endif
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Color4 GammaAdjustColor(Color4 color)
+        {
+            for(int i = 0; i < 3; i++)
+            {
+                color[i] = (Half)Math.Pow(color[i], 1/ 1.4f);
+            }
+            return color;
+        }
+
 #if ENDWALKER
         private static ShaderMapperDelegate GetShaderMapper(CustomModelColors colors, XivMtrl mtrl, ShaderMapperSettings settings)
         {
@@ -843,8 +851,6 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 // Clone the list in case the data is accessed or changed while we're working.
                 colorset = mtrl.ColorSetData.ToList();
-
-                // TODO: If gamma adjustment on CSet needs to happen it should happen here.
             }
             else
             {
@@ -920,6 +926,8 @@ namespace xivModdingFramework.Models.ModelTextures
                         var alpha = normal.Blue * alphaMultiplier;
 
                         alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                        //diffuse = GammaAdjustColor(diffuse);
                         return new ShaderMapperResult()
                         {
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
