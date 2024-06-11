@@ -679,7 +679,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     float highlightInfluence = normal.Blue;
 
                     var occlusion = new Color4(multi.Alpha, multi.Alpha, multi.Alpha, 1.0f);
-                    diffuse = Color4.Lerp(hairColor, hairColor * highlightColor, highlightInfluence);
+                    diffuse = Color4.Lerp(hairColor, highlightColor, highlightInfluence);
                     diffuse = Color4.Modulate(diffuse,occlusion);
 
                     var spec = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
