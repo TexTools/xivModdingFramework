@@ -468,6 +468,8 @@ namespace xivModdingFramework.Models.ModelTextures
             bool hasSpecular = mtrl.GetTexture(XivTexType.Specular) != null;
             bool hasMulti = mtrl.GetTexture(XivTexType.Mask) != null;
 
+            bool allowTranslucency = (mtrl.MaterialFlags & EMaterialFlags1.EnableTranslucency) != 0;
+
             // Arbitrary floor used for allowing non-metals to have specular reflections.
             const float _MetalFloor = 0.1f;
 
@@ -608,6 +610,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         }
 
                         var alpha = normal.Blue * alphaMultiplier;
+                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
                         return new ShaderMapperResult()
                         {
@@ -649,6 +652,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                     var alpha = diffuse.Alpha * alphaMultiplier;
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                     return new ShaderMapperResult()
                     {
                         Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
@@ -681,6 +685,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     spec = Color4.Modulate(spec, _HairSpecMultiplier);
 
                     var alpha = normal.Alpha * alphaMultiplier;
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                     diffuse.Alpha = alpha;
                     return new ShaderMapperResult()
                     {
@@ -704,6 +709,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     diffuse = Color4.Lerp(_MoleColor, tattooColor, tattooInfluence);
 
                     var alpha = normal.Alpha * alphaMultiplier;
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                     diffuse.Alpha = alpha;
                     return new ShaderMapperResult()
                     {
@@ -816,6 +822,8 @@ namespace xivModdingFramework.Models.ModelTextures
             bool visualizeColorset = settings.VisualizeColorset;
             var highlightRow = settings.HighlightedRow;
 
+            bool allowTranslucency = (mtrl.MaterialFlags & EMaterialFlags1.EnableTranslucency) != 0;
+
             var alphaMultiplier = 1.0f;
 
             // Alpha Threshold Constant
@@ -906,6 +914,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                         var alpha = normal.Blue * alphaMultiplier;
 
+                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                         return new ShaderMapperResult()
                         {
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
@@ -928,6 +937,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                         var alpha = normal.Blue * alphaMultiplier;
+                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                         return new ShaderMapperResult()
                         {
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
@@ -947,6 +957,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                         var alpha = normal.Blue * alphaMultiplier;
+                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                         return new ShaderMapperResult()
                         {
                             Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
@@ -999,12 +1010,13 @@ namespace xivModdingFramework.Models.ModelTextures
                     float skinInfluence = specular.Red;
                     var coloredSkin = diffuse * skinColor;
                     Color4 newDiffuse = Color4.Lerp(diffuse, coloredSkin, skinInfluence);
+                    var alpha = 1.0f;
                     return new ShaderMapperResult()
                     {
                         Diffuse = newDiffuse,
                         Normal = newNormal,
                         Specular = newSpecular,
-                        Alpha = new Color4(1.0f)
+                        Alpha = new Color4(alpha)
                     };
                 };
 
