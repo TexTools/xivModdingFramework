@@ -1321,7 +1321,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="race"></param>
         /// <param name="submeshId"></param>
         /// <returns></returns>
-        public static async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, bool shiftUVs = true, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mtrlVariant = 1;
@@ -1330,7 +1330,7 @@ namespace xivModdingFramework.Models.FileTypes
                 mtrlVariant = imcInfo.MaterialSet;
             }
 
-            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, includeTextures, getOriginal, tx);
+            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, includeTextures, getOriginal, shiftUVs, tx);
         }
 
         /// <summary>
@@ -1341,7 +1341,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="outputFilePath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public static async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool shiftUVs = true, bool getOriginal = false, ModTransaction tx = null)
         {
             // Importers and exporters currently use the same criteria.
             // Any available exporter is assumed to be able to import and vice versa.
@@ -1361,7 +1361,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var model = await GetTTModel(mdlPath, getOriginal, tx);
-            await ExportTTModelToFile(model, outputFilePath, mtrlVariant, includeTextures, tx);
+            await ExportTTModelToFile(model, outputFilePath, mtrlVariant, includeTextures, shiftUVs, tx);
         }
 
         /// <summary>
@@ -1370,7 +1370,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
         /// <returns></returns>
-        public static async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, ModTransaction tx = null)
+        public static async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool shiftUvs = true, ModTransaction tx = null)
         {
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
@@ -1379,6 +1379,9 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
+
+            // Clone the model since we will modify it in the process of prepping it for save.
+            model = (TTModel) model.Clone();
 
 
 
@@ -1426,9 +1429,13 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
+            if (shiftUvs)
+            {
+                // This is not a typo.  Because we haven't flipped the UV yet, we need to -1, not +1.
+                ModelModifiers.ShiftImportUV(model);
+            }
 
             // Save the DB file.
-
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);

@@ -32,7 +32,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
         public bool UseOriginalShapeData { get; set; }
-        public bool ForceUVQuadrant { get; set; }
+        public bool ShiftImportUV { get; set; }
         public bool ClearUV2 { get; set; }
         public bool CloneUV2 { get; set; }
         public bool ClearVColor { get; set; }
@@ -69,7 +69,7 @@ namespace xivModdingFramework.Models.Helpers
             CopyAttributes = true;
             CopyMaterials = true;
             UseOriginalShapeData = false;
-            ForceUVQuadrant = false;
+            ShiftImportUV = true;
             ClearUV2 = false;
             CloneUV2 = false;
             ClearVColor = false;
@@ -2067,5 +2067,84 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
+        public static void ShiftExportUV(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
+            loggingFunction(false, "Shifting Exported UV Map...");
+
+
+            foreach (var mg in model.MeshGroups)
+            {
+                foreach (var p in mg.Parts)
+                {
+                    ShiftExportUV_Part(p);
+                }
+            }
+
+        }
+
+        public static void ShiftImportUV(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = ModelModifiers.NoOp;
+            }
+
+            loggingFunction(false, "Shifting Imported UV Map...");
+
+
+            foreach(var mg in model.MeshGroups)
+            {
+                foreach(var p in mg.Parts)
+                {
+                    ShiftImportUV_Part(p);
+                }
+            }
+
+        }
+
+        public static void ShiftImportUV_Part(TTMeshPart p)
+        {
+            foreach(var v in p.Vertices)
+            {
+                v.UV1[1] -= 1;
+                v.UV2[1] -= 1;
+            }
+
+            foreach (var shpKv in p.ShapeParts)
+            {
+                foreach (var vKv in shpKv.Value.VertexReplacements)
+                {
+                    var shpVertex = shpKv.Value.Vertices[vKv.Value];
+                    var pVertex = p.Vertices[vKv.Key];
+                    shpVertex.UV1 = pVertex.UV1;
+                    shpVertex.UV2 = pVertex.UV2;
+                }
+            }
+        }
+
+        public static void ShiftExportUV_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.UV1[1] += 1;
+                v.UV2[1] += 1;
+            }
+
+            foreach (var shpKv in p.ShapeParts)
+            {
+                foreach (var vKv in shpKv.Value.VertexReplacements)
+                {
+                    var shpVertex = shpKv.Value.Vertices[vKv.Value];
+                    var pVertex = p.Vertices[vKv.Key];
+                    shpVertex.UV1 = pVertex.UV1;
+                    shpVertex.UV2 = pVertex.UV2;
+                }
+            }
+        }
     }
 }

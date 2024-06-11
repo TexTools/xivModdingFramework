@@ -1545,9 +1545,9 @@ namespace xivModdingFramework.Models.DataContainers
             }
 
 
-            if(settings != null && settings.ForceUVQuadrant)
+            if(settings != null && settings.ShiftImportUV)
             {
-                ModelModifiers.ForceUVQuadrant(model, loggingFunction);
+                ModelModifiers.ShiftImportUV(model, loggingFunction);
             }
 
             // Convert the model to FFXIV's internal weirdness.
