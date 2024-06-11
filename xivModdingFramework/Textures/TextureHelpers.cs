@@ -185,7 +185,8 @@ namespace xivModdingFramework.Textures
                 // Output is BGRA
 
                 // Normal Red (Swizzle)
-                normalPixelData[offset + 2] = maskPixelData[offset + 0];
+                normalPixelData[offset + 2] = normalPixelData[offset + 0];
+                
                 // Normal Blue - Highlight Color
                 normalPixelData[offset + 0] = maskPixelData[offset + 3];
 
