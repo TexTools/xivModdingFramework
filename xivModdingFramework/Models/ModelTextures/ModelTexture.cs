@@ -522,12 +522,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 // This is the most common family of shaders that appears on gear, monsters, etc.
                 // Many of its features should be controlled by shader parameters that aren't implemented
 
-                if (hasMulti)
-                {
-
                     return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                        
-
                         Color4 specular = new Color4(1.0f);
                         if (useTextures)
                         {
@@ -614,47 +609,6 @@ namespace xivModdingFramework.Models.ModelTextures
                             Alpha = new Color4(alpha)
                         };
                     };
-                }
-                else if (hasSpecular) // "Multi" is actually a full specular map
-                {
-
-                    int multiAOChannel = shaderPack == EShaderPack.CharacterLegacy ? 0 : 2;
-                    return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                        // Use AO as the diffuse if there is no diffuse texture
-                        if (!hasDiffuse)
-                            diffuse = new Color4(multi[multiAOChannel], multi[multiAOChannel], multi[multiAOChannel], 1.0f);
-
-
-
-                        var alpha = normal.Blue * alphaMultiplier;
-                        return new ShaderMapperResult()
-                        {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = multi,
-                            Alpha = new Color4(alpha)
-                        };
-                    };
-                }
-                else // No mask or specular
-                {
-                    int multiAOChannel = shaderPack == EShaderPack.CharacterLegacy ? 0 : 2;
-                    return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                        // Use AO as the diffuse if there is no diffuse texture
-                        if (!hasDiffuse)
-                            diffuse = new Color4(multi[multiAOChannel], multi[multiAOChannel], multi[multiAOChannel], 1.0f);
-
-                        
-                        var alpha = normal.Blue * alphaMultiplier;
-                        return new ShaderMapperResult()
-                        {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = Color4.Black,
-                            Alpha = new Color4(alpha)
-                        };
-                    };
-                }
             }
             else if (shaderPack == EShaderPack.Skin)
             {

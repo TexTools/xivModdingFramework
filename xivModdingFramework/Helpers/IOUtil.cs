@@ -636,7 +636,7 @@ namespace xivModdingFramework.Helpers
             {
                 fileName = fileName.ToLower();
             }
-            return fileName;
+            return fileName.Trim();
         }
         public static void CopyFolder(string sourcePath, string targetPath)
         {
