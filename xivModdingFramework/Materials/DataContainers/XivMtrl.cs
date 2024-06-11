@@ -39,7 +39,7 @@ namespace xivModdingFramework.Materials.DataContainers
     [Flags]
     public enum EMaterialFlags1 : ushort
     {
-        ShowBackfaces = 0x01,
+        HideBackfaces = 0x01,
         Unknown0002 = 0x02,
         Unknown0004 = 0x04,
         Unknown0008 = 0x08,
