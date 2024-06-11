@@ -782,13 +782,20 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         {
                             option = group.Options[0] as PmpStandardOptionJson;
                         }
+                        else if (group.Options.Count > 1)
+                        {
+                            return null;
+                        }
+                    } else if(pmp.Groups.Count > 1)
+                    {
+                        return null;
                     }
                 }
 
                 if (option == null)
                 {
-                    // Too may options or no options.
-                    return null;
+                    // Empty mod.
+                    return new Dictionary<string, FileStorageInformation>();
                 }
 
                 // Manipulation which cannot be converted into .meta or .rgsp are discarded here.
