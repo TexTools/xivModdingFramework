@@ -1457,7 +1457,7 @@ namespace xivModdingFramework.Cache
             }
 
             
-            if (list.Count == 0)
+            if (list.Count == 0 || list[0] == null)
             {
                 // No cache data, have to update.
                 list = await XivDependencyGraph.GetChildFiles(internalFilePath, tx);

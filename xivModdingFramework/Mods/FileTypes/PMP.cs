@@ -367,6 +367,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     await TTMP.UpdateEndwalkerFiles(imported.Keys, _Source, imported, progress, tx);
                 }
 
+                XivCache.QueueDependencyUpdate(imported.Keys);
+
                 if (boiler.OwnTx)
                 {
                     progress?.Report((0, 0, "Committing Transaction..."));

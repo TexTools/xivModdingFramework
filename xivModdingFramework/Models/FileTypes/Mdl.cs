@@ -938,10 +938,11 @@ namespace xivModdingFramework.Models.FileTypes
                 #region Base Geometry Data 
 
 
-                if (xivMdl.LoDList[1].VertexDataSize == 0 
-                    && xivMdl.LoDList[0].VertexDataOffset != br.BaseStream.Position)
+                if (xivMdl.LoDList[0].VertexDataOffset != br.BaseStream.Position)
                 {
                     // Old jank mod model with incorrect offset.
+                    // This has been known to occur both from old TT created models and from some
+                    // Penumbra beta builds.
                     var delta = (int) (xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
                     xivMdl.LoDList[0].VertexDataOffset -= delta;
                     xivMdl.LoDList[0].IndexDataOffset -= delta;
