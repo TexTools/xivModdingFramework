@@ -1274,31 +1274,21 @@ namespace xivModdingFramework.Models.FileTypes
                 tx = ModTransaction.BeginReadonlyTransaction();
             }
 
-            var mdlData = await Dat.ReadFile(mdlPath, getOriginal, tx);
-            var meshCount = BitConverter.ToUInt16(mdlData, 12);
-
-            using (var br = new BinaryReader(new MemoryStream(mdlData)))
+            using (var br = await tx.GetFileStream(mdlPath))
             {
-                // We skip the Vertex Data Structures for now
-                // This is done so that we can get the correct number of meshes per LoD first
-                br.BaseStream.Seek(64 + 136 * meshCount + 4, SeekOrigin.Begin);
+                var offset = br.BaseStream.Position;
+                br.BaseStream.Seek(12 + offset, SeekOrigin.Begin);
+                var meshCount = br.ReadUInt16();
+                br.BaseStream.Seek(64 + 136 * meshCount + 4 + offset, SeekOrigin.Begin);
 
+                // Just rip the path block and scan for strings ending in .mtrl.
                 var PathCount = br.ReadInt32();
                 var PathBlockSize = br.ReadInt32();
-
-
                 Regex materialRegex = new Regex(".*\\.mtrl$");
 
                 for (var i = 0; i < PathCount; i++)
                 {
-                    byte a;
-                    List<byte> bytes = new List<byte>(); ;
-                    while ((a = br.ReadByte()) != 0)
-                    {
-                        bytes.Add(a);
-                    }
-
-                    var st = Encoding.ASCII.GetString(bytes.ToArray()).Replace("\0", "");
+                    var st = IOUtil.ReadNullTerminatedString(br);
 
                     if (materialRegex.IsMatch(st))
                     {

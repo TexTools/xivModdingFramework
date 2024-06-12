@@ -408,7 +408,6 @@ namespace xivModdingFramework.Cache
 
             if (level == XivDependencyLevel.Model)
             {
-                var dataFile = IOUtil.GetDataFileFromPath(internalFilePath);
                 try
                 {
                     var mdlChildren = await Mdl.GetReferencedMaterialPaths(internalFilePath, -1, false, false, tx);
