@@ -1027,7 +1027,9 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     var shpVertex = shpKv.Value.Vertices[vKv.Value];
                     var pVertex = p.Vertices[vKv.Key];
-                    shpVertex = (TTVertex) pVertex.Clone();
+                    var newVert = (TTVertex) pVertex.Clone();
+                    newVert.Position = shpVertex.Position;
+                    shpKv.Value.Vertices[vKv.Value] = newVert;
                 }
             }
         }
