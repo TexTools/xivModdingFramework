@@ -572,7 +572,7 @@ namespace xivModdingFramework.Helpers
                 filesToUnzip = new HashSet<string>();
                 foreach (var f in files)
                 {
-                    filesToUnzip.Add(ReplaceSlashes(f));
+                    filesToUnzip.Add(ReplaceSlashes(f).ToLower());
                 }
             }
 
@@ -583,7 +583,7 @@ namespace xivModdingFramework.Helpers
                 // Just JSON files.
                 using (var zip = new Ionic.Zip.ZipFile(zipLocation))
                 {
-                    var toUnzip = zip.Entries.Where(x => filesToUnzip.Contains(ReplaceSlashes(x.FileName)));
+                    var toUnzip = zip.Entries.Where(x => filesToUnzip.Contains(ReplaceSlashes(x.FileName).ToLower()));
                     foreach (var e in toUnzip)
                     {
                         e.Extract(destination);

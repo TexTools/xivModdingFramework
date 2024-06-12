@@ -49,6 +49,8 @@ namespace xivModdingFramework.Mods.FileTypes
 {
     public class ModPackImportSettings
     {
+        public delegate Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>> RootConversionDelegate(HashSet<string> files, ModTransaction tx);
+
         /// <summary>
         /// The source application that should be considered as the owner of the mod files.
         /// </summary>
@@ -68,7 +70,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// Function that should be called to determine root conversions based on the incoming file paths.
         /// Will be called during import once the final file list has been resolved.
         /// </summary>
-        public Func<HashSet<string>, ModTransaction, Task<Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)>>> RootConversionFunction;
+        public RootConversionDelegate RootConversionFunction;
 
         /// <summary>
         /// Progress reporter, if desired.  May not always get reported to depending on the function in question.

@@ -503,6 +503,9 @@ namespace xivModdingFramework.Models.ModelTextures
             if(alphaConst != null && alphaConst.Values[0] != 0)
             {
                 alphaMultiplier = (float) (1.0f / alphaConst.Values[0]);
+            } else if (alphaConst != null && alphaConst.Values[0] == 0)
+            {
+                alphaMultiplier = 255;
             }
 
             List<Half> colorset = null;
@@ -844,6 +847,9 @@ namespace xivModdingFramework.Models.ModelTextures
             if (alphaConst != null && alphaConst.Values[0] != 0)
             {
                 alphaMultiplier = (float)(1.0f / alphaConst.Values[0]);
+            } else if (alphaConst != null && alphaConst.Values[0] == 0)
+            {
+                alphaMultiplier = 255;
             }
 
             List<Half> colorset = null;
