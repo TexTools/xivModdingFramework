@@ -454,6 +454,7 @@ namespace xivModdingFramework.Models.Helpers
                     var vertDict = new Dictionary<int, int>(uniqueVertexIds.Count);
 
                     // Now we need to loop through, copy over the vertex data, keeping track of the new vertex IDs.
+                    ttPart.Vertices = new List<TTVertex>(uniqueVertexIds.Count);
                     for(var i = 0; i < uniqueVertexIds.Count; i++)
                     {
                         var oldVertexId = uniqueVertexIds[i];
