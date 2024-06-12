@@ -432,7 +432,7 @@ namespace xivModdingFramework.Models.Helpers
                     ttMesh.Parts.Add(ttPart);
                     ttPart.Name = "Part " + partIdx;
 
-                    // Get the Indicies uniuqe to this part.
+                    // Get the Indicies unique to this part.
                     var basePart = fakePart == false ? baseMesh.MeshPartList[pi] : null;
                     var indexStart = fakePart == false ? basePart.IndexOffset - baseMesh.MeshInfo.IndexDataOffset : 0;
                     var indexCount = fakePart == false ? basePart.IndexCount : baseMesh.MeshInfo.IndexCount;
@@ -544,7 +544,8 @@ namespace xivModdingFramework.Models.Helpers
                     }
 
                     // Now we need to copy in the triangle indices, pointing to the new, part-level vertex IDs.
-                    foreach(var oldVertexId in indices)
+                    ttPart.TriangleIndices = new List<int>(indices.Count);
+                    foreach (var oldVertexId in indices)
                     {
                         ttPart.TriangleIndices.Add(vertDict[oldVertexId]);
                     }

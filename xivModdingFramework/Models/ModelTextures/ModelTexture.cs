@@ -1088,12 +1088,14 @@ namespace xivModdingFramework.Models.ModelTextures
                     float influenceStrength = specular.Alpha;
                     Color4 newDiffuse = Color4.Lerp(baseColor, targetColor, influenceStrength);
                     newDiffuse = Color4.Scale(newDiffuse, specular.Red);
+                    var alpha = normal.Alpha;
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                     return new ShaderMapperResult()
                     {
                         Diffuse = newDiffuse,
                         Normal = newNormal,
                         Specular = newSpecular,
-                        Alpha = new Color4(normal.Alpha)
+                        Alpha = new Color4(alpha)
                     };
                 };
             }
