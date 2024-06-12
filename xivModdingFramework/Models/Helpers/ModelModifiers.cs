@@ -914,13 +914,17 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach (var p in m.Parts)
                 {
-                    foreach (var v in p.Vertices)
-                    {
-
-                        v.UV2 = Vector2.Zero;
-                    }
+                    ClearUV2_Part(p);
                 }
             }
+        }
+        public static void ClearUV2_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.UV2 = Vector2.Zero;
+            }
+            UpdateShapeParts(p);
         }
 
         // Resets Vertex Color to White.
@@ -936,15 +940,30 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach (var p in m.Parts)
                 {
-                    foreach (var v in p.Vertices)
-                    {
-
-                        v.VertexColor[0] = 255;
-                        v.VertexColor[1] = 255;
-                        v.VertexColor[2] = 255;
-                    }
+                    ClearVColor_Part(p);
                 }
             }
+        }
+        public static void ClearVColor_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.VertexColor[0] = 255;
+                v.VertexColor[1] = 255;
+                v.VertexColor[2] = 255;
+            }
+            UpdateShapeParts(p);
+        }
+
+        public static void ClearVColor2_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.VertexColor2[0] = 255;
+                v.VertexColor2[1] = 255;
+                v.VertexColor2[2] = 255;
+            }
+            UpdateShapeParts(p);
         }
 
         // Resets Vertex Alpha to 255
@@ -960,13 +979,17 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach (var p in m.Parts)
                 {
-                    foreach (var v in p.Vertices)
-                    {
-
-                        v.VertexColor[3] = 255;
-                    }
+                    ClearVAlpha(p);
                 }
             }
+        }
+        public static void ClearVAlpha(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.VertexColor[3] = 255;
+            }
+            UpdateShapeParts(p);
         }
 
         // Clones UV1 to UV2
@@ -982,11 +1005,29 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach (var p in m.Parts)
                 {
-                    foreach (var v in p.Vertices)
-                    {
+                    CloneUV2_Part(p);
+                }
+            }
+        }
 
-                        v.UV2 = v.UV1;
-                    }
+        public static void CloneUV2_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.UV2 = v.UV1;
+            }
+            UpdateShapeParts(p);
+        }
+
+        private static void UpdateShapeParts(TTMeshPart p)
+        {
+            foreach (var shpKv in p.ShapeParts)
+            {
+                foreach (var vKv in shpKv.Value.VertexReplacements)
+                {
+                    var shpVertex = shpKv.Value.Vertices[vKv.Value];
+                    var pVertex = p.Vertices[vKv.Key];
+                    shpVertex = (TTVertex) pVertex.Clone();
                 }
             }
         }
