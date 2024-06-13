@@ -54,6 +54,7 @@ namespace xivModdingFramework.Models.ModelTextures
     /// </summary>
     public class CustomModelColors : ICloneable
     {
+
         public Color SkinColor;
         public Color EyeColor;      // Off eye color customization isn't really sanely doable since it's managed by Vertex Color.
         public Color LipColor;
@@ -108,6 +109,8 @@ namespace xivModdingFramework.Models.ModelTextures
 
     public static class ModelTexture
     {
+        public const float _ColorsetMul = 17.0f;
+
         // Static level default value accessor.
         // This is effectively the user's color settings as far as the 
         // framework lib is concerned.
@@ -1227,7 +1230,7 @@ namespace xivModdingFramework.Models.ModelTextures
             var row0Offset = _RowSize * (values.RowId * _RowsPerBlend);
             var row1Offset = 0;
 
-            if((values.RowId * _RowsPerBlend + 1)< _Height)
+            if((values.RowId * _RowsPerBlend + 1) < _Height)
             {
                 row1Offset = _RowSize * ((values.RowId * _RowsPerBlend) + 1);
             }
@@ -1242,7 +1245,7 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 for(int i = 0; i < 3; i++) { 
                     // Render the colorset as a continuous 0.0 -> 1.0 color on the diffuse.
-                    rowData[i] = ((values.RowId + values.Blend) / 15.0f);
+                    rowData[i] = ((values.RowId + values.Blend) / (_ColorsetMul - 1));
                 }
             }
             else
@@ -1255,8 +1258,12 @@ namespace xivModdingFramework.Models.ModelTextures
             
             if(highlightRow >= 0)
             {
+#if DAWNTRAIL
                 var baseRow = highlightRow / 2;
-                if(values.RowId == baseRow)
+#else
+                var baseRow = highlightRow;
+#endif
+                if (values.RowId == baseRow)
                 {
                     var blend = values.Blend;
                     if (highlightRow % 2 == 1)
@@ -1298,13 +1305,19 @@ namespace xivModdingFramework.Models.ModelTextures
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static (int RowId, float Blend) ReadColorIndex(float indexRed, float indexGreen)
         {
-            int rowNumber = (int)(indexRed * 15);
+            int byteRed = (int) Math.Round(indexRed * 255.0f);
+            int rowNumber = (int) (byteRed / (_ColorsetMul));
 
 #if DAWNTRAIL
             float blendAmount = 1.0f - indexGreen;
 #else
-            float blendAmount  = indexRed % (1.0f / 15.0f);
+            float blendAmount  = ((byteRed) % (_ColorsetMul)) / _ColorsetMul;
 #endif
+
+            if(indexRed < 0.085f && indexRed != 0)
+            {
+                var z = "ASDF";
+            }
 
             return (rowNumber, blendAmount);
         }

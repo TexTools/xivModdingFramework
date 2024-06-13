@@ -319,15 +319,22 @@ namespace xivModdingFramework.Helpers
         }
         private static async Task PenumbraRefresh(bool reload = false)
         {
-            if (ModFolder != null)
+            try
             {
-                var di = new DirectoryInfo(ModFolder);
-                var folder = di.Name;
-                if (reload)
+                if (ModFolder != null)
                 {
-                    await PenumbraAPI.ReloadMod(folder);
+                    var di = new DirectoryInfo(ModFolder);
+                    var folder = di.Name;
+                    if (reload)
+                    {
+                        await PenumbraAPI.ReloadMod(folder);
+                    }
+                    await PenumbraAPI.Redraw();
                 }
-                await PenumbraAPI.Redraw();
+            }
+            catch
+            {
+                // No-Op.
             }
         }
 
