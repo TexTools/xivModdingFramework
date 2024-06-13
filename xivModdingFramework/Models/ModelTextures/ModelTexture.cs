@@ -209,7 +209,8 @@ namespace xivModdingFramework.Models.ModelTextures
 
             var settings = new ShaderMapperSettings()
             {
-                HighlightedRow = highlightedRow
+                HighlightedRow = highlightedRow,
+                //VisualizeColorset = true,
             };
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;

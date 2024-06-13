@@ -263,17 +263,44 @@ namespace xivModdingFramework.Helpers
                 }
                 else
                 {
-                    foreach (var file in _WantsSingleWrite)
+                    if(_WantsSingleWrite.Count == 0)
                     {
-                        var fileData = await Transaction.ReadFile(file, false, false);
-                        var realPath = PmpFilePaths[file];
+                        return;
+                    }
 
-                        DetatchWatch();
-                        var dir = Path.GetDirectoryName(realPath);
-                        Directory.CreateDirectory(dir);
-                        File.WriteAllBytes(realPath, fileData);
+                    DetatchWatch();
+                    try
+                    {
+
+                        foreach (var file in _WantsSingleWrite)
+                        {
+                            if (Transaction == null)
+                            {
+                                return;
+                            }
+
+                            if (!PmpFilePaths.ContainsKey(file))
+                            {
+                                continue;
+                            }
+
+                            var fileData = await Transaction.ReadFile(file, false, false);
+                            var realPath = PmpFilePaths[file];
+
+                            var dir = Path.GetDirectoryName(realPath);
+                            Directory.CreateDirectory(dir);
+                            File.WriteAllBytes(realPath, fileData);
+                        }
+                    }
+                    finally
+                    {
+                        AttachWatch();
                     }
                 }
+            }
+            catch
+            {
+                // No-Op
             }
             finally
             {
@@ -584,7 +611,7 @@ namespace xivModdingFramework.Helpers
         }
         private static void AttachWatch()
         {
-            if (Watcher != null)
+            if (Watcher != null && Transaction != null)
             {
                 // Safety call to prevent multi-attach.
                 DetatchWatch();
