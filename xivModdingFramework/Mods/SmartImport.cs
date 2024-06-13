@@ -170,7 +170,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task<byte[]> CreateUncompressedFile(string externalPath, string internalPath, ModTransaction tx = null, SmartImportOptions options = null)
         {
-            if(options == null)
+            if (options == null)
             {
                 options = new SmartImportOptions();
             }
@@ -181,9 +181,9 @@ namespace xivModdingFramework.Mods
             string magic20b, magic16b;
 
             // Pull the magic info from the file.
-            using(var f = File.OpenRead(externalPath))
+            using (var f = File.OpenRead(externalPath))
             {
-                using(var br = new BinaryReader(f))
+                using (var br = new BinaryReader(f))
                 {
                     var header = br.ReadBytes(20);
                     magic = BitConverter.ToUInt64(header, 0);
@@ -198,10 +198,13 @@ namespace xivModdingFramework.Mods
             var pngMagicAsAscii = ASCIIEncoding.ASCII.GetString(BitConverter.GetBytes(PNGMagic));
 
 
+            var modelExtentions = Mdl.GetAvailableExporters().Select(x => "." + x);
+            var imageExtensions = new List<string>() { ".tga", ".png", ".bmp", ".dds" };
+
 
             byte[] result = null;
             // Targa is horrible to detect by bytes, so only allow it for file endings.
-            if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic || externalPath.ToLower().EndsWith(".tga"))
+            if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic || imageExtensions.Any(x => externalPath.ToLower().EndsWith(x)))
             {
                 var ddsPath = externalPath;
                 if (magic32 != DDSMagic)
@@ -214,7 +217,7 @@ namespace xivModdingFramework.Mods
                 }
 
                 return Tex.DDSToUncompressedTex(ddsPath);
-            } else if(magic20b == FBXMagic || magic16b == SQLiteMagic)
+            } else if(magic20b == FBXMagic || magic16b == SQLiteMagic || modelExtentions.Any(x => externalPath.ToLower().EndsWith(x)))
             {
                 // Do Model import.
                 return await Mdl.FileToUncompressedMdl(externalPath, internalPath, options.ModelOptions, tx);
