@@ -1057,6 +1057,12 @@ namespace xivModdingFramework.Mods.FileTypes
                         continue;
                     }
 
+                    if (!File.Exists(kv.Value.RealPath))
+                    {
+                        // File doesn't actually exist.
+                        continue;
+                    }
+
                     var internalPath = kv.Key;
                     var fileInfo = kv.Value;
 

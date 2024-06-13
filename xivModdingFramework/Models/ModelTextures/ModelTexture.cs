@@ -1094,6 +1094,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     newDiffuse = Color4.Scale(newDiffuse, specular.Red);
                     var alpha = normal.Alpha;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    newDiffuse.Alpha = alpha;
                     return new ShaderMapperResult()
                     {
                         Diffuse = newDiffuse,
