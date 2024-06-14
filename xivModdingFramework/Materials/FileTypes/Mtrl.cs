@@ -1753,6 +1753,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 var mtrlMatch = _raceMatch.Match(mtrlName);
 
 
+                var race = match.Groups[1].Value;
+                var body = match.Groups[2].Value;
+
                 // Both Items have racial model information in their path, and the races DON'T match.
                 if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
                 {
@@ -1761,6 +1764,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     var baseRace = XivRaces.GetXivRace(mdlMatch.Groups[1].Value.Substring(1));
                     var skinRace = XivRaceTree.GetSkinRace(baseRace);
                     var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
+                    race = XivRaces.GetRaceCode(skinRace);
 
                     // In this case, we actually replace both with the racial skin material based on the Model, which has priority.
                     mtrlName = mtrlName.Replace(mtrlMatch.Groups[1].Value, skinRaceString);
@@ -1772,12 +1776,11 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         mtrlName = _bodyRegex.Replace(mtrlName, "b0001");
                         mdlPath = _bodyRegex.Replace(mdlPath, "b0001");
+                        body = "0001";
                     }
                 }
 
 
-                var race = match.Groups[1].Value;
-                var body = match.Groups[2].Value;
 
                 mtrlFolder = "chara/human/c" + race + "/obj/body/b" + body + "/material/v0001";
 

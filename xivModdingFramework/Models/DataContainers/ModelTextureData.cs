@@ -14,6 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using xivModdingFramework.Helpers;
+using xivModdingFramework.Materials.FileTypes;
+using xivModdingFramework.Models.Helpers;
+
 namespace xivModdingFramework.Models.DataContainers
 {
     /// <summary>
@@ -36,6 +40,13 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] Emissive { get; set; }
 
         public string MaterialPath { get; set; }
+
+        public bool IsSkin {
+            get
+            {
+                return ModelModifiers.IsSkinMaterial(MaterialPath);
+            }
+        }
 
         public bool RenderBackfaces { get; set; }
     }
