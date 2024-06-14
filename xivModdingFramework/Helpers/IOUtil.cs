@@ -564,6 +564,24 @@ namespace xivModdingFramework.Helpers
             await UnzipFiles(zipLocation, destination, new List<string>() { file });
         }
 
+        public static async Task UnzipFiles(string zipLocation, string destination, Func<string, bool> selector)
+        {
+            var filesToUnzip = new HashSet<string>();
+            // Select all files in zip if null.
+            using (var zip = new Ionic.Zip.ZipFile(zipLocation))
+            {
+                var files = (zip.Entries.Select(x => ReplaceSlashes(x.FileName).ToLower()));
+
+                files.Where(x =>
+                {
+                    return selector(x);
+                });
+
+                filesToUnzip.UnionWith(files);
+            }
+
+            await UnzipFiles(zipLocation, destination, filesToUnzip);
+        }
         public  static async Task UnzipFiles(string zipLocation, string destination, IEnumerable<string> files = null)
         {
             HashSet<string> filesToUnzip = null;
@@ -573,6 +591,15 @@ namespace xivModdingFramework.Helpers
                 foreach (var f in files)
                 {
                     filesToUnzip.Add(ReplaceSlashes(f).ToLower());
+                }
+            }
+            else
+            {
+                filesToUnzip = new HashSet<string>();
+                // Select all files in zip if null.
+                using (var zip = new Ionic.Zip.ZipFile(zipLocation))
+                {
+                    filesToUnzip.UnionWith(zip.Entries.Select(x => ReplaceSlashes(x.FileName).ToLower()));
                 }
             }
 

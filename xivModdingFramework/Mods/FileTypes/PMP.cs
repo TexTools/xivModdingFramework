@@ -68,18 +68,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     if (!jsonsOnly)
                     {
-                        // Extract everything.
-                        System.IO.Compression.ZipFile.ExtractToDirectory(path, tempFolder);
+                        // Unzip everything.
+                        await IOUtil.UnzipFiles(path, tempFolder);
                     } else
                     {
                         // Just JSON files.
-                        using(var zip = new Ionic.Zip.ZipFile(path)) {
-                            var jsons = zip.Entries.Where(x => x.FileName.ToLower().EndsWith(".json"));
-                            foreach(var e in jsons)
-                            {
-                                e.Extract(tempFolder);
-                            }
-                        }
+                        await IOUtil.UnzipFiles(path, tempFolder, (file) =>
+                        {
+                            return file.EndsWith(".json");
+                        });
                     }
                 });
                 path = tempFolder;
@@ -87,7 +84,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return path;
         }
 
-        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeHeaderImage = false)
+        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false)
         {
             var gameDir = XivCache.GameInfo.GameDirectory;
 
@@ -128,17 +125,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             };
 
 
-            if (includeHeaderImage)
+            if (includeImages)
             {
-                image = pmp.GetHeaderImage();
-                if(image != null)
+                await IOUtil.UnzipFiles(originalPath, path, (file) =>
                 {
-                    if (!alreadyUnzipped)
-                    {
-                        await IOUtil.UnzipFile(originalPath, path, image);
-                    }
-                    image = Path.Combine(path, image);
-                }
+                    return file.EndsWith(".png");
+                });
             }
 
 
@@ -239,14 +231,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     // Order groups by Priority, Lowest => Highest, tiebreaker default order
                     var orderedGroups = pmp.Groups.OrderBy(x => x.Priority);
-                    var optionIdx = 0;
+                    var groupIdx = 0;
                     foreach (var group in orderedGroups)
                     {
                         if (group.Options == null || group.Options.Count == 0)
                         {
                             // No valid options.
+                            groupIdx++;
                             continue;
                         }
+                        var optionIdx = 0;
 
                         // Get Default selection.
                         var selected = group.DefaultSettings;
@@ -263,7 +257,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             {
                                 selected = 0;
                             }
-                            var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, optionIdx);
+                            var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, groupIdx, optionIdx);
                             UnionDict(imported, groupRes.Imported);
                             notImported.UnionWith(groupRes.NotImported);
                         }
@@ -278,7 +272,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 var value = 1 << i;
                                 if ((selected & value) > 0)
                                 {
-                                    var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, optionIdx);
+                                    var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, groupIdx, optionIdx);
                                     UnionDict(imported, groupRes.Imported);
                                     notImported.UnionWith(groupRes.NotImported);
                                     optionIdx++;
@@ -342,7 +336,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                             }
                         }
-
+                        groupIdx++;
                     }
                 }
 
@@ -404,7 +398,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
-        private static async Task<(Dictionary<string, TxFileState> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson baseOption, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int optionIdx = 0)
+        private static async Task<(Dictionary<string, TxFileState> Imported, HashSet<string> NotImported)> ImportOption(PMPOptionJson baseOption, string basePath, ModTransaction tx, IProgress<(int, int, string)> progress = null, int groupIdx = 0, int optionIdx = 0)
         {
             var imported = new Dictionary<string, TxFileState>();
             var notImported = new HashSet<string>();
@@ -422,7 +416,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 var internalPath = file.Key;
                 var externalPath = Path.Combine(basePath, file.Value);
-                progress?.Report((i, option.Files.Count, "Importing New Files from Option " + (optionIdx+1) + "..."));
+                progress?.Report((i, option.Files.Count, $"Importing New Files from Group {groupIdx+1} - Option {optionIdx+1}..."));
 
                 // Safety checks.
                 if (!CanImport(file.Key))

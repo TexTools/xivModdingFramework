@@ -174,6 +174,7 @@ namespace xivModdingFramework.Mods
         public static event FileChangedEventHandler FileChangedOnCommit;
 
         public static event TransactionEventHandler ActiveTransactionBlocked;
+        public static event TransactionEventHandler ActiveTransactionUnblocked;
 
         private static bool _CANCEL_BLOCKED_TX = false;
         private static bool _ACTIVE_TX_BLOCKED = false;
@@ -727,6 +728,7 @@ namespace xivModdingFramework.Mods
 
             CheckWriteTimes();
 
+            var wasBlocked = false;
             if(Settings.Target == ETransactionTarget.GameFiles)
             {
                 var cancelled = await Task.Run(async () =>
@@ -738,6 +740,7 @@ namespace xivModdingFramework.Mods
                         if (_ACTIVE_TX_BLOCKED == false)
                         {
                             _ACTIVE_TX_BLOCKED = true;
+                            wasBlocked = true;
                             ActiveTransactionBlocked.Invoke(null);
                         }
 
@@ -754,6 +757,11 @@ namespace xivModdingFramework.Mods
                     return false;
                 });
                 if (cancelled) return false;
+            }
+
+            if (wasBlocked)
+            {
+                ActiveTransactionUnblocked?.Invoke(this);
             }
 
             Dictionary<XivDataFile, Dictionary<long, uint>> openSlots = null;
