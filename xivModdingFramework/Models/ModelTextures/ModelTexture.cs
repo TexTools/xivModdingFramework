@@ -485,6 +485,9 @@ namespace xivModdingFramework.Models.ModelTextures
             // Arbitrary multplier used to enhance metal specular strength.
             const float _MetalMultiplier = 1.5f;
 
+            // How specularly reflective eyes should be.
+            var _EyeSpecular = new Color4(_MetalFloor * 2, _MetalFloor * 2, _MetalFloor * 2, 1.0f);
+
             // Arbitrary multiplier used to reduce hair shininess.
             var _HairSpecMultiplier = new Color4(_MetalFloor, _MetalFloor, _MetalFloor, 1.0f);
 
@@ -750,13 +753,11 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = multi.Blue;
                     diffuse = Color4.Lerp(diffuse, diffuse * irisColor, colorInfluence);
-                    // This map covers everything except the pupil, so use it to disable specular there
-                    float spec = 1.0f - multi.Blue;
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                        Specular = new Color4(spec, spec, spec, 1.0f),
+                        Specular = _EyeSpecular,
                         Alpha = new Color4(1.0f)
                     };
                 };

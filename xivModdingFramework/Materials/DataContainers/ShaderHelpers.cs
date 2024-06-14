@@ -346,6 +346,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 // Names based on user observation.
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
+                UpdateConstantName(shKv.Key, 0x58DE06E2, "Limbal Color?");
 
                 // Names based on analyzing shader code.
                 UpdateConstantName(shKv.Key, 0x62E44A4F, "Skin Fresnel");
