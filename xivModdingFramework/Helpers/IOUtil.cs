@@ -577,19 +577,26 @@ namespace xivModdingFramework.Helpers
             }
 
             Directory.CreateDirectory(destination);
-            // Run Zip extract on a new thread.
-            await Task.Run(async () =>
+
+            // Extract each zip file independently in parallel.
+            var tasks = new List<Task>();
+            foreach (var file in filesToUnzip)
             {
-                // Just JSON files.
-                using (var zip = new Ionic.Zip.ZipFile(zipLocation))
+                var taskFile = file;
+                tasks.Add(Task.Run(async () =>
                 {
-                    var toUnzip = zip.Entries.Where(x => filesToUnzip.Contains(ReplaceSlashes(x.FileName).ToLower()));
-                    foreach (var e in toUnzip)
+                    using (var zip = new Ionic.Zip.ZipFile(zipLocation))
                     {
-                        e.Extract(destination);
+                        var toUnzip = zip.Entries.Where(x => ReplaceSlashes(x.FileName).ToLower() == taskFile);
+                        foreach (var e in toUnzip)
+                        {
+                            e.Extract(destination);
+                        }
                     }
-                }
-            });
+                }));
+            }
+
+            await Task.WhenAll(tasks);
         }
 
         /// <summary>
