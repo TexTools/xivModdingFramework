@@ -241,6 +241,7 @@ namespace xivModdingFramework.Cache
                 throw new InvalidDataException("Material Path cannot be pre-calculated for SGB-using assets.");
             }
 
+
             const string MaterialFolderWithVariant = "{0}material/v{1}/";
             const string MaterialFolderWithoutVariant = "{0}material/";
 
@@ -265,10 +266,14 @@ namespace xivModdingFramework.Cache
                 // Fix for some hackiness in the human tree.  Body materials don't use a slot suffix.
                 // But we keep the slot suffix set as [top] in that tree internally to retain tree sanity.
                 materialName = materialName.Substring(0, materialName.Length - 4);
-            } else if(fakeSlot != null && Slot != null)
+            } else if(!string.IsNullOrWhiteSpace(fakeSlot) && !string.IsNullOrWhiteSpace(Slot))
             {
                 // This is for stuff like human faces, where they use fake slot identifiers.
                 materialName = materialName.Replace("_" + Slot, "_" + fakeSlot);
+            } else if (string.IsNullOrWhiteSpace(fakeSlot))
+            {
+                // The base material we're starting from has no slot suffix.
+                materialName = materialName.Replace("_" + Slot, "");
             }
 
             if(!string.IsNullOrWhiteSpace(suffix))
