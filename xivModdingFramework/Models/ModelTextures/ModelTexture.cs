@@ -1283,13 +1283,15 @@ namespace xivModdingFramework.Models.ModelTextures
             {
 #if DAWNTRAIL
                 var baseRow = highlightRow / 2;
+                var baseRow2 = values.RowId;
 #else
                 var baseRow = highlightRow;
+                var baseRow2 = values.RowId;
 #endif
-                if (values.RowId == baseRow)
+                if (baseRow == baseRow2)
                 {
                     var blend = values.Blend;
-                    if (highlightRow % 2 == 1)
+                    if (highlightRow % 2 == 0)
                     {
                         blend = 1 - blend;
                     }
