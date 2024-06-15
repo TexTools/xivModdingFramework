@@ -618,10 +618,15 @@ namespace xivModdingFramework.Models.ModelTextures
                                 var metalness = row[18];
                                 //var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
 
-                                diffuse = Color4.Lerp(diffuse, specular, metalness);
 
 
+                                // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
                                 specular *= _MetalFloor + (metalness * _MetalMultiplier);
+
+
+                                // As metalness rises, the diffuse/specular colors merge.
+                                diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
+                                specPixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
                             }
                             else
                             {
