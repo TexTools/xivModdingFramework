@@ -1305,6 +1305,15 @@ namespace xivModdingFramework.Models.ModelTextures
                     rowData[1] = blend;
                     rowData[2] = blend;
 
+                    if (rowData.Length > 18)
+                    {
+                        rowData[18] = 0;
+                    }
+
+                    rowData[8] = blend;
+                    rowData[9] = blend;
+                    rowData[10] = blend;
+
                 } else
                 {
                     // Mute the colors on non-selected rows.
@@ -1343,12 +1352,6 @@ namespace xivModdingFramework.Models.ModelTextures
 #else
             float blendAmount  = ((byteRed) % (_ColorsetMul)) / _ColorsetMul;
 #endif
-
-            if(indexRed < 0.085f && indexRed != 0)
-            {
-                var z = "ASDF";
-            }
-
             return (rowNumber, blendAmount);
         }
 
