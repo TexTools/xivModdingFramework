@@ -1305,10 +1305,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     rowData[1] = blend;
                     rowData[2] = blend;
 
-                    if (rowData.Length > 18)
-                    {
-                        rowData[18] = 0;
-                    }
 
                     rowData[8] = blend;
                     rowData[9] = blend;
@@ -1320,6 +1316,11 @@ namespace xivModdingFramework.Models.ModelTextures
                     rowData[0] *= 0.1f;
                     rowData[1] *= 0.1f;
                     rowData[2] *= 0.1f;
+
+                }
+                if (rowData.Length > 18)
+                {
+                    rowData[18] = 0;
                 }
                 rowData[4] = 0f;
                 rowData[5] = 0f;
