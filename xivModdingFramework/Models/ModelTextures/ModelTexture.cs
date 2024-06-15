@@ -498,6 +498,10 @@ namespace xivModdingFramework.Models.ModelTextures
             // No clue where it comes from in game, but it's used for moles.
             var _MoleColor = new Color4( 56 / 255f, 24 / 255f, 8 / 255f, 1.0f);
 
+
+            var emissiveMultiplier = new Color4(1.0f);
+
+
             bool useTextures = settings.UseTextures;
             bool useColorset = settings.UseColorset;
             bool visualizeColorset = settings.VisualizeColorset;
@@ -514,6 +518,14 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 alphaMultiplier = 255;
             }
+            
+            // Emissive Color constant
+            var emissConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 950420322);
+            if(emissConst != null)
+            {
+                emissiveMultiplier = new Color4(emissConst.Values[0], emissConst.Values[1], emissConst.Values[2], 1.0f);
+            }
+
 
             List<Half> colorset = null;
             if(mtrl.ColorSetData != null && mtrl.ColorSetData.Count >= 1024)
@@ -594,6 +606,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
                             var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
                             emissive = emissPixel;
+
+                            emissive *= emissiveMultiplier;
 
                             Color4 invRoughPixel;
                             float invRough = 0.5f;
@@ -753,12 +767,17 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = multi.Blue;
                     diffuse = Color4.Lerp(diffuse, diffuse * irisColor, colorInfluence);
+
+                    var emissive = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                    emissive *= emissiveMultiplier;
+
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = _EyeSpecular,
-                        Alpha = new Color4(1.0f)
+                        Alpha = new Color4(1.0f),
+                        Emissive = emissive,
                     };
                 };
             }
