@@ -1173,6 +1173,7 @@ namespace xivModdingFramework.Cache
             }
             return XivGenericItemModel.FromDependencyRoot(this, defaultImcSubset);
         }
+
         /// <summary>
         /// Creates and returns an IIteModel instance based on this root's information.
         /// This will match the IItem entry available in the main item lists, if an item exists for this root.

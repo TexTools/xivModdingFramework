@@ -4982,28 +4982,6 @@ namespace xivModdingFramework.Models.FileTypes
         }
         #endregion
 
-        #region Dawntrail Model Fix
-        public static async Task UpdateEndwalkerModels(string path, string source, ModTransaction tx)
-        {
-            var uncomp = await tx.ReadFile(path, false, false);
-
-            using (var ms = new MemoryStream(uncomp))
-            {
-                using (var br = new BinaryReader(ms))
-                {
-                    using (var bw = new BinaryWriter(ms))
-                    {
-                        var anyChanges = EndwalkerUpgrade.FastMdlv6Upgrade(br, bw);
-                        if (!anyChanges)
-                        {
-                            return;
-                        }
-                    }
-                }
-            }
-
-            await Dat.WriteModFile(uncomp, path, source, null, tx, false);
-        }
 
 
 
@@ -5050,7 +5028,6 @@ namespace xivModdingFramework.Models.FileTypes
             }
         }
 
-        #endregion
 
         #region Static Dictionaries and Internal Classes
         public static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>

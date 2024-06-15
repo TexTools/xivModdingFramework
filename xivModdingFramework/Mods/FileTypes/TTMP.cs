@@ -827,7 +827,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     if (settings.UpdateEndwalkerFiles)
                     {
                         var modPack = filteredModsJson[0].ModPackEntry;
-                        await UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, progress, tx);
+                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, progress, tx);
                     }
 
                     count = 0;
@@ -893,35 +893,6 @@ namespace xivModdingFramework.Mods.FileTypes
             return v < 2;
         }
 
-
-        public static async Task UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
-        {
-#if ENDWALKER
-            return;
-#endif
-
-            var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
-            var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
-
-            var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
-            var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
-
-            await Mtrl.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress);
-
-            var idx = 0;
-            var total = fixableMdls.Count;
-            foreach (var path in fixableMdls)
-            {
-                progress?.Report((idx, total, "Updating Endwalker Models..."));
-                idx++;
-                await Mdl.UpdateEndwalkerModels(path, source, tx);
-            }
-
-            progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-            await Mtrl.CheckImportForOldHairJank(filePaths.ToList(), source, tx);
-
-            progress?.Report((0, total, "Endwalker Upgrades Complete..."));
-        }
 
         /// <summary>
         /// Handles passing control to the application supplied root conversion function, then altering any inbound mod roots as needed.
@@ -1148,7 +1119,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (settings.UpdateEndwalkerFiles)
                 {
-                    await UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(paths);
