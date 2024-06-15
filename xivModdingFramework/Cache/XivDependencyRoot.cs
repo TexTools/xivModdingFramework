@@ -1027,7 +1027,7 @@ namespace xivModdingFramework.Cache
         {
             var files = new List<string>();
 
-            var avfx = await GetAvfx(variant);
+            var avfx = await GetAvfx(variant, tx);
 
             if(avfx.Count == 0)
             {

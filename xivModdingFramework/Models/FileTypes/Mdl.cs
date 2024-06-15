@@ -4719,8 +4719,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                 if (copyTextures == true && Imc.UsesImc(toRoot) && Imc.UsesImc(fromRoot))
                 {
-                    var toEntries = await Imc.GetEntries(await toRoot.GetImcEntryPaths(), false, tx);
-                    var fromEntries = await Imc.GetEntries(await fromRoot.GetImcEntryPaths(), false, tx);
+                    var toEntries = await Imc.GetEntries(await toRoot.GetImcEntryPaths(tx), false, tx);
+                    var fromEntries = await Imc.GetEntries(await fromRoot.GetImcEntryPaths(tx), false, tx);
 
                     var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
                     var fromSets = fromEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
@@ -4915,8 +4915,8 @@ namespace xivModdingFramework.Models.FileTypes
                     // Copy the materials through to all the destination IMC sets as needed.
                     if (Imc.UsesImc(mainRoot) && Imc.UsesImc(mergeInRoot))
                     {
-                        var toEntries = await Imc.GetEntries(await mainRoot.GetImcEntryPaths(), false, tx);
-                        var fromEntries = await Imc.GetEntries(await mergeInRoot.GetImcEntryPaths(), false, tx);
+                        var toEntries = await Imc.GetEntries(await mainRoot.GetImcEntryPaths(tx), false, tx);
+                        var fromEntries = await Imc.GetEntries(await mergeInRoot.GetImcEntryPaths(tx), false, tx);
 
                         var toSets = toEntries.Select(x => x.MaterialSet).Where(x => x != 0).ToList();
                         var fromSet = fromEntries[mergeInImcVariant];

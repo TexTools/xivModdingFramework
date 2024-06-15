@@ -807,7 +807,7 @@ namespace xivModdingFramework.Mods
                         tx = ModTransaction.BeginReadonlyTransaction();
                     }
 
-                    imcEntries = await Imc.GetEntries(await root.GetImcEntryPaths(), false, tx);
+                    imcEntries = await Imc.GetEntries(await root.GetImcEntryPaths(tx), false, tx);
                     ImcEntriesCache.Add(root, imcEntries);
                 }
                 var mSetId = Int32.Parse(match.Groups[1].Value);
