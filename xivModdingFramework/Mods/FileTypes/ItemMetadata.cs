@@ -305,7 +305,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 // We need to validate the material paths.
 
                 // First find the base files to copy. (Just always copy from set 1 for simplicity)
-                var copySource = await Root.GetMaterialFiles(1);
+                var copySource = await Root.GetMaterialFiles(1, tx);
                 var item = Root.GetFirstItem();
 
                 var newMaterialSetMax = ImcEntries.Select(x => x.MaterialSet).Max();
