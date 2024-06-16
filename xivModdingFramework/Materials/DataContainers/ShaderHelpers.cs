@@ -133,7 +133,7 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 case EShaderPack.Character:
                 case EShaderPack.CharacterLegacy:
-                case EShaderPack.DyeableFurniture:
+                case EShaderPack.BgColorChange:
                     return true;
                 default:
                     return false;
@@ -417,7 +417,7 @@ namespace xivModdingFramework.Materials.DataContainers
 #endif
 
             // At least for furniture, these are unconditionally masks and not specular maps
-            if(mtrl != null && (mtrl.ShaderPack == EShaderPack.Furniture || mtrl.ShaderPack == EShaderPack.Prop || mtrl.ShaderPack == EShaderPack.DyeableFurniture)){
+            if(mtrl != null && (mtrl.ShaderPack == EShaderPack.Bg || mtrl.ShaderPack == EShaderPack.BgProp || mtrl.ShaderPack == EShaderPack.BgColorChange)){
                 if (samplerId == ESamplerId.g_SamplerSpecularMap0 || samplerId == ESamplerId.g_SamplerSpecularMap1)
                 {
                     return XivTexType.Mask;
@@ -518,15 +518,15 @@ namespace xivModdingFramework.Materials.DataContainers
             [Description("iris.shpk")]
             Iris,
             [Description("bg.shpk")]
-            Furniture,
+            Bg,
             [Description("bgprop.shpk")]
-            Prop,
+            BgProp,
             [Description("bgcolorchange.shpk")]
-            DyeableFurniture,
+            BgColorChange,
             [Description("bguvscroll.shpk")]
-            FurnitureScroll,
+            BgUvScroll,
             [Description("bgcrestchange.shpk")]
-            FurnitureCrestChange,
+            BgCrestChange,
             [Description("charactertattoo.shpk")]
             CharacterTattoo,
             [Description("characterocclusion.shpk")]
