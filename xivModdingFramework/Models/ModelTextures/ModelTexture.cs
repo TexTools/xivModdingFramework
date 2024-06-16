@@ -695,6 +695,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     spec = Color4.Modulate(spec, _SkinSpecMultiplier);
 
 
+                    diffuse *= diffuseColorMul;
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
                     return new ShaderMapperResult()
@@ -730,6 +731,8 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    diffuse *= diffuseColorMul;
                     diffuse.Alpha = alpha;
                     return new ShaderMapperResult()
                     {
