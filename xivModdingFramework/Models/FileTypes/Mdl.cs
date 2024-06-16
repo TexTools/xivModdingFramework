@@ -1840,6 +1840,11 @@ namespace xivModdingFramework.Models.FileTypes
                 currentMdl = originalMdl;
             }
 
+            if(originalMdl == null)
+            {
+                originalMdl = currentMdl;
+            }
+
             byte[] bytes = null;
 
             if(currentMdl == null)

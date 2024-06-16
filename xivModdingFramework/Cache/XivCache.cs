@@ -137,6 +137,11 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public static void SetCacheWorkerStateSync(bool state)
+        {
+            CacheWorkerEnabled = state;
+        }
+
         public static async Task SetCacheWorkerState(bool state)
         {
             CacheWorkerEnabled = state;

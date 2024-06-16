@@ -1087,7 +1087,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = diffuse.Alpha;
 
-                    // This shpk seems to ignore the diffuse color var even though it's set in the shader.
+                    // This shpk seems to ignore the diffuse color var even though it's typically set in the material.
+                    // It usually seems to roughly reflect the default dye color, but not always.
+                    // Probably a vestigial dev value.
                     var baseDiffuse = diffuse * multi.Red;// * diffuseColorMul;
                     var dyeDiffuse = diffuse * multi.Red * colors.FurnitureColor;
 
