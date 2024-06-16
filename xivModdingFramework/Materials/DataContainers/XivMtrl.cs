@@ -887,13 +887,15 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             get
             {
-                var val = (((byte)SamplerSettingsRaw) >> 4) & 0x3f;
+                var val = ((SamplerSettingsRaw >> 4) & 0x3f);
                 return (byte)val;
             }
             set
             {
                 unchecked
                 {
+                    // No more than 6 bits.
+                    value &= 0x3F;
                     SamplerSettingsRaw &= ~((uint)0x3f << 4);
                     SamplerSettingsRaw |= ((uint)value << 4);
                 }
