@@ -27,6 +27,7 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Materials.FileTypes;
+using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
@@ -108,7 +109,7 @@ namespace xivModdingFramework.Materials.DataContainers
             return (ushort) size;
         } }
 
-        public List<MtrlString> MapStrings { get; set; } = new List<MtrlString>();
+        public List<MtrlString> UvMapStrings { get; set; } = new List<MtrlString>();
 
         public List<MtrlString> ColorsetStrings { get; set; } = new List<MtrlString>();
 
@@ -269,6 +270,51 @@ namespace xivModdingFramework.Materials.DataContainers
                 var c = new ShaderConstant() { ConstantId = parameterId, Values = data };
                 ShaderConstants.Add(c);
             }
+        }
+
+        internal ushort GetRealSamplerCount()
+        {
+            var total = Textures.Count(x => x.Sampler != null);
+
+            if(UvMapStrings.Count <= 1)
+            {
+                return (ushort)total;
+            }
+
+            foreach (var tex in Textures)
+            {
+                if (tex.Sampler == null) continue;
+                if (tex.Sampler.SamplerId == ESamplerId.g_SamplerColorMap0
+                    || tex.Sampler.SamplerId == ESamplerId.g_SamplerSpecularMap0
+                    || tex.Sampler.SamplerId == ESamplerId.g_SamplerNormalMap0)
+                {
+                    ESamplerId secondarySampler;
+                    switch (tex.Sampler.SamplerId)
+                    {
+                        case ESamplerId.g_SamplerColorMap0:
+                            secondarySampler = ESamplerId.g_SamplerColorMap1;
+                            break;
+                        case ESamplerId.g_SamplerSpecularMap0:
+                            secondarySampler = ESamplerId.g_SamplerSpecularMap1;
+                            break;
+                        case ESamplerId.g_SamplerNormalMap0:
+                        default:
+                            secondarySampler = ESamplerId.g_SamplerNormalMap1;
+                            break;
+                    }
+
+                    if (Textures.Any(x => x.Sampler != null && x.Sampler.SamplerId == secondarySampler))
+                    {
+                        // This already has another copy of this sampler manually added on a different tex.
+                        continue;
+                    }
+
+                    // These samplers get double-written when available.
+                    total++;
+                }
+            }
+
+            return (ushort)total;
         }
 
         /// <summary>

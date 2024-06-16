@@ -499,9 +499,6 @@ namespace xivModdingFramework.Models.ModelTextures
             var _MoleColor = new Color4( 56 / 255f, 24 / 255f, 8 / 255f, 1.0f);
 
 
-            var emissiveMultiplier = new Color4(1.0f);
-
-
             bool useTextures = settings.UseTextures;
             bool useColorset = settings.UseColorset;
             bool visualizeColorset = settings.VisualizeColorset;
@@ -519,11 +516,26 @@ namespace xivModdingFramework.Models.ModelTextures
                 alphaMultiplier = 255;
             }
             
-            // Emissive Color constant
-            var emissConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 950420322);
-            if(emissConst != null)
+            // Color constants
+            var diffuseColorMul = new Color4(1.0f);
+            var diffuseColorConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x2C2A34DD);
+            if (diffuseColorConst != null)
             {
-                emissiveMultiplier = new Color4(emissConst.Values[0], emissConst.Values[1], emissConst.Values[2], 1.0f);
+                diffuseColorMul = new Color4(diffuseColorConst.Values[0], diffuseColorConst.Values[1], diffuseColorConst.Values[2], 1.0f);
+            }
+
+            var specularColorMul = new Color4(1.0f);
+            var specularColorConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x141722D5);
+            if (specularColorConst != null)
+            {
+                specularColorMul = new Color4(specularColorConst.Values[0], specularColorConst.Values[1], specularColorConst.Values[2], 1.0f);
+            }
+
+            var emissiveColorMul = new Color4(0,0,0, 1.0f);
+            var emissiveColorConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x38A64362);
+            if (emissiveColorConst != null)
+            {
+                emissiveColorMul = new Color4(emissiveColorConst.Values[0], emissiveColorConst.Values[1], emissiveColorConst.Values[2], 1.0f);
             }
 
 
@@ -607,7 +619,7 @@ namespace xivModdingFramework.Models.ModelTextures
                             var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
                             emissive = emissPixel;
 
-                            emissive *= emissiveMultiplier;
+                            emissive *= emissiveColorMul;
 
                             Color4 invRoughPixel;
                             float invRough = 0.5f;
@@ -774,7 +786,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     diffuse = Color4.Lerp(diffuse, diffuse * irisColor, colorInfluence);
 
                     var emissive = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                    emissive *= emissiveMultiplier;
+                    emissive *= emissiveColorMul;
 
                     return new ShaderMapperResult()
                     {
@@ -880,6 +892,30 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 alphaMultiplier = 255;
             }
+
+            // Color constants
+            var diffuseColorMul = new Color4(1.0f);
+            var diffuseColorConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x2C2A34DD);
+            if (diffuseColorConst != null)
+            {
+                diffuseColorMul = new Color4(diffuseColorConst.Values[0], diffuseColorConst.Values[1], diffuseColorConst.Values[2], 1.0f);
+            }
+
+            var specularColorMul = new Color4(1.0f);
+            var specularColorConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x141722D5);
+            if (specularColorConst != null)
+            {
+                specularColorMul = new Color4(specularColorConst.Values[0], specularColorConst.Values[1], specularColorConst.Values[2], 1.0f);
+            }
+
+            var emissiveColorMul = new Color4(0,0,0, 1.0f);
+            var emissiveColorConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x38A64362);
+            if (emissiveColorConst != null)
+            {
+                emissiveColorMul = new Color4(emissiveColorConst.Values[0], emissiveColorConst.Values[1], emissiveColorConst.Values[2], 1.0f);
+            }
+
+
 
             List<Half> colorset = null;
             if (mtrl.ColorSetData != null && mtrl.ColorSetData.Count >= 256)
@@ -1019,26 +1055,63 @@ namespace xivModdingFramework.Models.ModelTextures
             else if (shaderPack == EShaderPack.Furniture || mtrl.ShaderPack == EShaderPack.Prop)
             {
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                    float colorInfluence = diffuse.Alpha;
+
+                    var baseDiffuse = diffuse * multi.Red * diffuseColorMul;
+                    var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
+                    specular *= specularColorMul;
+
+                    // Spec Power
+                    specular *= multi.Green;
+
+                    // Gloss - We just multiply this through to badly simulate the effect.
+                    specular *= multi.Blue;
+
+                    var emissive = emissiveColorMul * multi.Alpha * diffuse;
+
+                    var alpha = new Color4(diffuse.Alpha);
+
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
-                        Alpha = new Color4(diffuse.Alpha)
+                        Emissive = emissive,
+                        Alpha = alpha
                     };
                 };
             }
             else if (shaderPack == EShaderPack.DyeableFurniture)
             {
-                Color4 furnitureColor = colors.FurnitureColor;
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = diffuse.Alpha;
+
+                    // This shpk seems to ignore the diffuse color var even though it's set in the shader.
+                    var baseDiffuse = diffuse * multi.Red;// * diffuseColorMul;
+                    var dyeDiffuse = diffuse * multi.Red * colors.FurnitureColor;
+
+                    diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
+
+
+                    var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
+                    specular *= specularColorMul;
+
+                    // Spec Power
+                    specular *= multi.Green;
+
+                    // Gloss - We just multiply this through to badly simulate the effect.
+                    specular *= multi.Blue; 
+
+                    var emissive = emissiveColorMul * diffuse;
+
+                    var alpha = new Color4(1.0f);
                     return new ShaderMapperResult()
                     {
-                        Diffuse = Color4.Lerp(new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, 1.0f), furnitureColor, colorInfluence),
+                        Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
-                        Alpha = new Color4(1.0f)
+                        Emissive = emissive,
+                        Alpha = new Color4(alpha)
                     };
                 };
             }
@@ -1059,11 +1132,16 @@ namespace xivModdingFramework.Models.ModelTextures
                     var coloredSkin = diffuse * skinColor;
                     Color4 newDiffuse = Color4.Lerp(diffuse, coloredSkin, skinInfluence);
                     var alpha = 1.0f;
+                    newDiffuse *= diffuseColorMul;
+
+                    var emissive = emissiveColorMul;
+
                     return new ShaderMapperResult()
                     {
                         Diffuse = newDiffuse,
                         Normal = newNormal,
                         Specular = newSpecular,
+                        Emissive = emissive,
                         Alpha = new Color4(alpha)
                     };
                 };
@@ -1117,6 +1195,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     float influenceStrength = specular.Alpha;
                     Color4 newDiffuse = Color4.Lerp(baseColor, targetColor, influenceStrength);
                     newDiffuse = Color4.Scale(newDiffuse, specular.Red);
+                    newDiffuse *= diffuseColorMul;
+
                     var alpha = normal.Alpha;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 

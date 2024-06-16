@@ -211,14 +211,14 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 // Map String Information.
                 var mapOffset = new List<int>(mapCount);
-                xivMtrl.MapStrings = new List<MtrlString>();
+                xivMtrl.UvMapStrings = new List<MtrlString>();
                 for (var i = 0; i < mapCount; i++)
                 {
                     mapOffset.Add(br.ReadInt16());
 
                     var map = new MtrlString();
                     map.Flags = br.ReadUInt16();
-                    xivMtrl.MapStrings.Add(map);
+                    xivMtrl.UvMapStrings.Add(map);
                 }
 
                 // Colorset String Information.
@@ -241,11 +241,11 @@ namespace xivModdingFramework.Materials.FileTypes
                     xivMtrl.Textures[i].TexturePath = path;
                 }
 
-                for (var i = 0; i < xivMtrl.MapStrings.Count; i++)
+                for (var i = 0; i < xivMtrl.UvMapStrings.Count; i++)
                 {
                     br.BaseStream.Seek(stringBlockStart + mapOffset[i], SeekOrigin.Begin);
                     var st = IOUtil.ReadNullTerminatedString(br);
-                    xivMtrl.MapStrings[i].Value = st;
+                    xivMtrl.UvMapStrings[i].Value = st;
                 }
 
                 for (var i = 0; i < xivMtrl.ColorsetStrings.Count; i++)
@@ -366,7 +366,28 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     if (xivMtrl.Textures.Count > textureIndex)
                     {
-                        xivMtrl.Textures[textureIndex].Sampler = sampler;
+                        if (xivMtrl.Textures[textureIndex] != null
+                            && xivMtrl.Textures[textureIndex].Sampler != null
+                            && xivMtrl.Textures[textureIndex].Sampler.SamplerId != ESamplerId.Invalid)
+                        {
+                            // We already added a sampler.
+
+                            if (sampler.SamplerId == ESamplerId.g_SamplerColorMap0
+                            || sampler.SamplerId == ESamplerId.g_SamplerSpecularMap0
+                            || sampler.SamplerId == ESamplerId.g_SamplerNormalMap0)
+                            {
+                                // Keep new sampler.
+                                xivMtrl.Textures[textureIndex].Sampler = sampler;
+                            } else
+                            {
+                                // Keep old sampler.
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            xivMtrl.Textures[textureIndex].Sampler = sampler;
+                        }
                     }
                     else
                     {
@@ -549,7 +570,7 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort)0)); // Shader Name Offset - Backfilled later
 
             mtrlBytes.Add((byte)xivMtrl.Textures.Count(x => !x.TexturePath.StartsWith(EmptySamplerPrefix)));
-            mtrlBytes.Add((byte)xivMtrl.MapStrings.Count);
+            mtrlBytes.Add((byte)xivMtrl.UvMapStrings.Count);
             mtrlBytes.Add((byte)xivMtrl.ColorsetStrings.Count);
             mtrlBytes.Add((byte)xivMtrl.AdditionalData.Length);
 
@@ -573,7 +594,7 @@ namespace xivModdingFramework.Materials.FileTypes
                 stringBlock.Add(0);
             }
 
-            foreach (var mapPathString in xivMtrl.MapStrings)
+            foreach (var mapPathString in xivMtrl.UvMapStrings)
             {
                 mapOffsets.Add(stringBlock.Count);
                 stringBlock.AddRange(Encoding.UTF8.GetBytes(mapPathString.Value));
@@ -607,7 +628,7 @@ namespace xivModdingFramework.Materials.FileTypes
             for (var i = 0; i < mapOffsets.Count; i++)
             {
                 mtrlBytes.AddRange(BitConverter.GetBytes((short)mapOffsets[i]));
-                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.MapStrings[i].Flags));
+                mtrlBytes.AddRange(BitConverter.GetBytes((short)xivMtrl.UvMapStrings[i].Flags));
             }
 
             for (var i = 0; i < colorsetOffsets.Count; i++)
@@ -662,7 +683,7 @@ namespace xivModdingFramework.Materials.FileTypes
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderConstantsDataSize));
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderKeyCount));
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.ShaderConstantsCount));
-            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.Textures.Count(x => x.Sampler != null)));
+            mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.GetRealSamplerCount()));
 
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.MaterialFlags));
             mtrlBytes.AddRange(BitConverter.GetBytes((ushort)xivMtrl.MaterialFlags2));
@@ -705,6 +726,41 @@ namespace xivModdingFramework.Materials.FileTypes
                         mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerSettingsRaw));
                         mtrlBytes.Add((byte)i);
                         mtrlBytes.AddRange(new byte[3]);
+
+                        // These have their secondary sampler also written when used with 2x uv layers.
+                        if (xivMtrl.UvMapStrings.Count > 1)
+                        {
+                            if (tex.Sampler.SamplerId == ESamplerId.g_SamplerColorMap0
+                            || tex.Sampler.SamplerId == ESamplerId.g_SamplerSpecularMap0
+                            || tex.Sampler.SamplerId == ESamplerId.g_SamplerNormalMap0)
+                            {
+                                ESamplerId secondarySampler;
+                                switch (tex.Sampler.SamplerId)
+                                {
+                                    case ESamplerId.g_SamplerColorMap0:
+                                        secondarySampler = ESamplerId.g_SamplerColorMap1;
+                                        break;
+                                    case ESamplerId.g_SamplerSpecularMap0:
+                                        secondarySampler = ESamplerId.g_SamplerSpecularMap1;
+                                        break;
+                                    case ESamplerId.g_SamplerNormalMap0:
+                                    default:
+                                        secondarySampler = ESamplerId.g_SamplerNormalMap1;
+                                        break;
+                                }
+
+                                if(xivMtrl.Textures.Any(x => x.Sampler != null && x.Sampler.SamplerId == secondarySampler))
+                                {
+                                    // This already has another copy of this sampler manually added on a different tex.
+                                    continue;
+                                }
+
+                                mtrlBytes.AddRange(BitConverter.GetBytes((uint)secondarySampler));
+                                mtrlBytes.AddRange(BitConverter.GetBytes(tex.Sampler.SamplerSettingsRaw));
+                                mtrlBytes.Add((byte)i);
+                                mtrlBytes.AddRange(new byte[3]);
+                            }
+                        }
                     }
                 }
 

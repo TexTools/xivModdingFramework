@@ -347,20 +347,21 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
                 UpdateConstantName(shKv.Key, 0x58DE06E2, "Limbal Color?");
+                UpdateConstantName(shKv.Key, 0x141722D5, "Specular Color");
 
                 // Names based on analyzing shader code.
                 UpdateConstantName(shKv.Key, 0x62E44A4F, "Skin Fresnel");
                 UpdateConstantName(shKv.Key, 0x2E60B071, "Skin Tile Multiplier");
-                UpdateConstantName(shKv.Key, 740963549, "Skin Color");
+                UpdateConstantName(shKv.Key, 0x2C2A34DD, "Skin Color");
                 UpdateConstantName(shKv.Key, 2569562539, "Skin Wetness Lerp");
                 UpdateConstantName(shKv.Key, 1112929012, "Skin Tile Material");
                 UpdateConstantName(shKv.Key, 0x59BDA9B1, "Subsurface/Fur Index", true);
 
                 // Brute-Forced CRCs
-                UpdateConstantName(shKv.Key, 699138595, "g_AlphaThreshold", true);
-                UpdateConstantName(shKv.Key, 740963549, "g_DiffuseColor", true);
-                UpdateConstantName(shKv.Key, 298385553, "g_WhiteEyeColor", true);
-                UpdateConstantName(shKv.Key, 950420322, "g_EmissiveColor", true);
+                UpdateConstantName(shKv.Key, 0x29AC0223, "g_AlphaThreshold", true);
+                UpdateConstantName(shKv.Key, 0x2C2A34DD, "g_DiffuseColor", true);
+                UpdateConstantName(shKv.Key, 0x11C90091, "g_WhiteEyeColor", true);
+                UpdateConstantName(shKv.Key, 0x38A64362, "g_EmissiveColor", true);
                 UpdateConstantName(shKv.Key, 3086627810, "g_SSAOMask", true);
                 UpdateConstantName(shKv.Key, 1112929012, "g_TileIndex", true);
                 UpdateConstantName(shKv.Key, 778088561, "g_TileScale", true);
