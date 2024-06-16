@@ -226,7 +226,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         // Load the individual pixels into memory.
                         Color4 baseDiffuseColor = readInputPixel(diffusePixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
                         Color4 baseNormalColor = readInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 1.0f, 1.0f));
-                        Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(0.0f, 0.0f, 0.0f, 1.0f));
+                        Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
                         Color4 baseIndexColor = readInputPixel(indexPixels, i, new Color4(1.0f, 1.0f, 0.0f, 1.0f));
 
                         if (invertNormalGreen)
@@ -1057,7 +1057,8 @@ namespace xivModdingFramework.Models.ModelTextures
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = diffuse.Alpha;
 
-                    var baseDiffuse = diffuse * multi.Red * diffuseColorMul;
+
+                    diffuse *= multi.Red * diffuseColorMul;
                     var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
                     specular *= specularColorMul;
 
