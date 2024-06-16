@@ -334,7 +334,7 @@ namespace xivModdingFramework.Cache
         }
 
         /// <summary>
-        /// Calculates and returns the SGD file name for this root.
+        /// Calculates and returns the SGB file name for this root.
         /// </summary>
         /// <returns></returns>
         public string GetSgbName()

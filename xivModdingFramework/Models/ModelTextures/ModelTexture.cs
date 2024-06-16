@@ -803,6 +803,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     float colorInfluence = diffuse.Alpha;
 
 
+                    var savedAlpha = diffuse.Alpha;
                     diffuse *= multi.Red * diffuseColorMul;
                     var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
                     specular *= specularColorMul;
@@ -815,6 +816,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var emissive = emissiveColorMul * multi.Alpha * diffuse;
 
+                    diffuse.Alpha = savedAlpha;
                     var alpha = new Color4(diffuse.Alpha);
 
                     return new ShaderMapperResult()
@@ -1101,7 +1103,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     specular *= multi.Blue;
 
                     var emissive = emissiveColorMul * multi.Alpha * diffuse;
-
+                    
+                    diffuse.Alpha = savedAlpha;
                     var alpha = new Color4(diffuse.Alpha);
 
                     return new ShaderMapperResult()
@@ -1126,7 +1129,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     var dyeDiffuse = diffuse * multi.Red * colors.FurnitureColor;
 
                     diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
-
+                    
 
                     var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
                     specular *= specularColorMul;
