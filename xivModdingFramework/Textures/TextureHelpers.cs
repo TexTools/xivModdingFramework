@@ -143,6 +143,25 @@ namespace xivModdingFramework.Textures
             return res;
         }
 
+        /// <summary>
+        /// Swizzle Red/Blue channels for switching between RGBA and BGRA formats.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <param name="channel"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public static async Task SwizzleRB(byte[] data, int width, int height)
+        {
+            Action<int> act = (i) =>
+            {
+                var original = data[i + 0];
+                data[i + 0] = data[i + 2];
+                data[i + 2] = data[original];
+            };
+            await ModifyPixels(act, width, height);
+        }
 
         internal static async Task FillChannel(byte[] data, int width, int height, int channel, byte value)
         {
@@ -152,7 +171,7 @@ namespace xivModdingFramework.Textures
             };
             await ModifyPixels(act, width, height);
         }
-        internal static async Task CreateIndexTexture(byte[] normalPixelData, byte[] indexPixelData, int width, int height)
+        public static async Task CreateIndexTexture(byte[] normalPixelData, byte[] indexPixelData, int width, int height)
         {
             await ModifyPixels((int offset) =>
             {
@@ -193,7 +212,7 @@ namespace xivModdingFramework.Textures
                 indexPixelData[offset + 3] = 255;
             }, width, height);
         }
-        internal static async Task CreateHairMaps(byte[] normalPixelData, byte[] maskPixelData, int width, int height)
+        public static async Task CreateHairMaps(byte[] normalPixelData, byte[] maskPixelData, int width, int height)
         {
             await ModifyPixels((int offset) =>
             {
@@ -239,6 +258,20 @@ namespace xivModdingFramework.Textures
             return (timgA.Result, timgB.Result, maxW, maxH);
         }
 
+        public static async Task<(byte[] TexA, byte[] TexB, int Width, int Height)> ResizeImages(byte[] imgA, int widthA, int heightA, byte[] imgB, int widthB, int heightB)
+        {
+            var maxW = Math.Max(widthA, widthB);
+            var maxH = Math.Max(heightA, heightB);
+
+            var timgA = ResizeImage(imgA, widthA, heightA, maxW, maxH);
+            var timgB = ResizeImage(imgB, widthB, heightB, maxW, maxH);
+
+            await Task.WhenAll(timgA, timgB);
+
+            return (timgA.Result, timgB.Result, maxW, maxH);
+        }
+
+
         /// <summary>
         /// Resize a texture to the given size, returning the raw pixel data.
         /// </summary>
@@ -255,7 +288,6 @@ namespace xivModdingFramework.Textures
             }
             return await ResizeImage(pixels, tex.Width, tex.Height, newWidth, newHeight);
         }
-
 
         /// <summary>
         /// Resize an image to the given size, returning the raw pixel data.

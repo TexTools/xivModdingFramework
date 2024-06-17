@@ -53,6 +53,7 @@ using HelixToolkit.SharpDX.Core.Helper;
 using xivModdingFramework.Exd.Enums;
 using SharpDX.Toolkit.Graphics;
 using xivModdingFramework.Models.DataContainers;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -1083,6 +1084,65 @@ namespace xivModdingFramework.Textures.FileTypes
             // Write header.
             var texHeader = CreateTexFileHeader(texFormat, newWidth, newHeight, newMipCount).ToArray();
             return (texHeader, headerLength);
+        }
+
+        /// <summary>
+        /// Retrieves the raw pixel data from a given external file path.
+        /// </summary>
+        /// <param name="externalFile"></param>
+        /// <returns></returns>
+        public static async Task<(byte[] PixelData, int Width, int Height)> GetPixelDataFromFile(string externalFile, int resizeWidth = -1, int resizeHeight = -1)
+        {
+            byte[] pixelData;
+            int width, height;
+            var resizeOptions = new ResizeOptions
+            {
+                Size = new Size(resizeWidth, resizeHeight),
+                PremultiplyAlpha = false,
+                Mode = ResizeMode.Stretch,
+            };
+
+            if (externalFile.ToLower().EndsWith(".dds"))
+            {
+
+                // We could have functions somewhere to just raw read the DDS tex data, but this is a 
+                // relatively minor perf hit since it just flips a header around.
+                var otherTex = XivTex.FromUncompressedTex(Tex.DDSToUncompressedTex(externalFile));
+                width = otherTex.Width;
+                height = otherTex.Height;
+                pixelData = await otherTex.GetRawPixels();
+
+                if(resizeWidth > 0 || resizeHeight > 0)
+                {
+                    // Resize if needed.
+                    using (var image = SixLabors.ImageSharp.Image.LoadPixelData<Rgba32>(pixelData, otherTex.Width, otherTex.Height))
+                    {
+                        image.Mutate(x => x.Resize(resizeOptions));
+                        pixelData = IOUtil.GetImageSharpPixels(image);
+
+                        width = image.Width;
+                        height = image.Height;
+                    }
+                }
+
+            }
+            else
+            {
+                using (var image = SixLabors.ImageSharp.Image.Load<Rgba32>(externalFile))
+                {
+                    if(resizeWidth > 0 || resizeHeight > 0)
+                    {
+                        image.Mutate(x => x.Resize(resizeOptions));
+                    }
+
+                    pixelData = IOUtil.GetImageSharpPixels(image);
+
+                    width = image.Width;
+                    height = image.Height;
+                }
+            }
+
+            return (pixelData, width, height);
         }
 
         /// <summary>
