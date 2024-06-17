@@ -1192,9 +1192,10 @@ namespace xivModdingFramework.Models.ModelTextures
                     var coloredSkin = diffuse * skinColor;
                     Color4 newDiffuse = Color4.Lerp(diffuse, coloredSkin, skinInfluence);
                     var alpha = 1.0f;
-                    newDiffuse *= diffuseColorMul;
 
+                    newDiffuse *= diffuseColorMul;
                     var emissive = emissiveColorMul;
+                    newDiffuse.Alpha = alpha;
 
                     return new ShaderMapperResult()
                     {
@@ -1208,15 +1209,23 @@ namespace xivModdingFramework.Models.ModelTextures
 
                 ShaderMapperDelegate faceShader = (Color4 diffuse, Color4 normal, Color4 specular, Color4 index) => {
                     ShaderMapperResult result = skinShader(diffuse, normal, specular, index);
+
+                    var alpha = normal.Blue * alphaMultiplier;
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
                     // Face shaders also allow for lip color.
                     var coloredLip = diffuse * lipColor;
                     float lipInfluence = specular.Blue;
                     result.Diffuse = Color4.Lerp(result.Diffuse, coloredLip, lipInfluence);
+                    result.Diffuse.Alpha = alpha;
+
                     // For lipstick, increase the specular value slightly.
                     float specAmp = 1.0f + (lipInfluence * 0.25f);
                     result.Specular = result.Specular * specAmp;
                     // Face shader supports alpha, unlike normal skin textures.
-                    result.Alpha = new Color4(normal.Blue);
+                    result.Alpha = new Color4(alpha);
+
+
                     return result;
                 };
 
