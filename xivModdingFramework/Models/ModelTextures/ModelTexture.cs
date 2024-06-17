@@ -985,125 +985,79 @@ namespace xivModdingFramework.Models.ModelTextures
 
             if (shaderPack == EShaderPack.Character || shaderPack == EShaderPack.CharacterGlass)
             {
-                if (hasMulti)
-                {
-
                     return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
 
 
-                        Color4 specular;
-                        if (useTextures)
+                    Color4 specular;
+                    if (useTextures)
+                    {
+                        if (!hasDiffuse)
                         {
-                            if (!hasDiffuse)
-                            {
-                                diffuse = new Color4(1.0f);
-                            }
-
-
-                            if (!hasSpecular)
-                            {
-                                var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                                diffuse *= occlusion;
-                                specular = occlusion;
-
-                                // Specular/Gloss flow
-                                var specPower = new Color4(multi.Green, multi.Green, multi.Green, 1.0f);
-                                var gloss = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
-                                specular = occlusion * specPower * gloss;
-                            }
-                            else
-                            {
-                                specular = multi;
-                            }
-                        }
-                        else
-                        {
-                            specular = new Color4(1.0f);
                             diffuse = new Color4(1.0f);
                         }
 
 
-                        var emissive = new Color4(0, 0, 0, 1.0f);
-                        if (useColorset)
+                        if (!hasSpecular)
                         {
-                            var row = GetColorsetRow(colorset, normal[3], 0.0f, visualizeColorset, highlightRow);
+                            var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                            diffuse *= occlusion;
+                            specular = occlusion;
 
-                            var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
-                            var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
-                            var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
-
-                            Color4 invRoughPixel;
-                            float invRough = 0.5f;
-                            // Arbitrary estimation for SE-gloss to inverse roughness.
-                            invRough = row[7] / 32;
-
-                            invRoughPixel = new Color4(invRough, invRough, invRough, 1.0f);
-
-                            diffuse *= diffusePixel;
-                            specular *= invRoughPixel;
-                            specular *= specPixel;
-
-                            emissive = emissPixel;
-
+                            // Specular/Gloss flow
+                            var specPower = new Color4(multi.Green, multi.Green, multi.Green, 1.0f);
+                            var gloss = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
+                            specular = occlusion * specPower * gloss;
                         }
-
-                        var alpha = normal.Blue * alphaMultiplier;
-
-                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
-
-                        //diffuse = GammaAdjustColor(diffuse);
-                        return new ShaderMapperResult()
+                        else
                         {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = specular,
-                            Alpha = new Color4(alpha),
-                            Emissive = emissive
-                        };
+                            specular = multi;
+                        }
+                    }
+                    else
+                    {
+                        specular = new Color4(1.0f);
+                        diffuse = new Color4(1.0f);
+                    }
+
+
+                    var emissive = new Color4(0, 0, 0, 1.0f);
+                    if (useColorset)
+                    {
+                        var row = GetColorsetRow(colorset, normal[3], 0.0f, visualizeColorset, highlightRow);
+
+                        var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
+                        var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
+                        var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
+
+                        Color4 invRoughPixel;
+                        float invRough = 0.5f;
+                        // Arbitrary estimation for SE-gloss to inverse roughness.
+                        invRough = row[7] / 32;
+
+                        invRoughPixel = new Color4(invRough, invRough, invRough, 1.0f);
+
+                        diffuse *= diffusePixel;
+                        specular *= invRoughPixel;
+                        specular *= specPixel;
+
+                        emissive = emissPixel;
+
+                    }
+
+                    var alpha = normal.Blue * alphaMultiplier;
+
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    //diffuse = GammaAdjustColor(diffuse);
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = specular,
+                        Alpha = new Color4(alpha),
+                        Emissive = emissive
                     };
-                }
-                else if (hasSpecular) // "Multi" is actually a full specular map
-                {
-
-                    int multiAOChannel = shaderPack == EShaderPack.CharacterLegacy ? 0 : 2;
-                    return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                        // Use AO as the diffuse if there is no diffuse texture
-                        if (!hasDiffuse)
-                            diffuse = new Color4(multi[multiAOChannel], multi[multiAOChannel], multi[multiAOChannel], 1.0f);
-
-
-
-                        var alpha = normal.Blue * alphaMultiplier;
-                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
-                        return new ShaderMapperResult()
-                        {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = multi,
-                            Alpha = new Color4(alpha)
-                        };
-                    };
-                }
-                else // No mask or specular
-                {
-                    int multiAOChannel = shaderPack == EShaderPack.CharacterLegacy ? 0 : 2;
-                    return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                        // Use AO as the diffuse if there is no diffuse texture
-                        if (!hasDiffuse)
-                            diffuse = new Color4(multi[multiAOChannel], multi[multiAOChannel], multi[multiAOChannel], 1.0f);
-
-
-                        var alpha = normal.Blue * alphaMultiplier;
-                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
-                        return new ShaderMapperResult()
-                        {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = Color4.Black,
-                            Alpha = new Color4(alpha)
-                        };
-                    };
-                }
+                };
             }
             else if (shaderPack == EShaderPack.Bg 
                 || mtrl.ShaderPack == EShaderPack.BgProp 
