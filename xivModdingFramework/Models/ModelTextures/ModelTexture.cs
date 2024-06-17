@@ -290,17 +290,33 @@ namespace xivModdingFramework.Models.ModelTextures
                 switch (ttp.Type)
                 {
                     case XivTexType.Diffuse:
+                        if(texMapData.Diffuse != null)
+                        {
+                            continue;
+                        }
                         texMapData.Diffuse = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                     case XivTexType.Specular:
                     case XivTexType.Mask:
                     case XivTexType.Skin:
+                        if (texMapData.Multi != null)
+                        {
+                            continue;
+                        }
                         texMapData.Multi = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                     case XivTexType.Normal:
+                        if (texMapData.Normal != null)
+                        {
+                            continue;
+                        }
                         texMapData.Normal = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                     case XivTexType.Index:
+                        if (texMapData.Index != null)
+                        {
+                            continue;
+                        }
                         texMapData.Index = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                 }
