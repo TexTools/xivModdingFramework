@@ -797,7 +797,10 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (shaderPack == EShaderPack.Bg || shaderPack == EShaderPack.BgProp)
+            else if (shaderPack == EShaderPack.Bg 
+                || mtrl.ShaderPack == EShaderPack.BgProp 
+                || mtrl.ShaderPack == EShaderPack.BgCrestChange
+                || mtrl.ShaderPack == EShaderPack.BgUvScroll )
             {
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = diffuse.Alpha;
@@ -1086,11 +1089,14 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 }
             }
-            else if (shaderPack == EShaderPack.Furniture || mtrl.ShaderPack == EShaderPack.Prop)
+            else if (shaderPack == EShaderPack.Bg 
+                || mtrl.ShaderPack == EShaderPack.BgProp 
+                || mtrl.ShaderPack == EShaderPack.BgCrestChange
+                || mtrl.ShaderPack == EShaderPack.BgUvScroll )
             {
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                    float colorInfluence = diffuse.Alpha;
 
+                    var savedAlpha = diffuse.Alpha;
 
                     diffuse *= multi.Red * diffuseColorMul;
                     var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
@@ -1117,7 +1123,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     };
                 };
             }
-            else if (shaderPack == EShaderPack.DyeableFurniture)
+            else if (shaderPack == EShaderPack.BgColorChange)
             {
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float colorInfluence = diffuse.Alpha;
