@@ -355,7 +355,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 var afterRoot = DateTimeOffset.Now.ToUnixTimeMilliseconds();
                 // Pre-Dawntrail Files
-                if (pmp.Meta.FileVersion <= 3)
+                if (settings.UpdateEndwalkerFiles)
                 {
                     progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
                     await EndwalkerUpgrade.UpdateEndwalkerFiles(imported.Keys, _Source, imported, progress, tx);

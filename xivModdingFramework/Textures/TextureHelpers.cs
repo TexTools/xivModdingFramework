@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Materials;
@@ -171,6 +172,15 @@ namespace xivModdingFramework.Textures
             };
             await ModifyPixels(act, width, height);
         }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static byte RemapByte(byte value, byte oldMin, byte oldMax, byte newMin, byte newMax)
+        {
+            var z = (float)(value - oldMin) / (float)(newMin - oldMin) * (float)(newMax - newMin) + newMin;
+            return (byte)Math.Max(Math.Min(Math.Round(z), 255), 0);
+        }
+
         public static async Task CreateIndexTexture(byte[] normalPixelData, byte[] indexPixelData, int width, int height)
         {
             await ModifyPixels((int offset) =>
@@ -217,6 +227,11 @@ namespace xivModdingFramework.Textures
             await ModifyPixels((int offset) =>
             {
                 var newGreen = (byte)(255 - maskPixelData[offset]);
+
+                // Lift floor slightly.  This is a bit of artistic interpretation -
+                // Except for the fact that the new engine will break with roughness value 0, so you have to 
+                // at least bump 0 to 1.
+                newGreen = RemapByte(newGreen, 0, 255, 10, 255);
 
                 // Output is BGRA
 
