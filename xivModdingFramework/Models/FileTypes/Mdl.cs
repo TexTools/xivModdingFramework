@@ -938,14 +938,18 @@ namespace xivModdingFramework.Models.FileTypes
                 #region Base Geometry Data 
 
 
-                if (xivMdl.LoDList[0].VertexDataOffset != br.BaseStream.Position)
+                // Attempts to catch weird broken mod mdls.
+                // This has been known to occur with both certain penumbra MDLs, and very old
+                // TexTools MDLs.
+                if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
+                    || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
                 {
-                    // Old jank mod model with incorrect offset.
-                    // This has been known to occur both from old TT created models and from some
-                    // Penumbra beta builds.
+
                     var delta = (int) (xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
                     xivMdl.LoDList[0].VertexDataOffset -= delta;
                     xivMdl.LoDList[0].IndexDataOffset -= delta;
+                    //var rem = br.ReadBytes(delta);
+                    var z = "z";
                 }
 
 

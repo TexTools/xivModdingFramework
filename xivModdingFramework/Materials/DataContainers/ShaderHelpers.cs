@@ -382,6 +382,10 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x3632401A, "g_LipRoughnessScale", true);
                 UpdateConstantName(shKv.Key, 0x7DABA471, "g_IrisRingEmissiveIntensity", true);
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "g_SpecularColorMask", true);
+
+
+                UpdateConstantName(shKv.Key, 0xCB0338DC, "g_IrisAPrefersRg", true);
+                UpdateConstantName(shKv.Key, 0xC4647F37, "g_GlassThicknessMax", true);
             }
 
         }
