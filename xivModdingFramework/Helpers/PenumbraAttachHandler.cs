@@ -227,8 +227,13 @@ namespace xivModdingFramework.Helpers
                     return;
                 }
 
+                if (!Transaction.ModifiedFiles.Contains(internalFilePath))
+                {
+                    // File was reset.  We have to rewrite the penumbra JSON files in this case.
+                    _WantsGlobalWrite = true;
+                }
                 // If this file doesn't exist in the penumbra state yet, is a manipulation file, or is deleted, we need to do a full write.
-                if (!PmpFilePaths.ContainsKey(internalFilePath) || internalFilePath.EndsWith(".meta") || internalFilePath.EndsWith(".rgsp") || newOffset == 0)
+                else if (!PmpFilePaths.ContainsKey(internalFilePath) || internalFilePath.EndsWith(".meta") || internalFilePath.EndsWith(".rgsp") || newOffset == 0)
                 {
                     _WantsGlobalWrite = true;
                 } else
