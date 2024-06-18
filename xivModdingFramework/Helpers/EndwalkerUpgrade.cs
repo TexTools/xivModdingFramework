@@ -20,6 +20,10 @@ using xivModdingFramework.Textures.FileTypes;
 using xivModdingFramework.Textures;
 using xivModdingFramework.Textures.DataContainers;
 using System.Diagnostics;
+using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes.PMP;
+using xivModdingFramework.Mods.Interfaces;
 
 namespace xivModdingFramework.Helpers
 {
@@ -108,6 +112,39 @@ namespace xivModdingFramework.Helpers
             progress?.Report((0, total, "Endwalker Upgrades Complete..."));
         }
 
+
+        /// <summary>
+        /// Takes any single-option modpack and converts it into a Dawntrail friendly PMP at the given path.
+        /// </summary>
+        /// <param name="modpackPath"></param>
+        /// <param name="newModpackPath"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidDataException"></exception>
+        public static async Task SimpleUpgdateEndwalkerModpack(string modpackPath, string newModpackPath)
+        {
+            var files = await TTMP.ModPackToSimpleFileList(modpackPath, true);
+
+            if(files == null)
+            {
+                throw new InvalidDataException("Modpack has multiple options or was not valid.");
+            }
+
+            var mpi = await TTMP.GetModpackInfo(modpackPath);
+
+            Version.TryParse(mpi.ModPack.Version, out var ver);
+            var meta = new BaseModpackData()
+            {
+                Author = mpi.ModPack.Author,
+                Name = mpi.ModPack.Name,
+                Description = mpi.Description,
+                Url = mpi.ModPack.Url,
+                Version = ver,
+            };
+
+            await PMP.CreateSimplePmp(newModpackPath, meta, files, null, true);
+        }
+
+
         public static async Task UpdateEndwalkerModel(string path, string source, ModTransaction tx, Dictionary<string, FileStorageInformation> files = null)
         {
             var uncomp = await ResolveFile(path, files, tx);
@@ -129,6 +166,7 @@ namespace xivModdingFramework.Helpers
 
             await WriteFile(uncomp, path, files, tx, source);
         }
+
         /// <summary>
         /// Reads an uncompressed v5 MDL and retrieves the offsets to the bone lists, in order to update them.
         /// </summary>
