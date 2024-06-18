@@ -29,10 +29,28 @@ namespace xivModdingFramework.Helpers
 {
     public static class EndwalkerUpgrade
     {
+        /// <summary>
+        /// Enum representing the type of upgrade a given texture needs to go through.
+        /// </summary>
+        public enum EUpgradeTextureUsage
+        {
+            IndexMaps,
+            HairMaps,
+        };
+
+        public struct UpgradeInfo
+        {
+            public EUpgradeTextureUsage Usage;
+            public Dictionary<string, string> Files;
+        }
+        
+
 
         /// <summary>
         /// Performs Endwalker => Dawntrail Upgrades on an arbitrary set of internal files as part of a transaction.
         /// This is used primarily during Modpack installs.
+        /// 
+        /// Returns a collection of file upgrade information.
         /// </summary>
         /// <param name="filePaths"></param>
         /// <param name="source"></param>
@@ -40,10 +58,11 @@ namespace xivModdingFramework.Helpers
         /// <param name="progress"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static async Task UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
 #if ENDWALKER
-            return;
+            return ret;
 #endif
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
@@ -54,7 +73,7 @@ namespace xivModdingFramework.Helpers
             var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
-            await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress, _ConvertedTextures);
+            ret = await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress, _ConvertedTextures);
 
             var idx = 0;
             var total = fixableMdls.Count;
@@ -69,18 +88,23 @@ namespace xivModdingFramework.Helpers
             await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures);
 
             progress?.Report((0, total, "Endwalker Upgrades Complete..."));
+            return ret;
         }
 
         /// <summary>
         /// Performs Endwalker => Dawntrail Upgrades on an arbitrary set of files that do not exist in the transaction file system.
         /// This is used primarily for in-place modpack upgrades.
+        /// 
+        /// Returns a collection of file upgrade information to be used for texture upgrades.
+        /// NOTE : Does not run texture upgrades in this pass for Materials.
         /// </summary>
         /// <param name="files"></param>
         /// <returns></returns>
-        public static async Task UpdateEndwalkerFiles(Dictionary<string, FileStorageInformation> files, IProgress<(int current, int total, string message)> progress = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(Dictionary<string, FileStorageInformation> files, IProgress<(int current, int total, string message)> progress = null)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
 #if ENDWALKER
-            return;
+            return ret;
 #endif
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
@@ -95,7 +119,7 @@ namespace xivModdingFramework.Helpers
             var source = "Unused";
             ModTransaction tx = null;
 
-            await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress, _ConvertedTextures, files);
+            ret = await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress, _ConvertedTextures, files);
 
             var idx = 0;
             var total = fixableMdls.Count;
@@ -106,42 +130,12 @@ namespace xivModdingFramework.Helpers
                 await EndwalkerUpgrade.UpdateEndwalkerModel(path, source, tx, files);
             }
 
-            progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-            await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures, files);
+           // This introduces complication that is best skipped for the moment.
+           //progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
+           // await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures, files);
 
-            progress?.Report((0, total, "Endwalker Upgrades Complete..."));
-        }
+            return ret;
 
-
-        /// <summary>
-        /// Takes any single-option modpack and converts it into a Dawntrail friendly PMP at the given path.
-        /// </summary>
-        /// <param name="modpackPath"></param>
-        /// <param name="newModpackPath"></param>
-        /// <returns></returns>
-        /// <exception cref="InvalidDataException"></exception>
-        public static async Task SimpleUpgdateEndwalkerModpack(string modpackPath, string newModpackPath)
-        {
-            var files = await TTMP.ModPackToSimpleFileList(modpackPath, true);
-
-            if(files == null)
-            {
-                throw new InvalidDataException("Modpack has multiple options or was not valid.");
-            }
-
-            var mpi = await TTMP.GetModpackInfo(modpackPath);
-
-            Version.TryParse(mpi.ModPack.Version, out var ver);
-            var meta = new BaseModpackData()
-            {
-                Author = mpi.ModPack.Author,
-                Name = mpi.ModPack.Name,
-                Description = mpi.Description,
-                Url = mpi.ModPack.Url,
-                Version = ver,
-            };
-
-            await PMP.CreateSimplePmp(newModpackPath, meta, files, null, true);
         }
 
 
@@ -330,10 +324,11 @@ namespace xivModdingFramework.Helpers
         }
 
         #region Endwalker => Dawntrail Material Conversion
-        private static async Task UpdateEndwalkerMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
+        private static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
 #if ENDWALKER
-            return;
+            return ret;
 #endif
             if (_ConvertedTextures == null)
             {
@@ -367,9 +362,21 @@ namespace xivModdingFramework.Helpers
             foreach (var mtrl in materials)
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
-                await UpdateEndwalkerMaterial(mtrl, source, true, tx, _ConvertedTextures, files);
+                var missingFiles = await UpdateEndwalkerMaterial(mtrl, source, true, tx, _ConvertedTextures, files);
+
+                // Merge missing files in.
+                foreach(var kv in missingFiles)
+                {
+                    if (!ret.ContainsKey(kv.Key))
+                    {
+                        ret.Add(kv.Key, kv.Value);
+                    }
+                }
+
                 i++;
             }
+
+            return ret;
         }
 
         private const uint _OldShaderConstant1 = 0x36080AD0; // == 1
@@ -411,8 +418,10 @@ namespace xivModdingFramework.Helpers
             return false;
         }
 
-        public static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
+
             if (!createTextures)
             {
                 // Should we really allow this?
@@ -421,7 +430,7 @@ namespace xivModdingFramework.Helpers
 
             if (!DoesMtrlNeedDawntrailUpdate(mtrl))
             {
-                return;
+                return ret;
             }
             if (files == null)
             {
@@ -429,8 +438,9 @@ namespace xivModdingFramework.Helpers
                 tx = boiler.Transaction;
                 try
                 {
-                    await UpdateEndwalkerMaterial(mtrl, source, tx, _ConvertedTextures);
+                    ret = await UpdateEndwalkerMaterial(mtrl, source, tx, _ConvertedTextures);
                     await boiler.Commit();
+                    return ret;
                 }
                 catch
                 {
@@ -439,7 +449,7 @@ namespace xivModdingFramework.Helpers
                 }
             } else
             {
-                await UpdateEndwalkerMaterial(mtrl, source, null, _ConvertedTextures, files);
+                return await UpdateEndwalkerMaterial(mtrl, source, null, _ConvertedTextures, files);
             }
         }
 
@@ -451,8 +461,9 @@ namespace xivModdingFramework.Helpers
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, ModTransaction tx, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
+        private static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerMaterial(XivMtrl mtrl, string source, ModTransaction tx, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
             if (_ConvertedTextures == null)
             {
                 _ConvertedTextures = new HashSet<string>();
@@ -461,6 +472,16 @@ namespace xivModdingFramework.Helpers
             if (mtrl.ColorSetDataSize > 0)
             {
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx, files);
+
+                ret.Add(texInfo.normalToCreateFrom, new UpgradeInfo()
+                {
+                     Usage = EUpgradeTextureUsage.IndexMaps,
+                      Files = new Dictionary<string, string>()
+                      {
+                          { "normal", texInfo.normalToCreateFrom },
+                          { "index", texInfo.indexTextureToCreate }
+                      },
+                });
 
                 if (!_ConvertedTextures.Contains(texInfo.normalToCreateFrom))
                 {
@@ -473,17 +494,9 @@ namespace xivModdingFramework.Helpers
                         }
                         else
                         {
+
                             // Resave the material with texture validation to create dummy textures if none exist.
                             await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
-                        }
-                    } else
-                    {
-                        if (data.data != null)
-                        {
-                            await WriteFile(data.data, data.indexFilePath, files, tx, source);
-                        } else
-                        {
-                            throw new InvalidDataException("Cannot create Index file for Material: " + mtrl.MTRLPath + " - Normal Map is not present in same file set");
                         }
                     }
                     _ConvertedTextures.Add(texInfo.normalToCreateFrom);
@@ -491,8 +504,9 @@ namespace xivModdingFramework.Helpers
             }
             else if (mtrl.ShaderPack == EShaderPack.Hair)
             {
-                await UpdateEndwalkerHairMaterial(mtrl, source, tx, _ConvertedTextures, files);
+                ret = await UpdateEndwalkerHairMaterial(mtrl, source, tx, _ConvertedTextures, files);
             }
+            return ret;
         }
 
         /// <summary>
@@ -692,33 +706,49 @@ namespace xivModdingFramework.Helpers
             return (indexPath, indexData);
         }
 
-        private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> files)
+        private static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> files)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
             var normalTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
             var maskTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
 
             if (normalTexSampler == null || maskTexSampler == null)
             {
-                // Not Resolveable.
-                return;
+                // Not resolveable.  Mtrl has some weird stuff going on.
+                return ret;
             }
 
             // Arbitrary base game hair file to use to replace our shader constants.
             var constantBase = await Mtrl.GetXivMtrl("chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl", true, tx);
             mtrl.ShaderConstants = constantBase.ShaderConstants;
 
-            if (await Exists(normalTexSampler.Dx11Path, files, tx) && await Exists(maskTexSampler.Dx11Path, files, tx))
+            ret.Add(normalTexSampler.Dx11Path, new UpgradeInfo()
             {
-                await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx, _ConvertedTextures, files);
+                Usage = EUpgradeTextureUsage.HairMaps,
+                Files = new Dictionary<string, string>()
+                      {
+                          { "normal", normalTexSampler.Dx11Path },
+                          { "mask", maskTexSampler.Dx11Path }
+                      },
+            });
 
-                var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
-                await WriteFile(mtrlData, mtrl.MTRLPath, files, tx, source);
-            }
-            else if (files == null)
+            if (files == null)
             {
-                // Use slower material import path here to do texture stubbing.
-                await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                if (await Exists(normalTexSampler.Dx11Path, files, tx) && await Exists(maskTexSampler.Dx11Path, files, tx))
+                {
+                    await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx, _ConvertedTextures, files);
+
+                    var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+                    await WriteFile(mtrlData, mtrl.MTRLPath, files, tx, source);
+                }
+                else
+                {
+                    // Use slower material import path here to do texture stubbing.
+                    await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                }
             }
+
+            return ret;
 
         }
 
@@ -729,7 +759,8 @@ namespace xivModdingFramework.Helpers
 
             if(oldNormData == null || oldMaskData == null)
             {
-                return;
+                // Shouldn't ever be able to hit this, but if we do, nothing to be done about it.
+                throw new FileNotFoundException("Unable to properly resolve existing Hair Normal/Mask texture.");
             }
 
 
@@ -1000,5 +1031,49 @@ namespace xivModdingFramework.Helpers
                 await Dat.WriteModFile(uncompData, path, sourceApplication, null, tx, false);
             }
         }
+
+        /// <summary>
+        /// Function to scan for any missing texture pieces in a file collection.
+        /// Returns a hash set of the files which were found/upgraded.
+        /// </summary>
+        /// <param name="files"></param>
+        /// <param name="missing"></param>
+        /// <returns></returns>
+        public static async Task UpgradeRemainingTextures(Dictionary<string, FileStorageInformation> files, Dictionary<string, UpgradeInfo> upgrades)
+        {
+            foreach(var kv in upgrades)
+            {
+                var upgrade = kv.Value;
+
+                if(upgrade.Usage == EUpgradeTextureUsage.IndexMaps)
+                {
+                    if (files.ContainsKey(upgrade.Files["normal"]))
+                    {
+                        var res = await CreateIndexFromNormal(upgrade.Files["index"], upgrade.Files["normal"], null, files);
+                        if(res.data == null)
+                        {
+                            throw new InvalidDataException("Failed to create Normal map from Index file");
+                        }
+                        await WriteFile(res.data, res.indexFilePath, files, null);
+                    }
+                } else if(upgrade.Usage == EUpgradeTextureUsage.HairMaps)
+                {
+                    if (files.ContainsKey(upgrade.Files["normal"])
+                        && files.ContainsKey(upgrade.Files["mask"]))
+                    {
+
+                        await UpdateEndwalkerHairTextures(upgrade.Files["normal"], upgrade.Files["mask"], "Unused", null, null, files);
+
+                    } else if(files.ContainsKey(upgrade.Files["normal"])
+                        || files.ContainsKey(upgrade.Files["mask"]))
+                    {
+                        // One but not both.
+                        throw new FileNotFoundException("Unable to upgrade Hair Normal/Mask - Normal/Mask do not exist in the same file set.\n" + upgrade.Files["normal"] +"\n" + upgrade.Files["mask"]);
+                    }
+                }
+
+            }
+        }
+
     }
 }
