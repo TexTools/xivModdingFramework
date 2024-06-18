@@ -789,6 +789,8 @@ namespace xivModdingFramework.Models.ModelTextures
                 var irisColor = (Color4)colors.EyeColor;
 
                 var scleraColor = GetConstColor(mtrl, 0x11C90091, new Color4(1.0f));
+
+                //g_SpecularColorMask
                 var reflectionColor = GetConstColor(mtrl, 0xCB0338DC, new Color4(1.0f));
 
 

@@ -378,6 +378,10 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 2289092920, "g_OutlineWidth", true);
                 UpdateConstantName(shKv.Key, 0x39551220, "g_TextureMipBias", true);
                 UpdateConstantName(shKv.Key, 0x7801E004, "g_GlassIOR", true);
+                UpdateConstantName(shKv.Key, 0xDF15112D, "g_ToonIndex", true);
+                UpdateConstantName(shKv.Key, 0x3632401A, "g_LipRoughnessScale", true);
+                UpdateConstantName(shKv.Key, 0x7DABA471, "g_IrisRingEmissiveIntensity", true);
+                UpdateConstantName(shKv.Key, 0xCB0338DC, "g_SpecularColorMask", true);
             }
 
         }
