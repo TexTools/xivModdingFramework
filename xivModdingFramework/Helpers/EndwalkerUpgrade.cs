@@ -30,13 +30,15 @@ namespace xivModdingFramework.Helpers
             return;
 #endif
 
+            HashSet<string> _ConvertedTextures = new HashSet<string>();
+
             var fixableMdlsRegex = new Regex("chara\\/.*\\.mdl");
             var fixableMdls = filePaths.Where(x => fixableMdlsRegex.Match(x).Success).ToList();
 
             var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
-            await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress);
+            await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress, _ConvertedTextures);
 
             var idx = 0;
             var total = fixableMdls.Count;
@@ -48,7 +50,7 @@ namespace xivModdingFramework.Helpers
             }
 
             progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-            await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx);
+            await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures);
 
             progress?.Report((0, total, "Endwalker Upgrades Complete..."));
         }
@@ -237,11 +239,15 @@ namespace xivModdingFramework.Helpers
         }
 
         #region Endwalker => Dawntrail Material Conversion
-        public static async Task UpdateEndwalkerMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress)
+        public static async Task UpdateEndwalkerMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress, HashSet<string> _ConvertedTextures = null)
         {
 #if ENDWALKER
             return;
 #endif
+            if (_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
+            }
             var total = paths.Count;
             var materials = new List<XivMtrl>();
             var i = 0;
@@ -268,7 +274,7 @@ namespace xivModdingFramework.Helpers
             foreach (var mtrl in materials)
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
-                await UpdateEndwalkerMaterial(mtrl, source, true, tx);
+                await UpdateEndwalkerMaterial(mtrl, source, true, tx, _ConvertedTextures);
                 i++;
             }
         }
@@ -312,7 +318,7 @@ namespace xivModdingFramework.Helpers
             return false;
         }
 
-        public static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null)
+        public static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, bool createTextures, ModTransaction tx = null, HashSet<string> _ConvertedTextures = null)
         {
             if (!createTextures)
             {
@@ -329,7 +335,7 @@ namespace xivModdingFramework.Helpers
             tx = boiler.Transaction;
             try
             {
-                await UpdateEndwalkerMaterial(mtrl, source, tx);
+                await UpdateEndwalkerMaterial(mtrl, source, tx, _ConvertedTextures);
                 await boiler.Commit();
             }
             catch
@@ -347,22 +353,30 @@ namespace xivModdingFramework.Helpers
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerMaterial(XivMtrl mtrl, string source, ModTransaction tx, HashSet<string> _ConvertedTextures = null)
         {
+            if (_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
+            }
 
             if (mtrl.ColorSetDataSize > 0)
             {
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx);
 
-                var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
-                if (data.data != null)
+                if (!_ConvertedTextures.Contains(texInfo.normalToCreateFrom))
                 {
-                    await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
-                }
-                else
-                {
-                    // Resave the material with texture validation to create dummy textures if none exist.
-                    await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                    var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx);
+                    if (data.data != null)
+                    {
+                        await Dat.WriteModFile(data.data, data.indexFilePath, source, null, tx, false);
+                    }
+                    else
+                    {
+                        // Resave the material with texture validation to create dummy textures if none exist.
+                        await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                    }
+                    _ConvertedTextures.Add(texInfo.normalToCreateFrom);
                 }
             }
             else if (mtrl.ShaderPack == EShaderPack.Skin)
@@ -371,7 +385,7 @@ namespace xivModdingFramework.Helpers
             }
             else if (mtrl.ShaderPack == EShaderPack.Hair)
             {
-                await UpdateEndwalkerHairMaterial(mtrl, source, tx);
+                await UpdateEndwalkerHairMaterial(mtrl, source, tx, _ConvertedTextures);
             }
         }
 
@@ -583,8 +597,13 @@ namespace xivModdingFramework.Helpers
             */
 
         }
-        private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerHairMaterial(XivMtrl mtrl, string source, ModTransaction tx, HashSet<string> _ConvertedTextures = null)
         {
+            if (_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
+            }
+
             var normalTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
             var maskTexSampler = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Mask);
 
@@ -600,7 +619,7 @@ namespace xivModdingFramework.Helpers
 
             if (await tx.FileExists(normalTexSampler.Dx11Path) && await tx.FileExists(maskTexSampler.Dx11Path))
             {
-                await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx);
+                await UpdateEndwalkerHairTextures(normalTexSampler.Dx11Path, maskTexSampler.Dx11Path, source, tx, _ConvertedTextures);
 
                 // Direct call to writemodfile is a little faster than going full import route.
                 var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
@@ -614,11 +633,16 @@ namespace xivModdingFramework.Helpers
 
         }
 
-        private static async Task UpdateEndwalkerHairTextures(string normalPath, string maskPath, string source, ModTransaction tx)
+        private static async Task UpdateEndwalkerHairTextures(string normalPath, string maskPath, string source, ModTransaction tx, HashSet<string> _ConvertedTextures = null)
         {
             if (!await tx.FileExists(normalPath) || !await tx.FileExists(maskPath))
             {
                 return;
+            }
+
+            if(_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
             }
 
             // Read normal file.
@@ -631,17 +655,23 @@ namespace xivModdingFramework.Helpers
             // Create the final hair pixel data.
             await TextureHelpers.CreateHairMaps(data.TexA, data.TexB, data.Width, data.Height);
 
-            // Create MipMaps (And DDS header that we don't really need)
-            var normalData = await Tex.ConvertToDDS(data.TexA, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
-            var maskData = await Tex.ConvertToDDS(data.TexB, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
+            if (!_ConvertedTextures.Contains(normalPath))
+            {
+                // Normal
+                var normalData = await Tex.ConvertToDDS(data.TexA, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
+                normalData = Tex.DDSToUncompressedTex(normalData);
+                await Dat.WriteModFile(normalData, normalPath, source, null, tx, false);
+                _ConvertedTextures.Add(normalPath);
+            }
 
-            // Convert DDS to uncompressed Tex
-            normalData = Tex.DDSToUncompressedTex(normalData);
-            maskData = Tex.DDSToUncompressedTex(maskData);
-
-            // Write final files.
-            await Dat.WriteModFile(normalData, normalPath, source, null, tx, false);
-            await Dat.WriteModFile(maskData, maskPath, source, null, tx, false);
+            if (!_ConvertedTextures.Contains(maskPath))
+            {
+                // Mask
+                var maskData = await Tex.ConvertToDDS(data.TexB, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
+                maskData = Tex.DDSToUncompressedTex(maskData);
+                await Dat.WriteModFile(maskData, maskPath, source, null, tx, false);
+                _ConvertedTextures.Add(maskPath);
+            }
         }
 
         private static Half[] GetDefaultColorsetRow()
@@ -685,8 +715,12 @@ namespace xivModdingFramework.Helpers
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        internal static async Task CheckImportForOldHairJank(List<string> files, string source, ModTransaction tx)
+        internal static async Task CheckImportForOldHairJank(List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures = null)
         {
+            if(_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
+            }
 
             var results = new Dictionary<int, Dictionary<int, List<(string Path, XivTexType TexType)>>>();
 

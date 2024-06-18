@@ -177,7 +177,7 @@ namespace xivModdingFramework.Textures
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static byte RemapByte(byte value, byte oldMin, byte oldMax, byte newMin, byte newMax)
         {
-            var z = (float)(value - oldMin) / (float)(newMin - oldMin) * (float)(newMax - newMin) + newMin;
+            var z = (float)(value - oldMin) / (float)(oldMax - oldMin) * (float)(newMax - newMin) + newMin;
             return (byte)Math.Max(Math.Min(Math.Round(z), 255), 0);
         }
 
