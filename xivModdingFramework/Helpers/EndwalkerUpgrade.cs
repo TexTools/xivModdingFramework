@@ -754,6 +754,10 @@ namespace xivModdingFramework.Helpers
 
         private static async Task UpdateEndwalkerHairTextures(string normalPath, string maskPath, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> files)
         {
+            if (_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
+            }
             var oldNormData = await ResolveFile(normalPath, files, tx);
             var oldMaskData = await ResolveFile(maskPath, files, tx);
 
@@ -825,6 +829,7 @@ namespace xivModdingFramework.Helpers
         private static string OldHairMaterialFormat = "chara/human/c{0}/obj/hair/h{1}/material/v0001/mt_c{0}h{1}_hir_a.mtrl";
         private static string NewHairTextureFormat = "chara/human/c{0}/obj/hair/h{1}/texture/c{0}h{1}_hir_{2}.tex";
 
+
         /// <summary>
         /// This function does some jank analysis of inbound hair texture files,
         /// automatically copying them to SE's new pathing /if/ they were included by themselves, without their 
@@ -834,7 +839,7 @@ namespace xivModdingFramework.Helpers
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        private static async Task CheckImportForOldHairJank(List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
+        public static async Task CheckImportForOldHairJank(List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
         {
             var results = new Dictionary<int, Dictionary<int, List<(string Path, XivTexType TexType)>>>();
 
@@ -916,11 +921,6 @@ namespace xivModdingFramework.Helpers
                 {
                     var hair = hKv.Key.ToString("D4");
                     var material = string.Format(OldHairMaterialFormat, race, hair);
-                    if (!await Exists(material, fileInfos, tx))
-                    {
-                        // Weird, but nothing to be done.
-                        continue;
-                    }
                     var root = await XivCache.GetFirstRoot(material);
                     IItem item = null;
                     if (root != null)
@@ -938,7 +938,16 @@ namespace xivModdingFramework.Helpers
                             continue;
                         }
 
-                        await Dat.CopyFile(tex.Path, newPath, source, true, item, tx);
+                        if (fileInfos != null)
+                        {
+                            var data = await ResolveFile(tex.Path, fileInfos, tx);
+                            await WriteFile(data, newPath, fileInfos, tx, source);
+                        }
+                        else
+                        {
+                            await Dat.CopyFile(tex.Path, newPath, source, true, item, tx);
+                        }
+
                         files.Add(newPath);
                     }
 
