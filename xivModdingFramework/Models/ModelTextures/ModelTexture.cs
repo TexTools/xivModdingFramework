@@ -1119,6 +1119,8 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
+                    diffuse *= diffuseColorMul;
+
                     //diffuse = GammaAdjustColor(diffuse);
                     return new ShaderMapperResult()
                     {
