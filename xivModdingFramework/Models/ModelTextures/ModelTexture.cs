@@ -45,6 +45,7 @@ using SharpDX;
 using System.Diagnostics;
 using System.ComponentModel.Design;
 using xivModdingFramework.Textures;
+using System.Text.RegularExpressions;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -82,14 +83,14 @@ namespace xivModdingFramework.Models.ModelTextures
             // They don't really *have* to, but it probably makes sense to use the 
             // Same defaults.
 
-            SkinColor = new Color(204, 149, 120, 255);
-            EyeColor = new Color(21, 176, 172, 255);
-            LipColor = new Color(173, 105, 105, 255);
-            HairColor = new Color(130, 64, 13, 255);
-            TattooColor = new Color(0, 255, 66, 255);
+            SkinColor = new Color(219, 184, 154, 255);
+            EyeColor = new Color(172, 113, 159, 255);
+            LipColor = new Color(139, 55, 46, 153);
+            HairColor = new Color(110, 77, 35, 255);
+            HairHighlightColor = new Color(91, 110, 129, 255);
+            TattooColor = new Color(48, 112, 102, 255);
             FurnitureColor = new Color(141, 60, 204, 255);
 
-            HairHighlightColor = new Color(77, 126, 240, 255);
             InvertNormalGreen = false;
 
             DyeColors = new List<Color?>(16);
@@ -140,12 +141,61 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static void EncodeColorBytes(byte[] buf, int offset, Color4 c)
+        private static void EncodeColorBytes(byte[] buf, int offset, Color4 c, bool srgb = true)
         {
-            buf[offset] = (byte)(Clamp(c.Red) * 255.0f);
-            buf[offset + 1] = (byte)(Clamp(c.Green) * 255.0f);
-            buf[offset + 2] = (byte)(Clamp(c.Blue) * 255.0f);
-            buf[offset + 3] = (byte)(Clamp(c.Alpha) * 255.0f);
+
+            if (srgb)
+            {
+                buf[offset] = (byte)(Clamp((float)Math.Sqrt(c.Red)) * 255.0f);
+                buf[offset + 1] = (byte)(Clamp((float)Math.Sqrt(c.Green)) * 255.0f);
+                buf[offset + 2] = (byte)(Clamp((float)Math.Sqrt(c.Blue)) * 255.0f);
+                buf[offset + 3] = (byte)(Clamp((float)Math.Sqrt(c.Alpha)) * 255.0f);
+            } else
+            {
+                buf[offset] = (byte)(Clamp(c.Red) * 255f);
+                buf[offset + 1] = (byte)(Clamp(c.Green) * 255f);
+                buf[offset + 2] = (byte)(Clamp(c.Blue) * 255f);
+                buf[offset + 3] = (byte)(Clamp(c.Alpha) * 255f);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Color4 ReadInputPixel(byte[] pixels, int i, Color4 color, bool srgb = true)
+        {
+            if (pixels != null)
+            {
+                var red     = pixels[i + 0] / 255.0f;
+                var green   = pixels[i + 1] / 255.0f;
+                var blue    = pixels[i + 2] / 255.0f;
+                var alpha   = pixels[i + 3] / 255.0f;
+                if (srgb)
+                {
+                    color = new Color4(red * red, green * green, blue * blue, alpha);
+                }
+                else
+                {
+                    color = new Color4(red, green, blue, alpha);
+                }
+
+            }
+            return color;
+        }
+
+
+        public static Color4 GetLinearColor(Color color, bool convertFromSrgb = true)
+        {
+            var red = color[0] / 255.0f;
+            var green = color[1] / 255.0f;
+            var blue = color[2] / 255.0f;
+            var alpha = color[3] / 255.0f;
+            if (convertFromSrgb)
+            {
+                return new Color4(red * red, green * green, blue * blue, alpha);
+            }
+            else
+            {
+                return new Color4(red, green, blue, alpha);
+            }
         }
 
         /// <summary>
@@ -199,19 +249,13 @@ namespace xivModdingFramework.Models.ModelTextures
                 result.RenderBackfaces = true;
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            Color4 readInputPixel(byte[] pixels, int i, Color4 color)
-            {
-                if (pixels != null)
-                    color = new Color(pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]);
-                return color;
-            }
-
             var settings = new ShaderMapperSettings()
             {
                 HighlightedRow = highlightedRow,
                 //VisualizeColorset = true,
             };
+
+            //settings.UseColorset = false;
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
             var shaderFn = GetShaderMapper(GetCustomColors(), mtrl, settings);
@@ -224,10 +268,14 @@ namespace xivModdingFramework.Models.ModelTextures
                     for (int i = range.Item1 * 4; i < range.Item2 * 4; i += 4)
                     {
                         // Load the individual pixels into memory.
-                        Color4 baseDiffuseColor = readInputPixel(diffusePixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
-                        Color4 baseNormalColor = readInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 1.0f, 1.0f));
-                        Color4 baseMultiColor = readInputPixel(multiPixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
-                        Color4 baseIndexColor = readInputPixel(indexPixels, i, new Color4(1.0f, 1.0f, 0.0f, 1.0f));
+                        Color4 baseDiffuseColor = ReadInputPixel(diffusePixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
+                        Color4 baseNormalColor = ReadInputPixel(normalPixels, i, new Color4(0.5f, 0.5f, 1.0f, 1.0f), false);
+                        Color4 baseIndexColor = ReadInputPixel(indexPixels, i, new Color4(1.0f, 1.0f, 0.0f, 1.0f), false);
+
+                        // Sometimes Mask data is used as sRGB, and Sometimes Linear.
+                        // On average it's more commonly used as sRGB, but it's important to keep in mind that some
+                        // things will need to sqrt() the pixel data of individual channels in certain cases.
+                        Color4 baseMultiColor = ReadInputPixel(multiPixels, i, new Color4(1.0f, 1.0f, 1.0f, 1.0f));
 
                         if (invertNormalGreen)
                             baseNormalColor.Green = 1.0f - baseNormalColor.Green;
@@ -242,11 +290,14 @@ namespace xivModdingFramework.Models.ModelTextures
                         // White out the opacity channels where appropriate.
                         specularColor.Alpha = 1.0f;
                         normalColor.Alpha = 1.0f;
+                        
+                        // Copy alpha to diffuse for Blender.
+                        diffuseColor.Alpha = alphaColor.Alpha;
 
                         EncodeColorBytes(result.Diffuse, i, diffuseColor);
-                        EncodeColorBytes(result.Normal, i, normalColor);
+                        EncodeColorBytes(result.Normal, i, normalColor, false);
                         EncodeColorBytes(result.Specular, i, specularColor);
-                        EncodeColorBytes(result.Alpha, i, alphaColor);
+                        EncodeColorBytes(result.Alpha, i, alphaColor, false);
                         EncodeColorBytes(result.Emissive, i, emissiveColor);
                     }
                 });
@@ -511,8 +562,8 @@ namespace xivModdingFramework.Models.ModelTextures
             var _SkinSpecMultiplier = new Color4(_MetalFloor, _MetalFloor, _MetalFloor, 1.0f);
 
             // Arbitrary color to use for charactertattoo.shpk base color.
-            // No clue where it comes from in game, but it's used for moles.
-            var _MoleColor = new Color4( 56 / 255f, 24 / 255f, 8 / 255f, 1.0f);
+            // No clue where it comes from in game.  It is used for moles and the Keeper facial option forehead tear thing.
+            var _MoleColor = SrgbToLinear(new Color4( 56 / 255f, 24 / 255f, 8 / 255f, 1.0f));
 
 
             bool useTextures = settings.UseTextures;
@@ -538,6 +589,11 @@ namespace xivModdingFramework.Models.ModelTextures
             var specularColorMul = GetConstColor(mtrl, 0x141722D5, new Color4(1.0f));
             var emissiveColorMul = GetConstColor(mtrl, 0x38A64362, new Color4(0,0,0, 1.0f));
 
+            // Convert from SRGB to linear color space.
+            diffuseColorMul *= diffuseColorMul;
+            specularColorMul *= specularColorMul;
+            emissiveColorMul *= emissiveColorMul;
+
             List<Half> colorset = null;
             if(mtrl.ColorSetData != null && mtrl.ColorSetData.Count >= 1024)
             {
@@ -561,7 +617,10 @@ namespace xivModdingFramework.Models.ModelTextures
                 // This is the most common family of shaders that appears on gear, monsters, etc.
                 // Many of its features should be controlled by shader parameters that aren't implemented
 
-                    return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                // Default 1.0 emissive color for these, since it gets nuked by colorset typically.
+                emissiveColorMul = GetConstColor(mtrl, 0x38A64362, new Color4(1, 1, 1, 1.0f));
+
+                return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                         Color4 specular = new Color4(1.0f);
                         if (useTextures)
                         {
@@ -667,24 +726,41 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Skin)
             {
-                var skinColor = (Color4)colors.SkinColor;
+                var skinColor = GetLinearColor(colors.SkinColor, false);
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
 
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                    float skinInfluence = multi.Blue;
-                    diffuse = Color4.Lerp(diffuse, diffuse * skinColor, skinInfluence);
+
+                    // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
+                    // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
+                    // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
+                    // This effectively undoes one of those conversions.
+                    diffuse = LinearToSrgb(diffuse);
+
+                    float skinInfluence = (float)normal.Blue;
+
+
+                    var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
+                    diffuse *= sColor;
+
 
                     float bonusInfluence = normal.Alpha;
                     if (bonusColor.Color != null)
                     {
+                        
                         if (bonusColor.Blend)
                         {
-                            diffuse = TextureHelpers.AlphaBlendExplicit(diffuse, bonusColor.Color.Value, bonusInfluence * bonusColor.Color.Value.Alpha);
+                            var c = SrgbToLinear(bonusColor.Color.Value);
+                            c.Alpha = 1.0f;
+                            diffuse = Color4.Lerp(diffuse, c, bonusInfluence * bonusColor.Color.Value.Alpha);
                         } else
                         {
                             diffuse = Color4.Lerp(diffuse, bonusColor.Color.Value, bonusInfluence);
                         }
                     }
+
+                    diffuse *= LinearToSrgb(diffuseColorMul);
+                    //diffuse *= diffuseColorMul;
 
                     var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
                     var ir = 1 - multi.Green;
@@ -694,7 +770,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     spec = Color4.Modulate(spec, _SkinSpecMultiplier);
 
 
-                    diffuse *= diffuseColorMul;
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
@@ -712,30 +787,31 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Hair)
             {
-                var hairColor = colors.HairColor;
-                var bonusColor = GetHairBonusColor(mtrl, colors, colors.HairHighlightColor ?? colors.HairColor);
+                var hairColor = (Color4)colors.HairColor;
+                var bonusColor = GetHairBonusColor(mtrl, colors, colors.HairHighlightColor != null ? colors.HairHighlightColor.Value : colors.HairColor);
 
-                return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                //bonusColor = SrgbToLinear(bonusColor);
+
+                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     float bonusInfluence = normal.Blue;
 
-                    //float 
-                    var diffuseMask = new Color4(multi.Alpha, multi.Alpha, multi.Alpha, 1.0f);
-                    var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                    var ir = 1- multi.Green;
+
+                    var specMask = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
+                    var ir = 1- mask.Green;
                     var invRough = new Color4(ir, ir, ir, 1.0f);
 
                     diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
-                    diffuse = Color4.Modulate(diffuse, diffuseMask);
+                    diffuse *= (mask.Alpha * mask.Alpha);
+                    diffuse *= diffuseColorMul;
 
 
-                    var spec = Color4.Modulate(specMask, invRough);
+                    var spec = specMask * invRough;
 
-                    spec = Color4.Modulate(spec, _HairSpecMultiplier);
+                    spec *= _HairSpecMultiplier;
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
-                    diffuse *= diffuseColorMul;
                     diffuse.Alpha = alpha;
                     return new ShaderMapperResult()
                     {
@@ -751,7 +827,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 var bonusColor = GetHairBonusColor(mtrl, colors, colors.TattooColor);
 
 
-                var tattooColor = (Color4)colors.TattooColor;
+                var tattooColor = colors.TattooColor;
                 // Very similar to hair.shpk but without an extra texture
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     float tattooInfluence = normal.Blue;
@@ -760,7 +836,9 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
                     diffuse *= diffuseColorMul;
+
                     diffuse.Alpha = alpha;
                     return new ShaderMapperResult()
                     {
@@ -786,7 +864,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Iris)
             {
-                var irisColor = (Color4)colors.EyeColor;
+                var irisColor = GetLinearColor(colors.EyeColor);
 
                 var scleraColor = GetConstColor(mtrl, 0x11C90091, new Color4(1.0f));
 
@@ -859,7 +937,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     // It usually seems to roughly reflect the default dye color, but not always.
                     // Probably a vestigial dev value.
                     var baseDiffuse = diffuse * multi.Red;// * diffuseColorMul;
-                    var dyeDiffuse = diffuse * multi.Red * colors.FurnitureColor;
+                    var dyeDiffuse = diffuse * multi.Red * GetLinearColor(colors.FurnitureColor);
 
                     diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
 
@@ -901,15 +979,6 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 #endif
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Color4 GammaAdjustColor(Color4 color)
-        {
-            for(int i = 0; i < 3; i++)
-            {
-                color[i] = (Half)Math.Pow(color[i], 1/ 1.4f);
-            }
-            return color;
-        }
 
 #if ENDWALKER
         private static ShaderMapperDelegate GetShaderMapper(CustomModelColors colors, XivMtrl mtrl, ShaderMapperSettings settings)
@@ -1137,25 +1206,35 @@ namespace xivModdingFramework.Models.ModelTextures
                 var lipColor = colors.LipColor;
 
                 ShaderMapperDelegate skinShader = (Color4 diffuse, Color4 normal, Color4 specular, Color4 index) => {
+                    
                     Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
                     Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
+
+                    // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
+                    // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
+                    // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
+                    // This effectively undoes one of those conversions.
+                    diffuse = LinearToSrgb(diffuse);
+
+
                     // This is an arbitrary number.  There's likely some value in the shader params for skin that
                     // tones down the specularity here, but without it the skin is hyper reflective.
                     newSpecular = Color4.Scale(newSpecular, 0.25f);
+
                     // New diffuse starts from regular diffuse file.
                     // Then factors in the player's skin color multiplied by the shader value.
+
                     float skinInfluence = specular.Red;
-                    var coloredSkin = diffuse * skinColor;
-                    Color4 newDiffuse = Color4.Lerp(diffuse, coloredSkin, skinInfluence);
+                    var coloredSkin = Color4.Lerp(new Color4(1), skinColor, skinInfluence);
+                    diffuse *= coloredSkin;
                     var alpha = 1.0f;
 
-                    newDiffuse *= diffuseColorMul;
                     var emissive = emissiveColorMul;
-                    newDiffuse.Alpha = alpha;
+                    diffuse.Alpha = alpha;
 
                     return new ShaderMapperResult()
                     {
-                        Diffuse = newDiffuse,
+                        Diffuse = diffuse,
                         Normal = newNormal,
                         Specular = newSpecular,
                         Emissive = emissive,
@@ -1166,8 +1245,19 @@ namespace xivModdingFramework.Models.ModelTextures
                 ShaderMapperDelegate faceShader = (Color4 diffuse, Color4 normal, Color4 specular, Color4 index) => {
                     ShaderMapperResult result = skinShader(diffuse, normal, specular, index);
 
+                    // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
+                    // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
+                    // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
+                    // This effectively undoes one of those conversions.
+                    diffuse = LinearToSrgb(diffuse);
+
+
                     var alpha = normal.Blue * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    float skinInfluence = specular.Red;
+                    var coloredSkin = Color4.Lerp(new Color4(1), skinColor, skinInfluence);
+                    result.Diffuse = diffuse * coloredSkin;
 
                     // Face shaders also allow for lip color.
                     var coloredLip = diffuse * lipColor;
@@ -1193,10 +1283,8 @@ namespace xivModdingFramework.Models.ModelTextures
             else if (shaderPack == EShaderPack.Hair)
             {
                 var hairHighlightColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
-                var hairTargetColor = (Color)(colors.HairHighlightColor != null ? colors.HairHighlightColor : colors.HairColor);
 
-                // Starting from the original hair color...
-                var baseColor = colors.HairColor;
+
 
                 // Hair highlight color if available.
                 // But wait! If we're actually a tattoo preset, that changes instead to tattoo color.
@@ -1210,16 +1298,23 @@ namespace xivModdingFramework.Models.ModelTextures
                 else
                     targetColor = hairHighlightColor;
 
-                return (Color4 diffuse, Color4 normal, Color4 specular, Color4 index) => {
+                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
-                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
+                    Color4 specular = new Color4(mask.Green, mask.Green, mask.Green, 1.0f);
+
                     // This is an arbitrary number.  There's likely some value in the shader params for skin that
                     // tones down the specularity here, but without it the skin is hyper reflective.
-                    newSpecular = Color4.Scale(newSpecular, 0.25f);
+                    specular = Color4.Scale(specular, 0.25f);
+
                     // The influence here determines which base color we use.
-                    float influenceStrength = specular.Alpha;
+                    float influenceStrength = mask.Alpha;
+
+                    
+                    // Starting from the original hair color...
+                    var baseColor = colors.HairColor;
+
                     Color4 newDiffuse = Color4.Lerp(baseColor, targetColor, influenceStrength);
-                    newDiffuse = Color4.Scale(newDiffuse, specular.Red);
+                    newDiffuse *= mask.Red;
                     newDiffuse *= diffuseColorMul;
 
                     var alpha = normal.Alpha;
@@ -1230,7 +1325,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         Diffuse = newDiffuse,
                         Normal = newNormal,
-                        Specular = newSpecular,
+                        Specular = specular,
                         Alpha = new Color4(alpha)
                     };
                 };
@@ -1263,6 +1358,23 @@ namespace xivModdingFramework.Models.ModelTextures
         }
 #endif
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Color4 LinearToSrgb(Color4 color)
+        {
+            color.Red = (float)Math.Sqrt(color.Red);
+            color.Green = (float)Math.Sqrt(color.Green);
+            color.Blue = (float)Math.Sqrt(color.Blue);
+            return color;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Color4 SrgbToLinear(Color4 color)
+        {
+            color.Red *= color.Red;
+            color.Green *= color.Green;
+            color.Blue *= color.Blue;
+            return color;
+        }
 
         private static Color4 GetHairBonusColor(XivMtrl mtrl, CustomModelColors colors, Color4 defaultColor)
         {
@@ -1277,23 +1389,34 @@ namespace xivModdingFramework.Models.ModelTextures
                 {
                     if (colors.HairHighlightColor != null)
                     {
-                        bonusColor = (Color4)colors.HairHighlightColor;
+                        bonusColor = colors.HairHighlightColor.Value;
                     }
                     else
                     {
-                        bonusColor = (Color4)colors.HairColor;
+                        bonusColor = colors.HairColor;
                     }
                 }
                 // PART_FACE
                 else if (bonusColorKey.Value == 0x6E5B8F10)
                 {
-                    bonusColor = (Color4)colors.TattooColor;
+                    bonusColor = colors.TattooColor;
                 }
             }
 
             return bonusColor;
         }
 
+
+        private static float GetFloatConst(XivMtrl mtrl, uint constant, float defaultValue)
+        {
+            var mtrlConst = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == constant);
+            if (mtrlConst != null)
+            {
+                defaultValue = mtrlConst.Values[0];
+            }
+
+            return defaultValue;
+        }
 
         private static Color4 GetConstColor(XivMtrl mtrl, uint constant, Color4 defaultColor)
         {
@@ -1323,20 +1446,20 @@ namespace xivModdingFramework.Models.ModelTextures
                 // PART_FACE
                 else if (bonusColorKey.Value == 0xF5673524)
                 {
-                    bonusColor = (Color4)colors.LipColor;
+                    bonusColor = colors.LipColor;
                     return (bonusColor, true);
                 }
                 // PART_HRO
                 else if (bonusColorKey.Value == 0x57FF3B64)
                 {
                     // What actually goes here.
-                    bonusColor = (Color4)colors.HairColor;
+                    bonusColor = colors.HairColor;
                     return (bonusColor, false);
                 }
             } else
             {
                 // Default usage is as face.
-                bonusColor = (Color4)colors.LipColor;
+                bonusColor = colors.LipColor;
                 return (bonusColor, true);
             }
 
