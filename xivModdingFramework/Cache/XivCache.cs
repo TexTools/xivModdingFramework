@@ -13,6 +13,7 @@ using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -94,6 +95,18 @@ namespace xivModdingFramework.Cache
             {
                 _GameWriteEnbled = value;
                 GameWriteStateChanged?.Invoke(_GameWriteEnbled);
+            }
+        }
+
+
+
+        private static EModelingTool _ModelingTool = EModelingTool.Blender;
+        public static EModelingTool ModelingTool
+        {
+            get => _ModelingTool;
+            set
+            {
+                _ModelingTool = value;
             }
         }
 

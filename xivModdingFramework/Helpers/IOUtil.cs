@@ -734,5 +734,23 @@ namespace xivModdingFramework.Helpers
             DeleteTempDirectory(path);
         }
 
+        public static string GetParentIfExists(string path, string target, bool caseSensitive = true)
+        {
+            var compare = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            if (path.EndsWith(target, compare))
+            {
+                return path;
+            }
+
+            var par = Directory.GetParent(path);
+
+            if(par == null)
+            {
+                return null;
+            }
+
+            return GetParentIfExists(par.FullName, target, caseSensitive);
+        }
+
     }
 }

@@ -65,6 +65,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace xivModdingFramework.Models.FileTypes
 {
+
     public static class Mdl
     {
         #region Constants/Structures/Constructors

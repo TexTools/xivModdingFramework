@@ -1642,7 +1642,8 @@ namespace xivModdingFramework.Models.DataContainers
                             cmd.Parameters.AddWithValue("value", "r");
                             cmd.ExecuteScalar();
 
-                            var for3ds = ModelTexture.GetCustomColors().InvertNormalGreen;
+                            // Good old 3DS jank.
+                            var for3ds = XivCache.ModelingTool == EModelingTool.Max;
                             cmd.Parameters.AddWithValue("key", "for_3ds_max");
                             cmd.Parameters.AddWithValue("value", for3ds ? "1" : "0");
                             cmd.ExecuteScalar();
