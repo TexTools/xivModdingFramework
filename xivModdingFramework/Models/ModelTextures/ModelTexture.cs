@@ -566,6 +566,11 @@ namespace xivModdingFramework.Models.ModelTextures
             // No clue where it comes from in game.  It is used for moles and the Keeper facial option forehead tear thing.
             var _MoleColor = SrgbToLinear(new Color4( 56 / 255f, 24 / 255f, 8 / 255f, 1.0f));
 
+            // Arbitrary multiplier that darkens the body fur to loosely match most hairs.
+            // This is caused by hair having an extra diffuse mask/multiplier that skin lacks.
+            // I have no idea how SE resolves this on their end.  Possibly material var or reuse of another map.
+            var _BodyFurMultiplier = new Color4(0.4f, 0.4f, 0.4f, 1.0f);
+
 
             bool useTextures = settings.UseTextures;
             bool useColorset = settings.UseColorset;
@@ -740,11 +745,10 @@ namespace xivModdingFramework.Models.ModelTextures
                     diffuse = LinearToSrgb(diffuse);
 
                     float skinInfluence = (float)normal.Blue;
-
-
                     var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     diffuse *= sColor;
 
+                    var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
 
                     float bonusInfluence = normal.Alpha;
                     if (bonusColor.Color != null)
@@ -764,18 +768,20 @@ namespace xivModdingFramework.Models.ModelTextures
 
                             // Blend in hair color/hroth fur
                             diffuse = Color4.Lerp(diffuse, hairColor, bonusInfluence);
+
+                            // Arbitrary darkening to attempt to match hair better.
+                            diffuse *= _BodyFurMultiplier;
                         }
                     }
 
-                    diffuse *= LinearToSrgb(diffuseColorMul);
-                    //diffuse *= diffuseColorMul;
-
-                    var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
                     var ir = 1 - multi.Green;
                     var invRough = new Color4(ir, ir, ir, 1.0f);
                     var spec = Color4.Modulate(specMask, invRough);
-
                     spec = Color4.Modulate(spec, _SkinSpecMultiplier);
+
+                    // This is a bit of a hack here and probably not correct.
+                    diffuse *= LinearToSrgb(diffuseColorMul);
+                    //diffuse *= diffuseColorMul;
 
 
                     var alpha = diffuse.Alpha * alphaMultiplier;
