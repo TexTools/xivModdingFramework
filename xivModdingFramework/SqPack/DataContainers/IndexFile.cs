@@ -817,7 +817,10 @@ namespace xivModdingFramework.SqPack.DataContainers
                 
                 if (index1Syn)
                 {
-                    // Update the synonym entry.
+                    // Update Index2
+                    Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                    // Update the Index1 synonym entry.
                     var synEntry = Index1Synonyms[key].FirstOrDefault(x => x.FilePath == filePath);
                     if(synEntry == null)
                     {
@@ -828,7 +831,10 @@ namespace xivModdingFramework.SqPack.DataContainers
                 
                 if(index2Syn)
                 {
-                    // Update the synonym entry.
+                    // Update Index1
+                    Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                    // Update the Index2 synonym entry.
                     var synEntry = Index2Synonyms[fullHash].FirstOrDefault(x => x.FilePath == filePath);
                     if (synEntry == null)
                     {
