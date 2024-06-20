@@ -756,13 +756,14 @@ namespace xivModdingFramework.Models.ModelTextures
                             diffuse = Color4.Lerp(diffuse, c, bonusInfluence * bonusColor.Color.Value.Alpha);
                         } else
                         {
-                            // Blend in hair color/hroth fur
-                            diffuse = Color4.Lerp(diffuse, bonusColor.Color.Value, bonusInfluence);
+                            var hairColor = bonusColor.Color.Value;
                             if (highlightColor.Color != null)
                             {
-                                // Blend in hair highlight color/hroth fur pattern.
-                                diffuse = Color4.Lerp(diffuse, highlightColor.Color.Value, multi.Alpha);
+                                hairColor = Color4.Lerp(bonusColor.Color.Value, highlightColor.Color.Value, multi.Alpha);
                             }
+
+                            // Blend in hair color/hroth fur
+                            diffuse = Color4.Lerp(diffuse, hairColor, bonusInfluence);
                         }
                     }
 
