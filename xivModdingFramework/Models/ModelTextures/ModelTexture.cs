@@ -46,6 +46,7 @@ using System.Diagnostics;
 using System.ComponentModel.Design;
 using xivModdingFramework.Textures;
 using System.Text.RegularExpressions;
+using System.ComponentModel;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -728,6 +729,7 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 var skinColor = GetLinearColor(colors.SkinColor, false);
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
+                var highlightColor = GetSkinBonusColor2(mtrl, colors);
 
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
 
@@ -747,7 +749,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     float bonusInfluence = normal.Alpha;
                     if (bonusColor.Color != null)
                     {
-                        
                         if (bonusColor.Blend)
                         {
                             var c = SrgbToLinear(bonusColor.Color.Value);
@@ -755,7 +756,13 @@ namespace xivModdingFramework.Models.ModelTextures
                             diffuse = Color4.Lerp(diffuse, c, bonusInfluence * bonusColor.Color.Value.Alpha);
                         } else
                         {
+                            // Blend in hair color/hroth fur
                             diffuse = Color4.Lerp(diffuse, bonusColor.Color.Value, bonusInfluence);
+                            if (highlightColor.Color != null)
+                            {
+                                // Blend in hair highlight color/hroth fur pattern.
+                                diffuse = Color4.Lerp(diffuse, highlightColor.Color.Value, multi.Alpha);
+                            }
                         }
                     }
 
@@ -1454,7 +1461,6 @@ namespace xivModdingFramework.Models.ModelTextures
                 // PART_HRO
                 else if (bonusColorKey.Value == 0x57FF3B64)
                 {
-                    // What actually goes here.
                     bonusColor = colors.HairColor;
                     return (bonusColor, false);
                 }
@@ -1463,6 +1469,27 @@ namespace xivModdingFramework.Models.ModelTextures
                 // Default usage is as face.
                 bonusColor = colors.LipColor;
                 return (bonusColor, true);
+            }
+
+            return (bonusColor, false);
+        }
+        private static (Color4? Color, bool Blend) GetSkinBonusColor2(XivMtrl mtrl, CustomModelColors colors)
+        {
+            Color4? bonusColor = null;
+
+            var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
+
+            if (bonusColorKey != null)
+            {
+                // PART_HRO
+                if (bonusColorKey.Value == 0x57FF3B64)
+                {
+                    if (colors.HairHighlightColor != null)
+                    {
+                        bonusColor = colors.HairHighlightColor.Value;
+                        return (bonusColor, false);
+                    }
+                }
             }
 
             return (bonusColor, false);
