@@ -16,6 +16,7 @@
 
 using SharpDX;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
@@ -25,6 +26,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TeximpNet.Compression;
+using TeximpNet.DDS;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
@@ -827,6 +830,22 @@ namespace xivModdingFramework.Textures.FileTypes
 
         public static async Task<string> TexConv(string file, string format, bool generateMipMaps = true)
         {
+            // TexConv does not handle PNGs correctly.  Rip the raw bytes ourselves and resave as TGA.
+            if (file.ToLower().EndsWith(".png"))
+            {
+                var decoder = new PngDecoder();
+                byte[] data;
+                int width, height;
+                using (var img = Image.Load<Rgba32>(file, decoder))
+                {
+                    width = img.Width;
+                    height = img.Height;
+                    data = IOUtil.GetImageSharpPixels(img);
+                }
+                // TexConv does not handle PNG reading correctly.
+                return await TexConv(data, width, height, format, generateMipMaps);
+            }
+
             return await Task.Run(() =>
             {
 

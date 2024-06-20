@@ -47,6 +47,7 @@ using System.ComponentModel.Design;
 using xivModdingFramework.Textures;
 using System.Text.RegularExpressions;
 using System.ComponentModel;
+using SharpDX.Direct3D11;
 
 namespace xivModdingFramework.Models.ModelTextures
 {
@@ -732,7 +733,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Skin)
             {
-                var skinColor = GetLinearColor(colors.SkinColor, false);
+                var skinColor = colors.SkinColor;
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
                 var highlightColor = GetSkinBonusColor2(mtrl, colors);
 
@@ -878,9 +879,11 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Iris)
             {
-                var irisColor = GetLinearColor(colors.EyeColor);
-
+                var irisColor = colors.EyeColor;
                 var scleraColor = GetConstColor(mtrl, 0x11C90091, new Color4(1.0f));
+
+                irisColor *= irisColor;
+                scleraColor *= scleraColor;
 
                 //g_SpecularColorMask
                 var reflectionColor = GetConstColor(mtrl, 0xCB0338DC, new Color4(1.0f));
