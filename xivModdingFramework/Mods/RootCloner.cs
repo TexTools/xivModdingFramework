@@ -271,6 +271,9 @@ namespace xivModdingFramework.Mods
                     if (xmdl == null || tmdl == null)
                         continue;
 
+                    var srcRace = IOUtil.GetRaceFromPath(src);
+                    var dstRace = IOUtil.GetRaceFromPath(dst);
+
                     tmdl.Source = dst;
                     xmdl.MdlPath = dst;
 
@@ -296,6 +299,11 @@ namespace xivModdingFramework.Mods
                                 tmdl.MeshGroups.Remove(mg);
                             }
                         }
+                    }
+
+                    if(srcRace != dstRace && (int)srcRace > 100 && (int)dstRace > 100)
+                    {
+                        await ModelModifiers.RaceConvertRecursive(tmdl, dstRace, srcRace, null, tx);
                     }
 
                     // Save new Model.
@@ -719,7 +727,7 @@ namespace xivModdingFramework.Mods
             {
                 // Replace the entire root chunk for roots that have two identifiers.
                 var srcString = match.Groups[0].Value;
-                var dstString = Destination.Info.GetBaseFileName(false);
+                var dstString = Destination.Info.GetBaseFileName(true);
 
                 file = file.Replace(srcString, dstString);
             }
