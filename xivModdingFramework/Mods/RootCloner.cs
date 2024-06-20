@@ -517,12 +517,8 @@ namespace xivModdingFramework.Mods
                     modlist.AddOrUpdateMod(mod);
                 }
 
-                // Commit our transaction.
-                await boiler.Commit();
 
 
-
-                XivCache.QueueDependencyUpdate(allFiles.ToList());
 
                 if(saveDirectory != null)
                 {
@@ -557,6 +553,10 @@ namespace xivModdingFramework.Mods
                     await TTMP.CreateSimpleModPack(smpd, saveDirectory, null, true, tx);
                 }
 
+
+                XivCache.QueueDependencyUpdate(allFiles.ToList());
+                // Commit our transaction.
+                await boiler.Commit();
 
 
                 if (ProgressReporter != null)
