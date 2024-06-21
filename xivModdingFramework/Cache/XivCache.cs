@@ -191,12 +191,12 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool enableCacheWorker = true)
+        public static async Task SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool enableCacheWorker = true)
         {
             var gi = new GameInfo(gameDirectory, language);
-            SetGameInfo(gi, enableCacheWorker);
+            await SetGameInfo(gi, enableCacheWorker);
         }
-        public static async void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
+        public static async Task SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
         {
             if(ModTransaction.ActiveTransaction != null)
             {

@@ -317,36 +317,44 @@ namespace xivModdingFramework.Models.ModelTextures
             var texMapData = new TexMapData();
 
             // Use the function that returns proper sane reuslts.
-            var ttps = mtrl.GetTextureTypePathList();
+            var textures = mtrl.Textures;
 
-            var keepNormDummy = ttps.Count(x => x.Type == XivTexType.Normal) == 1;
-            ttps.RemoveAll(x => {
-                var isDummy = x.Path.StartsWith("bgcommon/texture/dummy_");
-                if (!isDummy) return false;
-                if (keepNormDummy && x.Path.EndsWith("_n.tex")) return false;
-                return true;
-            });
+            var dummyRegex = new Regex("bgcommon\\/texture\\/.*dummy.*\\.tex");
+            textures.RemoveAll(x => string.IsNullOrWhiteSpace(x.Dx11Path) || dummyRegex.IsMatch(x.Dx11Path));
+
 
             // Decode compressed textures
-            foreach (var ttp in ttps)
+            foreach (var tex in textures)
             {
+                var type = mtrl.ResolveFullUsage(tex);
                 // Skip loading textures that aren't supported in model previews
-                if (ttp.Type != XivTexType.Diffuse && ttp.Type != XivTexType.Specular && ttp.Type != XivTexType.Mask
-                 && ttp.Type != XivTexType.Skin && ttp.Type != XivTexType.Normal && ttp.Type != XivTexType.Index)
+                if (type != XivTexType.Diffuse && type != XivTexType.Specular && type != XivTexType.Mask
+                 && type != XivTexType.Skin && type != XivTexType.Normal && type != XivTexType.Index)
                 {
                     continue;
                 }
 
-                var texData = await Tex.GetXivTex(ttp.Path, false, tx);
+                if (tex.Sampler.SamplerId == ESamplerId.g_SamplerSpecularMap1
+                    || tex.Sampler.SamplerId == ESamplerId.g_SamplerColorMap1
+                    || tex.Sampler.SamplerId == ESamplerId.g_SamplerNormalMap1
+                    || tex.Sampler.SamplerId == ESamplerId.g_SamplerWaveMap1)
+                {
+                    // Uv2 samplers
+                    continue;
+                }
+
+                var texData = await Tex.GetXivTex(tex.Dx11Path, false, tx);
                 var imageData = await texData.GetRawPixels();
 
-                switch (ttp.Type)
+                switch (type)
                 {
                     case XivTexType.Diffuse:
-                        if(texMapData.Diffuse != null)
+                        if(tex.Sampler.SamplerId == ESamplerId.g_SamplerColorMap1)
                         {
+                            // Uv2 sampler;
                             continue;
                         }
+
                         texMapData.Diffuse = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                     case XivTexType.Specular:
@@ -356,6 +364,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         {
                             continue;
                         }
+
                         texMapData.Multi = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                     case XivTexType.Normal:
@@ -766,12 +775,12 @@ namespace xivModdingFramework.Models.ModelTextures
                             {
                                 hairColor = Color4.Lerp(bonusColor.Color.Value, highlightColor.Color.Value, multi.Alpha);
                             }
+                            hairColor *= _BodyFurMultiplier;
 
                             // Blend in hair color/hroth fur
                             diffuse = Color4.Lerp(diffuse, hairColor, bonusInfluence);
 
                             // Arbitrary darkening to attempt to match hair better.
-                            diffuse *= _BodyFurMultiplier;
                         }
                     }
 
@@ -1155,11 +1164,11 @@ namespace xivModdingFramework.Models.ModelTextures
                 || mtrl.ShaderPack == EShaderPack.BgUvScroll )
             {
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-
                     var savedAlpha = diffuse.Alpha;
 
-                    diffuse *= multi.Red * diffuseColorMul;
-                    var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
+                    diffuse *= ((float)Math.Sqrt(multi.Red)) * diffuseColorMul;
+                    var s = (float) Math.Sqrt(multi.Green);
+                    var specular = hasMulti ? new Color4(s,s,s, 1.0f) : Color4.Black;
                     specular *= specularColorMul;
 
                     // Spec Power

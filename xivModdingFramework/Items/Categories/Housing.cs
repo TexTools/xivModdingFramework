@@ -223,10 +223,13 @@ namespace xivModdingFramework.Items.Categories
                 tasksXL.Add(Index.CheckExistsMultiple(tx, formatXL, i, i + increment));
             }
 
-            await Task.WhenAll(tasksS);
-            await Task.WhenAll(tasksM);
-            await Task.WhenAll(tasksL);
-            await Task.WhenAll(tasksXL);
+            // Need to condense to a single await to avoid unhandled exceptions in the event the first await fails.
+            var allTasks = new List<Task>();
+            allTasks.AddRange(tasksS);
+            allTasks.AddRange(tasksM);
+            allTasks.AddRange(tasksL);
+            allTasks.AddRange(tasksXL);
+            await Task.WhenAll(allTasks);
 
             AddFish(fishList, tasksS, 1, "Small");
             AddFish(fishList, tasksM, 2, "Medium");

@@ -317,39 +317,6 @@ namespace xivModdingFramework.Materials.DataContainers
             return (ushort)total;
         }
 
-        /// <summary>
-        /// Get the 'TexTypePath' List that TT expects to populate the texture listing.
-        /// Generated via the actual sampler and shader key settings.
-        /// </summary>
-        /// <returns></returns>
-        public List<TexTypePath> GetTextureTypePathList()
-        {
-            var list = new List<TexTypePath>();
-            foreach(var tex in Textures)
-            {
-                var ttp = new TexTypePath()
-                {
-                    DataFile = IOUtil.GetDataFileFromPath(tex.TexturePath),
-                    Path = tex.Dx11Path,
-                    Type = ResolveFullUsage(tex),
-                    Name = Path.GetFileNameWithoutExtension(tex.TexturePath)
-                };
-                list.Add(ttp);
-            }
-            // Include the colorset as its own texture if we have one.
-            if (ColorsetStrings.Count > 0 && ColorSetData.Count > 0)
-            {
-                var ttp = new TexTypePath
-                {
-                    Path = MTRLPath,
-                    Type = XivTexType.ColorSet,
-                    DataFile = GetDataFile(),
-                    Name = Path.GetFileNameWithoutExtension(MTRLPath)
-                };
-                list.Add(ttp);
-            }
-            return list;
-        }
 
         /// <summary>
         /// Retrieves the Data File this MTRL resides in based on the path of the MTRL file.
