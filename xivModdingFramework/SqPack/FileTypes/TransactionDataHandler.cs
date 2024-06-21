@@ -108,7 +108,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 if (DefaultPathRoot == null)
                 {
                     // Create a temp folder if we weren't supplied one.
-                    var tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), "Tx_" + Guid.NewGuid().ToString());
+                    var tempFolder = IOUtil.GetFrameworkTempSubfolder("TX_");
                     DefaultPathRoot = tempFolder;
                 }
                 Directory.CreateDirectory(DefaultPathRoot);

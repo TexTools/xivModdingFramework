@@ -35,6 +35,7 @@ using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using System.Diagnostics;
+using System.Threading;
 
 namespace xivModdingFramework.Helpers
 {
@@ -582,7 +583,7 @@ namespace xivModdingFramework.Helpers
             {
                 var files = (zip.Entries.Select(x => ReplaceSlashes(x.FileName).ToLower()));
 
-                files.Where(x =>
+                files = files.Where(x =>
                 {
                     return selector(x);
                 });
@@ -726,6 +727,24 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+        public static string GetUniqueSubfolder(string basePath, string prefix = "")
+        {
+            var id = 0;
+            var path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+            while (Directory.Exists(path))
+            {
+                id++;
+                path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+            }
+            Directory.CreateDirectory(path);
+
+            return path;
+        }
+        public static string GetFrameworkTempSubfolder(string prefix = "")
+        {
+            var basePath = GetFrameworkTempFolder();
+            return GetUniqueSubfolder(basePath, prefix);
+        }
         public static string GetFrameworkTempFolder()
         {
             var path = Path.Combine(Path.GetTempPath(), "xivmf");

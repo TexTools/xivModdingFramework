@@ -61,7 +61,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             else if (path.EndsWith(".pmp"))
             {
                 // Compressed PMP file.  Decompress it first.
-                var tempFolder = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
+                var tempFolder = IOUtil.GetFrameworkTempSubfolder("PMP_");
 
                 // Run Zip extract on a new thread.
                 await Task.Run(async () =>
@@ -123,6 +123,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 DefaultMod = defaultOption,
                 Groups = groups
             };
+
+            image = Path.GetFullPath(Path.Combine(path, pmp.GetHeaderImage()));
 
 
             if (includeImages)
@@ -812,8 +814,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             if (option == null)
             {
-                // TODO - Convert IMC file to MetaFile here.
-                throw new NotImplementedException();
+                throw new InvalidDataException("Non-Standard groups cannot be converted to raw file lists.");
             }
 
             var includeData = zipArchivePath != null;
@@ -841,11 +842,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (tx != null && !tx.ReadOnly && unzipPath == null)
                 {
                     // Use TX data store if we have one.
-                    unzipPath = Path.Combine(tx.UNSAFE_GetTransactionStore(), Guid.NewGuid().ToString());
+                    unzipPath = IOUtil.GetUniqueSubfolder(tx.UNSAFE_GetTransactionStore(), "PMP_");
                 } else
                 {
                     // Make our own temp path.
-                    unzipPath = Path.Combine(IOUtil.GetFrameworkTempFolder(), Guid.NewGuid().ToString());
+                    unzipPath = IOUtil.GetFrameworkTempSubfolder("PMP_");
                 }
             }
 
