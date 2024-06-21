@@ -204,17 +204,18 @@ namespace xivModdingFramework.Models.ModelTextures
         /// Gets the texture maps for the model
         /// </summary>
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
-        public static async Task<ModelTextureData> GetModelMaps(XivMtrl mtrl, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
+        public static async Task<ModelTextureData> GetModelMaps(XivMtrl mtrl, bool pbrMaps = false, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
         {
             if (colors == null)
                 colors = GetCustomColors();
 
+            var limitTextureSize = !pbrMaps;
             var texMapData = await GetTexMapData(mtrl, tx);
-            var dimensions = await EqualizeTextureSizes(texMapData);
+            var dimensions = await EqualizeTextureSizes(texMapData, limitTextureSize);
 
             var diffusePixels = texMapData.Diffuse?.Data;
             var normalPixels = texMapData.Normal?.Data;
-            var multiPixels = texMapData.Multi?.Data;
+            var multiPixels = texMapData.Mask?.Data;
             var indexPixels = texMapData.Index?.Data;
 
             if (normalPixels == null && diffusePixels == null)
@@ -231,6 +232,14 @@ namespace xivModdingFramework.Models.ModelTextures
                     Alpha = new byte[0],
                     MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
                 };
+
+                if (pbrMaps)
+                {
+                    empty.Roughness = new byte[0];
+                    empty.Metalness = new byte[0];
+                    empty.Occlusion = new byte[0];
+                    empty.Subsurface = new byte[0];
+                }
                 return empty;
             }
 
@@ -242,9 +251,17 @@ namespace xivModdingFramework.Models.ModelTextures
                 Diffuse = new byte[dimensions.Width * dimensions.Height * 4],
                 Specular = new byte[dimensions.Width * dimensions.Height * 4],
                 Emissive = new byte[dimensions.Width * dimensions.Height * 4],
-                Alpha = new byte[dimensions.Width * dimensions.Height * 4],
+                Alpha = new byte[dimensions.Width * dimensions.Height],
                 MaterialPath = mtrl.MTRLPath.Substring(mtrl.MTRLPath.LastIndexOf('/'))
             };
+
+            if (pbrMaps)
+            {
+                result.Roughness = new byte[dimensions.Width * dimensions.Height];
+                result.Metalness = new byte[dimensions.Width * dimensions.Height];
+                result.Occlusion = new byte[dimensions.Width * dimensions.Height];
+                result.Subsurface = new byte[dimensions.Width * dimensions.Height];
+            }
 
             if((mtrl.MaterialFlags & EMaterialFlags1.HideBackfaces) == 0)
             {
@@ -254,10 +271,11 @@ namespace xivModdingFramework.Models.ModelTextures
             var settings = new ShaderMapperSettings()
             {
                 HighlightedRow = highlightedRow,
+                GeneratePbrMaps = pbrMaps,
                 //VisualizeColorset = true,
+                //UseColorset = false,
             };
 
-            //settings.UseColorset = false;
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
             var shaderFn = GetShaderMapper(GetCustomColors(), mtrl, settings);
@@ -286,7 +304,6 @@ namespace xivModdingFramework.Models.ModelTextures
                         Color4 diffuseColor = shaderResult.Diffuse;
                         Color4 normalColor = shaderResult.Normal;
                         Color4 specularColor = shaderResult.Specular;
-                        Color4 alphaColor = shaderResult.Alpha;
                         Color4 emissiveColor = shaderResult.Emissive;
 
                         // White out the opacity channels where appropriate.
@@ -294,13 +311,23 @@ namespace xivModdingFramework.Models.ModelTextures
                         normalColor.Alpha = 1.0f;
                         
                         // Copy alpha to diffuse for Blender.
-                        diffuseColor.Alpha = alphaColor.Alpha;
+                        diffuseColor.Alpha = shaderResult.Alpha;
 
                         EncodeColorBytes(result.Diffuse, i, diffuseColor);
                         EncodeColorBytes(result.Normal, i, normalColor, false);
                         EncodeColorBytes(result.Specular, i, specularColor);
-                        EncodeColorBytes(result.Alpha, i, alphaColor, false);
                         EncodeColorBytes(result.Emissive, i, emissiveColor);
+
+                        result.Alpha[i/4] = (byte)(shaderResult.Alpha * 255.0f);
+
+                        if (pbrMaps)
+                        {
+                            result.Roughness[i / 4] = (byte)(shaderResult.Roughness * 255.0f);
+                            result.Metalness[i / 4] = (byte)(shaderResult.Metalness * 255.0f);
+                            result.Occlusion[i / 4] = (byte)(shaderResult.Occlusion * 255.0f);
+                            result.Subsurface[i / 4] = (byte)(shaderResult.Subsurface * 255.0f);
+                        }
+
                     }
                 });
             });
@@ -360,12 +387,12 @@ namespace xivModdingFramework.Models.ModelTextures
                     case XivTexType.Specular:
                     case XivTexType.Mask:
                     case XivTexType.Skin:
-                        if (texMapData.Multi != null)
+                        if (texMapData.Mask != null)
                         {
                             continue;
                         }
 
-                        texMapData.Multi = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
+                        texMapData.Mask = new TexInfo { Width = texData.Width, Height = texData.Height, Data = imageData };
                         break;
                     case XivTexType.Normal:
                         if (texMapData.Normal != null)
@@ -418,7 +445,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// </summary>
         /// <param name="texMapData">The texture map data containing the texture bytes</param>
         /// <returns>The width and height that the textures were equalized to.</returns>
-        private static async Task<(int Width, int Height)> EqualizeTextureSizes(TexMapData texMapData)
+        private static async Task<(int Width, int Height)> EqualizeTextureSizes(TexMapData texMapData, bool limitSize = true)
         {
             // Normal map is chosen because almost every item has a normal map, diffuse is chosen otherwise
             var width = 0;
@@ -464,15 +491,15 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (texMapData.Multi != null)
+            if (texMapData.Mask != null)
             {
-                var size = texMapData.Multi.Width * texMapData.Multi.Height;
+                var size = texMapData.Mask.Width * texMapData.Mask.Height;
 
                 if (size > largestSize)
                 {
                     largestSize = size;
-                    width = texMapData.Multi.Width;
-                    height = texMapData.Multi.Height;
+                    width = texMapData.Mask.Width;
+                    height = texMapData.Mask.Height;
                 }
             }
 
@@ -488,7 +515,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 }
             }
 
-            if (width > 4000 || height > 4000)
+            if ((width > 4000 || height > 4000) && limitSize)
             {
                 scale = 2;
                 scaleDown = true;
@@ -512,8 +539,8 @@ namespace xivModdingFramework.Models.ModelTextures
                     if (texMapData.Diffuse != null && (largestSize > texMapData.Diffuse.Width * texMapData.Diffuse.Height || scaleDown))
                         ResizeTexture(texMapData.Diffuse, width, height);
                 }, () => {
-                    if (texMapData.Multi != null && (largestSize > texMapData.Multi.Width * texMapData.Multi.Height || scaleDown))
-                        ResizeTexture(texMapData.Multi, width, height);
+                    if (texMapData.Mask != null && (largestSize > texMapData.Mask.Width * texMapData.Mask.Height || scaleDown))
+                        ResizeTexture(texMapData.Mask, width, height);
                 }, () => {
                     if (texMapData.Index != null && (largestSize > texMapData.Index.Width * texMapData.Index.Height || scaleDown))
                         ResizeTexture(texMapData.Index, width, height, true);
@@ -528,8 +555,12 @@ namespace xivModdingFramework.Models.ModelTextures
             public Color4 Diffuse;
             public Color4 Normal;
             public Color4 Specular;
-            public Color4 Alpha;
             public Color4 Emissive;
+            public float Alpha;
+            public float Roughness;
+            public float Metalness;
+            public float Occlusion;
+            public float Subsurface;
         }
 
         private class ShaderMapperSettings
@@ -538,6 +569,7 @@ namespace xivModdingFramework.Models.ModelTextures
             public bool UseColorset = true;
             public bool VisualizeColorset = false;
             public int HighlightedRow = -1;
+            public bool GeneratePbrMaps;
         }
 
         private delegate ShaderMapperResult ShaderMapperDelegate(Color4 diffuse, Color4 normal, Color4 mask, Color4 index);
@@ -637,108 +669,131 @@ namespace xivModdingFramework.Models.ModelTextures
                 emissiveColorMul = GetConstColor(mtrl, 0x38A64362, new Color4(1, 1, 1, 1.0f));
 
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                        Color4 specular = new Color4(1.0f);
-                        if (useTextures)
+                    Color4 specular = new Color4(1.0f);
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
+
+                    if (useTextures)
+                    {
+                        if (!hasDiffuse)
                         {
-                            if (!hasDiffuse)
-                            {
-                                diffuse = new Color4(1.0f);
-                            }
-
-
-                            if (hasMulti)
-                            {
-
-                                // Construct specular from mask
-                                if (shaderPack == EShaderPack.CharacterLegacy)
-                                {
-                                    var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                                    diffuse *= occlusion;
-                                    specular *= occlusion;
-                                    // Specular/Gloss flow
-                                    var specPower = new Color4(multi.Green, multi.Green, multi.Green, 1.0f);
-                                    var gloss = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
-                                    specular = occlusion * specPower * gloss;
-                                }
-                                else
-                                {
-                                    specular *= new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
-                                    diffuse *= new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
-
-                                    var invRoughness = new Color4(1 - multi.Green, 1 - multi.Green, 1 - multi.Green, 1.0f);
-                                    specular *= invRoughness;
-                                }
-                            } else if(hasSpecular)
-                            {
-                                specular = multi;
-                            } else
-                            {
-                                // ???
-                                specular = new Color4(0.1f, 0.1f, 0.1f, 1.0f);
-                            }
-
-                        } else
-                        {
-                            specular = new Color4(1.0f);
                             diffuse = new Color4(1.0f);
                         }
-                        
-                        var emissive = new Color4(0, 0, 0, 1.0f);
-                        if (useColorset)
+
+
+                        if (hasMulti)
                         {
-                            var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
-
-                            var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
-                            var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
-                            var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
-                            emissive = emissPixel;
-
-                            emissive *= emissiveColorMul;
-
-                            Color4 invRoughPixel;
-                            float invRough = 0.5f;
-                            if (shaderPack != EShaderPack.CharacterLegacy)
+                            float diffuseMask, specMask;
+                            // Construct specular from mask
+                            if (shaderPack == EShaderPack.CharacterLegacy)
                             {
-                                invRough = 1 - Math.Max(Math.Min(row[16], 1), 0);
+                                // Specular/Gloss flow
 
-                                var metalness = row[18];
-                                //var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
+                                diffuseMask = multi.Red;
+                                specMask = multi.Green;
+                                roughness = 1 - multi.Blue;
+                            }
+                            else
+                            {
+                                diffuseMask = multi.Blue;
+                                specMask = multi.Red;
+                                roughness = multi.Green;
+                            }
+
+                            if (!settings.GeneratePbrMaps)
+                            {
+                                diffuse *= diffuseMask;
+                            }
+                            else
+                            {
+                                occlusion = diffuseMask;
+                            }
+
+                            specular *= specMask;
+
+                        } else if(hasSpecular)
+                        {
+                            specular = multi;
+                        } else
+                        {
+                            // ???
+                            specular = new Color4(0.1f, 0.1f, 0.1f, 1.0f);
+                        }
+
+                    } else
+                    {
+                        specular = new Color4(1.0f);
+                        diffuse = new Color4(1.0f);
+                    }
+                        
+                    var emissive = new Color4(0, 0, 0, 1.0f);
+                    if (useColorset)
+                    {
+                        var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
+
+                        var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
+                        var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
+                        var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
+                        emissive = emissPixel;
+
+                        emissive *= emissiveColorMul;
+
+                        Color4 invRoughPixel;
+                        float invRough = 0.5f;
+                        if (shaderPack != EShaderPack.CharacterLegacy)
+                        {
+                            var roughPixel = Math.Max(Math.Min(row[16], 1), 0);
+
+                            // Apply rough pixel by screen blending mode.
+                            roughness = 1 - ((1 - roughness) * (1 - roughPixel));
+
+                            metalness = row[18];
+                            //var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
 
 
 
+                            if (!settings.GeneratePbrMaps)
+                            {
                                 // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
                                 specular *= _MetalFloor + (metalness * _MetalMultiplier);
-
 
                                 // As metalness rises, the diffuse/specular colors merge.
                                 diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
                                 specPixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
                             }
-                            else
-                            {
-                                // Arbitrary estimation for SE-gloss to inverse roughness.
-                                invRough = row[3] / 16;
-                            }
-
-                            invRoughPixel = new Color4(invRough, invRough, invRough, 1.0f);
-
-                            diffuse *= diffusePixel;
-                            specular *= invRoughPixel;
-                            specular *= specPixel;
+                        }
+                        else
+                        {
+                            // Arbitrary estimation for SE-gloss to inverse roughness.
+                            roughness *= (1 - row[3] / 16);
                         }
 
-                        var alpha = normal.Blue * alphaMultiplier;
-                        alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+                        diffuse *= diffusePixel;
+                        specular *= specPixel;
+                    }
 
-                        return new ShaderMapperResult()
-                        {
-                            Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
-                            Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                            Specular = specular,
-                            Alpha = new Color4(alpha),
-                            Emissive = emissive,
-                        };
+                    if (!settings.GeneratePbrMaps)
+                    {
+                        var invRough = 1 - roughness;
+                        specular *= invRough;
+                    }
+
+                    var alpha = normal.Blue * alphaMultiplier;
+                    alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    return new ShaderMapperResult()
+                    {
+                        Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
+                        Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
+                        Specular = specular,
+                        Alpha = alpha,
+                        Emissive = emissive,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
                     };
+                };
             }
             else if (shaderPack == EShaderPack.Skin)
             {
@@ -746,7 +801,10 @@ namespace xivModdingFramework.Models.ModelTextures
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
                 var highlightColor = GetSkinBonusColor2(mtrl, colors);
 
-                return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
 
                     // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
                     // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
@@ -758,8 +816,10 @@ namespace xivModdingFramework.Models.ModelTextures
                     var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     diffuse *= sColor;
 
-                    var specMask = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
+                    var specMask = mask.Red;
+                    var specular = new Color4(specMask, specMask, specMask, 1.0f);
 
+                    roughness = mask.Green;
                     float bonusInfluence = normal.Alpha;
                     if (bonusColor.Color != null)
                     {
@@ -773,8 +833,9 @@ namespace xivModdingFramework.Models.ModelTextures
                             var hairColor = bonusColor.Color.Value;
                             if (highlightColor.Color != null)
                             {
-                                hairColor = Color4.Lerp(bonusColor.Color.Value, highlightColor.Color.Value, multi.Alpha);
+                                hairColor = Color4.Lerp(bonusColor.Color.Value, highlightColor.Color.Value, mask.Alpha);
                             }
+
                             hairColor *= _BodyFurMultiplier;
 
                             // Blend in hair color/hroth fur
@@ -784,10 +845,12 @@ namespace xivModdingFramework.Models.ModelTextures
                         }
                     }
 
-                    var ir = 1 - multi.Green;
-                    var invRough = new Color4(ir, ir, ir, 1.0f);
-                    var spec = Color4.Modulate(specMask, invRough);
-                    spec = Color4.Modulate(spec, _SkinSpecMultiplier);
+
+                    if (!settings.GeneratePbrMaps)
+                    {
+                        specular *= (1 - roughness);
+                        specular *= _SkinSpecMultiplier;
+                    }
 
                     // This is a bit of a hack here and probably not correct.
                     diffuse *= LinearToSrgb(diffuseColorMul);
@@ -798,14 +861,19 @@ namespace xivModdingFramework.Models.ModelTextures
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
                     var emissive = emissiveColorMul;
+                    var sss = mask.Blue;
 
                     return new ShaderMapperResult()
                     {
                         Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                        Specular = spec,
+                        Specular = specular,
                         Emissive = emissive,
-                        Alpha = new Color4(alpha)
+                        Alpha = alpha,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
+                        Subsurface = sss,
                     };
                 };
             }
@@ -817,21 +885,28 @@ namespace xivModdingFramework.Models.ModelTextures
                 //bonusColor = SrgbToLinear(bonusColor);
 
                 return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
                     float bonusInfluence = normal.Blue;
 
 
-                    var specMask = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
-                    var ir = 1- mask.Green;
-                    var invRough = new Color4(ir, ir, ir, 1.0f);
+
+                    roughness = mask.Green;
+                    var specular = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
 
                     diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
-                    diffuse *= (mask.Alpha * mask.Alpha);
                     diffuse *= diffuseColorMul;
 
+                    occlusion = (mask.Alpha * mask.Alpha);
+                    if (!settings.GeneratePbrMaps)
+                    {
+                        specular *= (1- roughness);
+                        specular *= _HairSpecMultiplier;
+                        diffuse *= occlusion;
+                    }
 
-                    var spec = specMask * invRough;
-
-                    spec *= _HairSpecMultiplier;
+                    var sss = mask.Blue;
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
@@ -841,8 +916,12 @@ namespace xivModdingFramework.Models.ModelTextures
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
-                        Specular = spec,
-                        Alpha = new Color4(alpha)
+                        Specular = specular,
+                        Alpha = alpha,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
+                        Subsurface = sss,
                     };
                 };
             }
@@ -854,6 +933,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 var tattooColor = colors.TattooColor;
                 // Very similar to hair.shpk but without an extra texture
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
                     float tattooInfluence = normal.Blue;
 
                     diffuse = Color4.Lerp(_MoleColor, tattooColor, tattooInfluence);
@@ -869,7 +951,10 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = Color4.Black,
-                        Alpha = new Color4(alpha)
+                        Alpha = alpha,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
                     };
                 };
             }
@@ -877,12 +962,18 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 // Not sure how this should be rendered if at all, so its fully transparent
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
                     return new ShaderMapperResult()
                     {
                         Diffuse = Color4.White,
                         Normal = new Color4(0.5f, 0.5f, 1.0f, 1.0f),
                         Specular = Color4.Black,
-                        Alpha = new Color4(0.0f)
+                        Alpha = 0.0f,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
                     };
                 };
             }
@@ -899,13 +990,23 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
+
+
                     float colorInfluence = multi.Blue;
                     diffuse = Color4.Lerp(diffuse * scleraColor, diffuse * irisColor, colorInfluence);
 
                     var emissive = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
                     emissive *= emissiveColorMul;
 
-                    var specular = _EyeSpecular * reflectionColor;
+                    var specular = _EyeSpecular;
+
+                    if (!settings.GeneratePbrMaps)
+                    {
+                        specular *= reflectionColor;
+                    }
 
                     diffuse *= diffuseColorMul;
 
@@ -914,8 +1015,11 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = specular,
-                        Alpha = new Color4(1.0f),
+                        Alpha = 1.0f,
                         Emissive = emissive,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
                     };
                 };
             }
@@ -924,25 +1028,42 @@ namespace xivModdingFramework.Models.ModelTextures
                 || mtrl.ShaderPack == EShaderPack.BgCrestChange
                 || mtrl.ShaderPack == EShaderPack.BgUvScroll )
             {
+                var useAlpha = mtrl.ShaderKeys.Any(x => x.KeyId == 0xA9A3EE25);
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
-                    float colorInfluence = diffuse.Alpha;
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
 
+                    if (!useAlpha)
+                    {
+                        diffuse.Alpha = 1.0f;
+                    }
 
                     var savedAlpha = diffuse.Alpha;
-                    diffuse *= multi.Red * diffuseColorMul;
-                    var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
-                    specular *= specularColorMul;
 
-                    // Spec Power
-                    specular *= multi.Green;
+                    diffuse *= diffuseColorMul;
 
-                    // Gloss - We just multiply this through to badly simulate the effect.
-                    specular *= multi.Blue;
+                    var specular = new Color4(1);
+                    if (!hasMulti)
+                    {
+                        specular = new Color4(0, 0, 0, 1);
+                    }
+                    else
+                    {
+                        roughness = multi.Green;
+                        if (!settings.GeneratePbrMaps)
+                        {
+                            specular *= (1 - roughness);
+                        }
+
+                        specular *= multi.Red;
+                        specular *= multi.Blue;
+                        specular *= specularColorMul;
+                    }
 
                     var emissive = emissiveColorMul * multi.Alpha * diffuse;
 
                     diffuse.Alpha = savedAlpha;
-                    var alpha = new Color4(diffuse.Alpha);
 
                     return new ShaderMapperResult()
                     {
@@ -950,26 +1071,46 @@ namespace xivModdingFramework.Models.ModelTextures
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
                         Emissive = emissive,
-                        Alpha = alpha
+                        Alpha = savedAlpha,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
                     };
                 };
             }
             else if (shaderPack == EShaderPack.BgColorChange)
             {
+                var useAlpha = mtrl.ShaderKeys.Any(x => x.KeyId == 0xA9A3EE25);
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+
+                    var roughness = 0.0f;
+                    var metalness = 0.0f;
+                    var occlusion = 1.0f;
+
+                    var alpha = normal.Alpha;
                     float colorInfluence = diffuse.Alpha;
 
                     // This shpk seems to ignore the diffuse color var even though it's typically set in the material.
                     // It usually seems to roughly reflect the default dye color, but not always.
                     // Probably a vestigial dev value.
                     var baseDiffuse = diffuse * multi.Red;// * diffuseColorMul;
-                    var dyeDiffuse = diffuse * multi.Red * GetLinearColor(colors.FurnitureColor);
+                    var dyeDiffuse = diffuse * colors.FurnitureColor;
 
                     diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
 
-
-                    var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
-                    specular *= specularColorMul;
+                    var specular = new Color4(1);
+                    if (!hasMulti)
+                    {
+                        specular = new Color4(0, 0, 0, 1);
+                    }
+                    else
+                    {
+                        var invRough = 1 - multi.Green;
+                        specular *= invRough;
+                        specular *= multi.Red;
+                        specular *= multi.Blue;
+                        specular *= specularColorMul;
+                    }
 
                     // Spec Power
                     specular *= multi.Green;
@@ -979,14 +1120,16 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var emissive = emissiveColorMul * diffuse;
 
-                    var alpha = new Color4(1.0f);
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
                         Emissive = emissive,
-                        Alpha = new Color4(alpha)
+                        Alpha = alpha,
+                        Roughness = roughness,
+                        Metalness = metalness,
+                        Occlusion = occlusion,
                     };
                 };
             }
@@ -998,7 +1141,10 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = diffuse,
                         Normal = normal,
                         Specular = Color4.Black,
-                        Alpha = new Color4(1.0f)
+                        Alpha = 1.0f,
+                        Roughness = 0.0f,
+                        Metalness = 0.0f,
+                        Occlusion = 1.0f,
                     };
                 };
             }
@@ -1153,7 +1299,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = new Color4(diffuse.Red, diffuse.Green, diffuse.Blue, alpha),
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = specular,
-                        Alpha = new Color4(alpha),
+                        Alpha = alpha,
                         Emissive = emissive
                     };
                 };
@@ -1191,7 +1337,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     var emissive = emissiveColorMul * multi.Alpha * diffuse;
                     
                     diffuse.Alpha = savedAlpha;
-                    var alpha = new Color4(diffuse.Alpha);
+                    var alpha = diffuse.Alpha;
 
                     return new ShaderMapperResult()
                     {
@@ -1238,14 +1384,14 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var emissive = emissiveColorMul * diffuse;
 
-                    var alpha = new Color4(1.0f);
+                    var alpha = 1.0f;
                     return new ShaderMapperResult()
                     {
                         Diffuse = diffuse,
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black,
                         Emissive = emissive,
-                        Alpha = new Color4(alpha)
+                        Alpha = alpha
                     };
                 };
             }
@@ -1287,7 +1433,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Normal = newNormal,
                         Specular = newSpecular,
                         Emissive = emissive,
-                        Alpha = new Color4(alpha)
+                        Alpha = alpha
                     };
                 };
 
@@ -1318,7 +1464,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     float specAmp = 1.0f + (lipInfluence * 0.25f);
                     result.Specular = result.Specular * specAmp;
                     // Face shader supports alpha, unlike normal skin textures.
-                    result.Alpha = new Color4(alpha);
+                    result.Alpha = alpha;
 
 
                     return result;
@@ -1375,7 +1521,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = newDiffuse,
                         Normal = newNormal,
                         Specular = specular,
-                        Alpha = new Color4(alpha)
+                        Alpha = alpha
                     };
                 };
             }
@@ -1388,7 +1534,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = Color4.Scale(colors.EyeColor, specular.Red),
                         Normal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f),
                         Specular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f),
-                        Alpha = new Color4(normal.Alpha)
+                        Alpha = normal.Alpha
                     };
                 };
             }
@@ -1400,7 +1546,7 @@ namespace xivModdingFramework.Models.ModelTextures
                         Diffuse = diffuse,
                         Normal = normal,
                         Specular = Color4.Black,
-                        Alpha = new Color4(1.0f)
+                        Alpha = 1.0f
                     };
                 };
             }
@@ -1668,7 +1814,7 @@ namespace xivModdingFramework.Models.ModelTextures
         {
             public TexInfo Diffuse;
             public TexInfo Normal;
-            public TexInfo Multi;
+            public TexInfo Mask;
             public TexInfo Index;
         }
 

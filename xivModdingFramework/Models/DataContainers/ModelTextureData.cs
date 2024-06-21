@@ -29,6 +29,43 @@ namespace xivModdingFramework.Models.DataContainers
 
         public int Height { get; set; }
 
+
+        //Color Data
+        public byte[] Diffuse { get; set; }
+        public byte[] Specular { get; set; }
+        public byte[] Emissive { get; set; }
+
+        // Other Common Data
+        public byte[] Normal { get; set; }
+        public byte[] Alpha { get; set; }
+
+        // PBR Data
+        public byte[] Occlusion { get; set; }
+        public byte[] Roughness { get; set; }
+        public byte[] Metalness { get; set; }
+        public byte[] Subsurface { get; set; }
+
+
+        public string MaterialPath { get; set; }
+
+        public bool IsSkin {
+            get
+            {
+                return ModelModifiers.IsSkinMaterial(MaterialPath);
+            }
+        }
+
+        public bool RenderBackfaces { get; set; }
+    }
+    /// <summary>
+    /// This class holds the data for the textures to be used on the 3D Model
+    /// </summary>
+    public class PbrModelTextureData
+    {
+        public int Width { get; set; }
+
+        public int Height { get; set; }
+
         public byte[] Diffuse { get; set; }
 
         public byte[] Specular { get; set; }
@@ -39,9 +76,14 @@ namespace xivModdingFramework.Models.DataContainers
 
         public byte[] Emissive { get; set; }
 
+        public byte[] Metalness { get; set; }
+
+        public byte[] Roughness{ get; set; }
+
         public string MaterialPath { get; set; }
 
-        public bool IsSkin {
+        public bool IsSkin
+        {
             get
             {
                 return ModelModifiers.IsSkinMaterial(MaterialPath);

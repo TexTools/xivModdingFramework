@@ -66,6 +66,13 @@ using System.Diagnostics.CodeAnalysis;
 namespace xivModdingFramework.Models.FileTypes
 {
 
+
+    public class ModelExportSettings
+    {
+        public bool ShiftUVs = true;
+        public bool IncludeTextures = true;
+        public bool PbrTextures = false;
+    };
     public static class Mdl
     {
         #region Constants/Structures/Constructors
@@ -1308,25 +1315,6 @@ namespace xivModdingFramework.Models.FileTypes
         #endregion
 
         #region High-Level Model Export
-        /// <summary>
-        /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
-        /// to match the target file extention.
-        /// </summary>
-        /// <param name="item"></param>
-        /// <param name="race"></param>
-        /// <param name="submeshId"></param>
-        /// <returns></returns>
-        public static async Task ExportMdlToFile(IItemModel item, XivRace race, string outputFilePath, bool shiftUVs = true, string submeshId = null, bool includeTextures = true, bool getOriginal = false, ModTransaction tx = null)
-        {
-            var mdlPath = await GetMdlPath(item, race, submeshId, tx);
-            var mtrlVariant = 1;
-            var imcInfo = (await Imc.GetImcInfo(item, false, tx));
-            if (imcInfo != null) {
-                mtrlVariant = imcInfo.MaterialSet;
-            }
-
-            await ExportMdlToFile(mdlPath, outputFilePath, mtrlVariant, includeTextures, getOriginal, shiftUVs, tx);
-        }
 
         /// <summary>
         /// Converts and exports an item's MDL file, passing it to the appropriate exporter as necessary
@@ -1336,7 +1324,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="outputFilePath"></param>
         /// <param name="getOriginal"></param>
         /// <returns></returns>
-        public static async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool shiftUVs = true, bool getOriginal = false, ModTransaction tx = null)
+        public static async Task ExportMdlToFile(string mdlPath, string outputFilePath, int mtrlVariant = 1, ModelExportSettings settings = null, bool getOriginal = false, ModTransaction tx = null)
         {
             // Importers and exporters currently use the same criteria.
             // Any available exporter is assumed to be able to import and vice versa.
@@ -1356,7 +1344,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var model = await GetTTModel(mdlPath, getOriginal, tx);
-            await ExportTTModelToFile(model, outputFilePath, mtrlVariant, includeTextures, shiftUVs, tx);
+            await ExportTTModelToFile(model, outputFilePath, mtrlVariant, settings, tx);
         }
 
         /// <summary>
@@ -1365,8 +1353,13 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="model"></param>
         /// <param name="outputFilePath"></param>
         /// <returns></returns>
-        public static async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, bool includeTextures = true, bool shiftUvs = true, ModTransaction tx = null)
+        public static async Task ExportTTModelToFile(TTModel model, string outputFilePath, int mtrlVariant = 1, ModelExportSettings settings = null, ModTransaction tx = null)
         {
+            if(settings == null)
+            {
+                settings = new ModelExportSettings();
+            }
+
             var exporters = GetAvailableExporters();
             var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
             fileFormat = fileFormat.ToLower();
@@ -1412,7 +1405,7 @@ namespace xivModdingFramework.Models.FileTypes
             // both the bone and material exports at the same time.
 
             // Pop the textures out so the exporters can reference them.
-            if (includeTextures)
+            if (settings.IncludeTextures)
             {
                 // Fix up our skin references in the model before exporting, to ensure
                 // we supply the right material names to the exporters down-chain.
@@ -1420,11 +1413,11 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
-                await ExportMaterialsForModel(model, outputFilePath, XivCache.GameInfo.GameDirectory, mtrlVariant, XivRace.All_Races, tx);
+                await ExportMaterialsForModel(model, outputFilePath, settings.PbrTextures, mtrlVariant, XivRace.All_Races, tx);
             }
 
 
-            if (shiftUvs)
+            if (settings.ShiftUVs)
             {
                 // This is not a typo.  Because we haven't flipped the UV yet, we need to -1, not +1.
                 ModelModifiers.ShiftImportUV(model);
@@ -1494,7 +1487,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// <summary>
         /// Retrieves and exports the materials for the current model, to be used alongside ExportModel
         /// </summary>
-        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, DirectoryInfo gameDirectory, int mtrlVariant = 1, XivRace targetRace = XivRace.All_Races, ModTransaction tx = null)
+        public static async Task ExportMaterialsForModel(TTModel model, string outputFilePath, bool pbrMaps = false, int materialSet = 1, XivRace targetRace = XivRace.All_Races, ModTransaction tx = null)
         {
             if (tx == null)
             {
@@ -1545,51 +1538,98 @@ namespace xivModdingFramework.Models.FileTypes
                     }
 
                     // This messy sequence is ultimately to get access to _modelMaps.GetModelMaps().
-                    var mtrlPath = Mtrl.GetMtrlPath(mdlPath, materialName, mtrlVariant);
+                    var mtrlPath = Mtrl.GetMtrlPath(mdlPath, materialName, materialSet);
                     var mtrl = await Mtrl.GetXivMtrl(mtrlPath, false, tx);
-                    var modelMaps = await ModelTexture.GetModelMaps(mtrl, null, -1, tx);
+                    var modelMaps = await ModelTexture.GetModelMaps(mtrl, pbrMaps, null, -1, tx);
 
                     // Outgoing file names.
                     var mtrl_prefix = directory + "\\" + Path.GetFileNameWithoutExtension(materialName.Substring(1)) + "_";
                     var mtrl_suffix = ".png";
 
-                    if (modelMaps.Diffuse != null && modelMaps.Diffuse.Length > 0)
+                    if (pbrMaps)
                     {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Diffuse, modelMaps.Width, modelMaps.Height))
-                        {
-                            img.Save(mtrl_prefix + "d" + mtrl_suffix, new PngEncoder());
-                        }
+                        mtrl_prefix += "pbr_";
                     }
 
-                    if (modelMaps.Normal != null && modelMaps.Diffuse.Length > 0)
+                    if (modelMaps.Diffuse.Length > 0)
                     {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Normal, modelMaps.Width, modelMaps.Height))
+                        if (modelMaps.Diffuse != null)
                         {
-                            img.Save(mtrl_prefix + "n" + mtrl_suffix, new PngEncoder());
+                            var prefix = pbrMaps ? "albedo" : "d";
+                            using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Diffuse, modelMaps.Width, modelMaps.Height))
+                            {
+                                img.Save(mtrl_prefix + prefix + mtrl_suffix, new PngEncoder());
+                            }
                         }
-                    }
 
-                    if (modelMaps.Specular != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Specular, modelMaps.Width, modelMaps.Height))
+                        if (modelMaps.Normal != null)
                         {
-                            img.Save(mtrl_prefix + "s" + mtrl_suffix, new PngEncoder());
+                            var prefix = pbrMaps ? "normal" : "n";
+                            using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Normal, modelMaps.Width, modelMaps.Height))
+                            {
+                                img.Save(mtrl_prefix + prefix + mtrl_suffix, new PngEncoder());
+                            }
                         }
-                    }
 
-                    if (modelMaps.Alpha != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Alpha, modelMaps.Width, modelMaps.Height))
+                        if (modelMaps.Specular != null)
                         {
-                            img.Save(mtrl_prefix + "o" + mtrl_suffix, new PngEncoder());
+                            var prefix = pbrMaps ? "specular" : "s";
+                            using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Specular, modelMaps.Width, modelMaps.Height))
+                            {
+                                img.Save(mtrl_prefix + prefix + mtrl_suffix, new PngEncoder());
+                            }
                         }
-                    }
 
-                    if (modelMaps.Emissive != null && modelMaps.Diffuse.Length > 0)
-                    {
-                        using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Emissive, modelMaps.Width, modelMaps.Height))
+                        if (modelMaps.Emissive != null)
                         {
-                            img.Save(mtrl_prefix + "e" + mtrl_suffix, new PngEncoder());
+                            var prefix = pbrMaps ? "emissive" : "e";
+                            using (Image<Rgba32> img = Image.LoadPixelData<Rgba32>(modelMaps.Emissive, modelMaps.Width, modelMaps.Height))
+                            {
+                                img.Save(mtrl_prefix + prefix + mtrl_suffix, new PngEncoder());
+                            }
+                        }
+
+                        if (modelMaps.Alpha != null)
+                        {
+                            var prefix = pbrMaps ? "alpha" : "o";
+                            using (Image<L8> img = Image.LoadPixelData<L8>(modelMaps.Alpha, modelMaps.Width, modelMaps.Height))
+                            {
+                                img.Save(mtrl_prefix + prefix + mtrl_suffix, new PngEncoder());
+                            }
+                        }
+
+                        if (pbrMaps)
+                        {
+                            if (modelMaps.Roughness != null)
+                            {
+                                using (Image<L8> img = Image.LoadPixelData<L8>(modelMaps.Roughness, modelMaps.Width, modelMaps.Height))
+                                {
+                                    img.Save(mtrl_prefix + "roughness" + mtrl_suffix, new PngEncoder());
+                                }
+                            }
+
+                            if (modelMaps.Metalness != null)
+                            {
+                                using (Image<L8> img = Image.LoadPixelData<L8>(modelMaps.Metalness, modelMaps.Width, modelMaps.Height))
+                                {
+                                    img.Save(mtrl_prefix + "metalness" + mtrl_suffix, new PngEncoder());
+                                }
+                            }
+
+                            if (modelMaps.Occlusion != null)
+                            {
+                                using (Image<L8> img = Image.LoadPixelData<L8>(modelMaps.Occlusion, modelMaps.Width, modelMaps.Height))
+                                {
+                                    img.Save(mtrl_prefix + "occlusion" + mtrl_suffix, new PngEncoder());
+                                }
+                            }
+                            if (modelMaps.Subsurface != null)
+                            {
+                                using (Image<L8> img = Image.LoadPixelData<L8>(modelMaps.Subsurface, modelMaps.Width, modelMaps.Height))
+                                {
+                                    img.Save(mtrl_prefix + "subsurface" + mtrl_suffix, new PngEncoder());
+                                }
+                            }
                         }
                     }
 
