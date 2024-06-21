@@ -728,7 +728,7 @@ namespace xivModdingFramework.Helpers
 
         public static string GetFrameworkTempFolder()
         {
-            var path = Path.Combine(Path.GetTempPath(), "xivmoddingframework_temp");
+            var path = Path.Combine(Path.GetTempPath(), "xivmf");
             Directory.CreateDirectory(path);
             return path;
         }

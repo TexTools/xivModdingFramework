@@ -306,16 +306,18 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             foreach(var shKv in ShaderKeys)
             {
-                // Names based on user observation.
+                // Names from CRC
                 UpdateKeyName(shKv.Key, 0xD2777173, "Decal Mode", true);
                 UpdateKeyName(shKv.Key, 0xB616DC5A, "Texture Mode", true);
                 UpdateKeyName(shKv.Key, 0xC8BD1DEF, "Specular Mode", true);
                 UpdateKeyName(shKv.Key, 0xF52CCF05, "Vertex Color Mode", true);
-                UpdateKeyName(shKv.Key, 0x40D1481E, "Index Mode?", true);
                 UpdateKeyName(shKv.Key, 0x380CAED0, "Skin Type", true);
                 UpdateKeyName(shKv.Key, 0x24826489, "Sub Color Mode", true);
 
+                // Names from testing/observation
+                UpdateKeyName(shKv.Key, 0x40D1481E, "Index Mode?", true);
                 UpdateKeyName(shKv.Key, 0x4F4F0636, "BG Vertex Paint", true);
+                UpdateKeyName(shKv.Key, 0xA9A3EE25, "BG Use Diffuse Alpha", true);
 
                 // Texture Mode
                 UpdateKeyValueName(shKv.Key, 0xB616DC5A, 0x5CC605B5, "MODE_DEFAULT");

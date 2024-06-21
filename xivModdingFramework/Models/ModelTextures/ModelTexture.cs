@@ -1163,19 +1163,30 @@ namespace xivModdingFramework.Models.ModelTextures
                 || mtrl.ShaderPack == EShaderPack.BgCrestChange
                 || mtrl.ShaderPack == EShaderPack.BgUvScroll )
             {
+                var useAlpha = mtrl.ShaderKeys.Any(x => x.KeyId == 0xA9A3EE25);
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                    if (!useAlpha)
+                    {
+                        diffuse.Alpha = 1.0f;
+                    }
+
                     var savedAlpha = diffuse.Alpha;
 
-                    diffuse *= ((float)Math.Sqrt(multi.Red)) * diffuseColorMul;
-                    var s = (float) Math.Sqrt(multi.Green);
-                    var specular = hasMulti ? new Color4(s,s,s, 1.0f) : Color4.Black;
-                    specular *= specularColorMul;
+                    diffuse *= diffuseColorMul;
 
-                    // Spec Power
-                    specular *= multi.Green;
-
-                    // Gloss - We just multiply this through to badly simulate the effect.
-                    specular *= multi.Blue;
+                    var specular = new Color4(1);
+                    if (!hasMulti)
+                    {
+                        specular = new Color4(0, 0, 0, 1);
+                    }
+                    else
+                    {
+                        var invRough = 1 - multi.Green;
+                        specular *= invRough;
+                        specular *= multi.Red;
+                        specular *= multi.Blue;
+                        specular *= specularColorMul;
+                    }
 
                     var emissive = emissiveColorMul * multi.Alpha * diffuse;
                     
