@@ -36,7 +36,7 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
-
+using xivModdingFramework.World;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Items.Categories
@@ -423,6 +423,8 @@ namespace xivModdingFramework.Items.Categories
             }
 
             var assetData = await tx.ReadFile(path);
+
+            //var sgb = Sgb.GetXivSgb(assetData);
 
             var housingAssets = new HousingAssets();
 

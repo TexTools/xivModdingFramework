@@ -315,6 +315,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyName(shKv.Key, 0x380CAED0, "Skin Type", true);
                 UpdateKeyName(shKv.Key, 0x24826489, "Sub Color Mode", true);
 
+                UpdateKeyName(shKv.Key, 0x4F4F0636, "BG Vertex Paint", true);
 
                 // Texture Mode
                 UpdateKeyValueName(shKv.Key, 0xB616DC5A, 0x5CC605B5, "MODE_DEFAULT");

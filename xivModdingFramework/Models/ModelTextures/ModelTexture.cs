@@ -1201,13 +1201,23 @@ namespace xivModdingFramework.Models.ModelTextures
                     // It usually seems to roughly reflect the default dye color, but not always.
                     // Probably a vestigial dev value.
                     var baseDiffuse = diffuse * multi.Red;// * diffuseColorMul;
-                    var dyeDiffuse = diffuse * multi.Red * colors.FurnitureColor;
+                    var dyeDiffuse = diffuse * colors.FurnitureColor;
 
                     diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
-                    
 
-                    var specular = hasMulti ? new Color4(multi.Green, multi.Green, multi.Green, 1.0f) : Color4.Black;
-                    specular *= specularColorMul;
+                    var specular = new Color4(1);
+                    if (!hasMulti)
+                    {
+                        specular = new Color4(0, 0, 0, 1);
+                    }
+                    else
+                    {
+                        var invRough = 1 - multi.Green;
+                        specular *= invRough;
+                        specular *= multi.Red;
+                        specular *= multi.Blue;
+                        specular *= specularColorMul;
+                    }
 
                     // Spec Power
                     specular *= multi.Green;

@@ -424,6 +424,16 @@ namespace xivModdingFramework.Helpers
         {
             //No-Op
         });
+
+        public static string ReadOffsetString(BinaryReader br, long offsetBase, bool utf8 = true)
+        {
+            var offset = br.ReadInt32();
+            var pos = br.BaseStream.Position;
+            br.BaseStream.Seek(offsetBase + offset, SeekOrigin.Begin);
+            var st = ReadNullTerminatedString(br, utf8);
+            br.BaseStream.Seek(pos, SeekOrigin.Begin);
+            return st;
+        }
         public static string ReadNullTerminatedString(BinaryReader br, bool utf8 = true)
         {
             var data = new List<byte>();
