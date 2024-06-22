@@ -1397,20 +1397,23 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Skin)
             {
-                var skinColor = colors.SkinColor;
+                var skinColor = (Color4)colors.SkinColor;
                 var lipColor = colors.LipColor;
 
+                //skinColor = LinearToSrgb(skinColor);
+
                 ShaderMapperDelegate skinShader = (Color4 diffuse, Color4 normal, Color4 specular, Color4 index) => {
-                    
-                    Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
-                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
 
                     // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
                     // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
                     // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
                     // This effectively undoes one of those conversions.
                     diffuse = LinearToSrgb(diffuse);
+                    //result.Diffuse = diffuse;
 
+
+                    Color4 newNormal = new Color4(normal.Red, normal.Green, 1.0f, 1.0f);
+                    Color4 newSpecular = new Color4(specular.Green, specular.Green, specular.Green, 1.0f);
 
                     // This is an arbitrary number.  There's likely some value in the shader params for skin that
                     // tones down the specularity here, but without it the skin is hyper reflective.
@@ -1419,8 +1422,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     // New diffuse starts from regular diffuse file.
                     // Then factors in the player's skin color multiplied by the shader value.
 
-                    float skinInfluence = (float)Math.Sqrt(specular.Red);
-                    skinInfluence = 1.0f;
+                    float skinInfluence = specular.Red;
                     var coloredSkin = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     diffuse *= coloredSkin;
                     var alpha = 1.0f;
@@ -1441,34 +1443,40 @@ namespace xivModdingFramework.Models.ModelTextures
                 ShaderMapperDelegate faceShader = (Color4 diffuse, Color4 normal, Color4 specular, Color4 index) => {
                     ShaderMapperResult result = skinShader(diffuse, normal, specular, index);
 
+                    var skinColor = (Color4)colors.SkinColor;
+
                     // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
                     // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
                     // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
                     // This effectively undoes one of those conversions.
-                    diffuse = LinearToSrgb(diffuse);
-                    result.Diffuse = diffuse;
+                    result.Diffuse = LinearToSrgb(diffuse);
+                    //result.Diffuse = diffuse;
 
                     var alpha = normal.Blue * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
-                    float skinInfluence = (float)Math.Sqrt(specular.Red);
-                    skinInfluence = 0.0f;
+                    float skinInfluence = (float)specular.Red;
                     var coloredSkin = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     coloredSkin.Alpha = 1.0f;
-                    result.Diffuse = diffuse * coloredSkin;
 
-                    // Face shaders also allow for lip color.
-                    var coloredLip = diffuse * lipColor;
-                    float lipInfluence = specular.Blue;
-                    result.Diffuse = Color4.Lerp(result.Diffuse, coloredLip, lipInfluence);
-                    result.Diffuse.Alpha = alpha;
 
-                    // For lipstick, increase the specular value slightly.
-                    float specAmp = 1.0f + (lipInfluence * 0.25f);
-                    result.Specular = result.Specular * specAmp;
+                    result.Diffuse *= coloredSkin;
+
+                    if (false)
+                    {
+                        // Face shaders also allow for lip color.
+                        var coloredLip = result.Diffuse * lipColor;
+                        float lipInfluence = specular.Blue;
+                        result.Diffuse = Color4.Lerp(result.Diffuse, coloredLip, lipInfluence);
+
+                        // For lipstick, increase the specular value slightly.
+                        float specAmp = 1.0f + (lipInfluence * 0.25f);
+                        result.Specular = result.Specular * specAmp;
+                    }
+
                     // Face shader supports alpha, unlike normal skin textures.
                     result.Alpha = alpha;
-
+                    result.Diffuse.Alpha = alpha;
 
                     return result;
                 };
