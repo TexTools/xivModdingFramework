@@ -130,7 +130,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
 
-            if (includeImages)
+            if (includeImages && !alreadyUnzipped)
             {
                 await IOUtil.UnzipFiles(originalPath, path, (file) =>
                 {
