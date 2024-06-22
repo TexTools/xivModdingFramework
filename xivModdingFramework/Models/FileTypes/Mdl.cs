@@ -4678,7 +4678,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var newRace = IOUtil.GetRaceFromPath(newPath);
 
 
-                if (originalRace != newRace)
+                if (originalRace != newRace && (int)originalRace > 100 && (int) newRace > 100)
                 {
                     // Convert the model to the new race.
                     await ModelModifiers.RaceConvert(model, originalRace, newPath, null, tx);

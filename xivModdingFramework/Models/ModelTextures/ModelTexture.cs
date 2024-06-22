@@ -1256,12 +1256,11 @@ namespace xivModdingFramework.Models.ModelTextures
                         {
                             var occlusion = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
                             diffuse *= occlusion;
-                            specular = occlusion;
 
                             // Specular/Gloss flow
                             var specPower = new Color4(multi.Green, multi.Green, multi.Green, 1.0f);
                             var gloss = new Color4(multi.Blue, multi.Blue, multi.Blue, 1.0f);
-                            specular = occlusion * specPower * gloss;
+                            specular = specPower * gloss;
                         }
                         else
                         {
