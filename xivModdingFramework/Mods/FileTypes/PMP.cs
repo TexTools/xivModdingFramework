@@ -422,7 +422,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var internalPath = file.Key;
                 var ePath = file.Value;
 
-                if(ePath.Contains("../") || ePath.Contains("..\\"))
+                if(ePath.Contains("../") || ePath.Contains("..\\") || ePath.Contains(":"))
                 {
                     throw new InvalidDataException("Modpack uses potentially unsafe external files paths.  Install cancelled for security reasons.");
                 }
