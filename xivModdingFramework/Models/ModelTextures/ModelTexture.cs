@@ -1043,7 +1043,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     diffuse *= diffuseColorMul;
 
-                    var specular = new Color4(1);
+                    var specular = new Color4(1.0f);
                     if (!hasMulti)
                     {
                         specular = new Color4(0, 0, 0, 1);
@@ -1098,7 +1098,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
 
-                    var specular = new Color4(1);
+                    var specular = new Color4(1.0f);
                     if (!hasMulti)
                     {
                         specular = new Color4(0, 0, 0, 1);
@@ -1320,7 +1320,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     diffuse *= diffuseColorMul;
 
-                    var specular = new Color4(1);
+                    var specular = new Color4(1.0f);
                     if (!hasMulti)
                     {
                         specular = new Color4(0, 0, 0, 1);
@@ -1362,7 +1362,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
 
-                    var specular = new Color4(1);
+                    var specular = new Color4(1.0f);
                     if (!hasMulti)
                     {
                         specular = new Color4(0, 0, 0, 1);
@@ -1419,8 +1419,9 @@ namespace xivModdingFramework.Models.ModelTextures
                     // New diffuse starts from regular diffuse file.
                     // Then factors in the player's skin color multiplied by the shader value.
 
-                    float skinInfluence = specular.Red;
-                    var coloredSkin = Color4.Lerp(new Color4(1), skinColor, skinInfluence);
+                    float skinInfluence = (float)Math.Sqrt(specular.Red);
+                    skinInfluence = 1.0f;
+                    var coloredSkin = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     diffuse *= coloredSkin;
                     var alpha = 1.0f;
 
@@ -1445,13 +1446,15 @@ namespace xivModdingFramework.Models.ModelTextures
                     // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
                     // This effectively undoes one of those conversions.
                     diffuse = LinearToSrgb(diffuse);
-
+                    result.Diffuse = diffuse;
 
                     var alpha = normal.Blue * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
-                    float skinInfluence = specular.Red;
-                    var coloredSkin = Color4.Lerp(new Color4(1), skinColor, skinInfluence);
+                    float skinInfluence = (float)Math.Sqrt(specular.Red);
+                    skinInfluence = 0.0f;
+                    var coloredSkin = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
+                    coloredSkin.Alpha = 1.0f;
                     result.Diffuse = diffuse * coloredSkin;
 
                     // Face shaders also allow for lip color.
