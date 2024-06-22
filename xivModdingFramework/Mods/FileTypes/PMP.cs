@@ -420,7 +420,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             foreach (var file in option.Files)
             {
                 var internalPath = file.Key;
-                var externalPath = Path.Combine(basePath, file.Value);
+                var ePath = file.Value;
+
+                if(ePath.Contains("../") || ePath.Contains("..\\"))
+                {
+                    throw new InvalidDataException("Modpack uses potentially unsafe external files paths.  Install cancelled for security reasons.");
+                }
+
+                if(ePath.StartsWith("/") || ePath.StartsWith("\\"))
+                {
+                    ePath = ePath.Substring(1);
+                }
+
+                var externalPath = Path.Combine(basePath, ePath);
                 progress?.Report((i, option.Files.Count, $"Importing New Files from Group {groupIdx+1} - Option {optionIdx+1}..."));
 
                 // Safety checks.
