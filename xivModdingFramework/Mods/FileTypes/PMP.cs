@@ -124,7 +124,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 Groups = groups
             };
 
-            image = Path.GetFullPath(Path.Combine(path, pmp.GetHeaderImage()));
+            var img = pmp.GetHeaderImage();
+            if (img != null) {
+                image = Path.GetFullPath(Path.Combine(path, img));
+            }
 
 
             if (includeImages)

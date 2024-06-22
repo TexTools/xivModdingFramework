@@ -53,7 +53,16 @@ namespace xivModdingFramework.SqPack.FileTypes
         static SemaphoreSlim _lock = new SemaphoreSlim(1);
 
         private const int _MODDED_DAT_MARK_OFFSET = 0x200;
-        private const int _MODDED_DAT_MARK = 1337;
+
+
+        // Arbitrary values we write to the DATs to identify modification status.
+        // Intentionally random and far apart numbers to ensure they are not accidentally set or rolled over by patching.
+        internal enum DatType : int
+        {
+            Unmodified = 0,
+            ModifiedFull = 1337,
+            ModifiedPartial = 6969,
+        }
 
         /// <summary>
         /// Universal Boolean that should be checked before allowing any alteration to DAT files.
@@ -132,6 +141,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
+
         /// <summary>
         /// Creates a new dat file to store modified data.
         /// </summary>
@@ -197,7 +207,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         }
 
 
-        public static bool IsOriginalDat(XivDataFile df, int datNumber)
+        internal static DatType GetDatType(XivDataFile df, int datNumber)
         {
             var datFilePath = Dat.GetDatPath(df, datNumber);
 
@@ -212,25 +222,36 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var one = binaryReader.ReadInt32();
                 var two = binaryReader.ReadInt32();
 
-                if (one == _MODDED_DAT_MARK && two == _MODDED_DAT_MARK)
+                if (one == (int)DatType.ModifiedFull && two == (int)DatType.ModifiedFull)
                 {
-                    return false;
-                }
-                else if(one == 0 && two == 0)
+                    return DatType.ModifiedFull;
+                } else if (one == (int)DatType.ModifiedPartial && two == (int)DatType.ModifiedPartial)
+                {
+                    return DatType.ModifiedPartial;
+                } else if(one == (int)DatType.Unmodified && two == (int)DatType.Unmodified)
                 {
 #if ENDWALKER
                     // Detection for old TexTools DATs.
                     if (IsOldTTDat(binaryReader))
                     {
-                        return false;
+                        return DatType.ModifiedFull;
                     }
 #endif
-                    return true;
-                } else
+
+                    return DatType.Unmodified;
+                }
+                else
                 {
                     throw new Exception("Unknown Format or corrupt DAT: " + df.ToString());
                 }
             }
+        }
+
+        public static bool IsOriginalDat(XivDataFile df, int datNumber)
+        {
+            var datType = GetDatType(df, datNumber);
+
+            return datType == DatType.Unmodified;
         }
 
 #if ENDWALKER
@@ -1382,7 +1403,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
         /// <summary>
         /// Writes a new block of data to the given data file, without changing
-        /// the indexes.  Returns the raw-index-style offset to the new data.
+        /// the indexes.  Returns the offset8x to the new data.
         ///
         /// A target offset of 0 or negative will append to the end of the first data file with space.
         /// </summary>
@@ -1403,7 +1424,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 throw new Exception("Attempted to write Invalid data to DAT files.");
             }
 
-            long filePointer = 0;
             await _lock.WaitAsync();
             try
             {
@@ -1418,8 +1438,6 @@ namespace xivModdingFramework.SqPack.FileTypes
                 {
                     // Seek to the target location.
                     bw.BaseStream.Seek(parts.Offset, SeekOrigin.Begin);
-
-                    filePointer = bw.BaseStream.Position;
 
                     // Write data.
                     bw.Write(importData);
@@ -1573,7 +1591,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Don't let us inject to original dat files.
                 if (original) continue;
-
 
 
                 var fInfo = new FileInfo(datPath);
