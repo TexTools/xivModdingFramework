@@ -315,9 +315,10 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyName(shKv.Key, 0x24826489, "Sub Color Mode", true);
 
                 // Names from testing/observation
-                UpdateKeyName(shKv.Key, 0x40D1481E, "Index Mode?", true);
+                UpdateKeyName(shKv.Key, 0x40D1481E, "Flow Mode?", true);
                 UpdateKeyName(shKv.Key, 0x4F4F0636, "BG Vertex Paint", true);
                 UpdateKeyName(shKv.Key, 0xA9A3EE25, "BG Use Diffuse Alpha", true);
+
 
                 // Texture Mode
                 UpdateKeyValueName(shKv.Key, 0xB616DC5A, 0x5CC605B5, "MODE_DEFAULT");
@@ -345,6 +346,11 @@ namespace xivModdingFramework.Materials.DataContainers
                 // Hair Values
                 UpdateKeyValueName(shKv.Key, 0x24826489, 0xF7B8956E, "PART_HAIR");
                 UpdateKeyValueName(shKv.Key, 0x24826489, 0x6E5B8F10, "PART_FACE");
+
+                // Flow Mode
+                UpdateKeyValueName(shKv.Key, 0x40D1481E, 0x337C6BC4, "Default?");
+                UpdateKeyValueName(shKv.Key, 0x40D1481E, 0x71ADA939, "Use Flow Map?");
+
 
                 // Names based on user observation.
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
