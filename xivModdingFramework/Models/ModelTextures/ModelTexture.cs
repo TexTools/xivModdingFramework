@@ -760,7 +760,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                                 // As metalness rises, the diffuse/specular colors merge.
                                 diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
-                                specPixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
+                                specPixel = Color4.Lerp(specPixel, diffusePixel * specPixel, metalness);
                             }
                         }
                         else
@@ -800,10 +800,11 @@ namespace xivModdingFramework.Models.ModelTextures
                 var skinColor = colors.SkinColor;
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
                 var highlightColor = GetSkinBonusColor2(mtrl, colors);
+                var metalnessConst = 1 - GetFloatConst(mtrl, 0x59BDA0B1, 1.0f);
 
                 return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     var roughness = 0.0f;
-                    var metalness = 0.0f;
+                    var metalness = metalnessConst;
                     var occlusion = 1.0f;
 
                     // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
@@ -812,7 +813,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     // This effectively undoes one of those conversions.
                     diffuse = LinearToSrgb(diffuse);
 
-                    float skinInfluence = (float)normal.Blue;
+                    float skinInfluence = (float)normal.Blue;// * normal.Blue;
                     var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     diffuse *= sColor;
 
@@ -846,15 +847,26 @@ namespace xivModdingFramework.Models.ModelTextures
                     }
 
 
+                    //diffuse *= diffuseColorMul;
+                    // This is a bit of a hack here and probably not correct.
+                    diffuse *= LinearToSrgb(diffuseColorMul);
+
                     if (!settings.GeneratePbrMaps)
                     {
                         specular *= (1 - roughness);
-                        specular *= _SkinSpecMultiplier;
-                    }
 
-                    // This is a bit of a hack here and probably not correct.
-                    diffuse *= LinearToSrgb(diffuseColorMul);
-                    //diffuse *= diffuseColorMul;
+                        if (metalness < 0.5f)
+                        {
+                            specular *= _SkinSpecMultiplier;
+                        } else
+                        {
+                            specular *= _MetalFloor + (metalness * _MetalMultiplier);
+
+                            // As metalness rises, the diffuse/specular colors merge.
+                            diffuse = Color4.Lerp(diffuse, diffuse * specular, metalness);
+                            specular = Color4.Lerp(specular, diffuse * specular, metalness);
+                        }
+                    }
 
 
                     var alpha = diffuse.Alpha * alphaMultiplier;

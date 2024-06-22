@@ -350,6 +350,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
                 UpdateConstantName(shKv.Key, 0x58DE06E2, "Limbal Color?");
+                UpdateConstantName(shKv.Key, 0x59BDA0B1, "Inverse Metalness?");
                 UpdateConstantName(shKv.Key, 0x141722D5, "Specular Color");
 
                 // Names based on analyzing shader code.
