@@ -268,6 +268,12 @@ namespace xivModdingFramework.Models.ModelTextures
                 result.RenderBackfaces = true;
             }
 
+            if (mtrl.Textures.Count > 0)
+            {
+                result.UTilingMode = mtrl.Textures[0].Sampler.UTilingMode;
+                result.VTilingMode = mtrl.Textures[0].Sampler.VTilingMode;
+            }
+
             var settings = new ShaderMapperSettings()
             {
                 HighlightedRow = highlightedRow,
