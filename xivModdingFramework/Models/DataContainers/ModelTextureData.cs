@@ -15,6 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Materials.DataContainers;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.Helpers;
 
@@ -56,6 +57,8 @@ namespace xivModdingFramework.Models.DataContainers
         }
 
         public bool RenderBackfaces { get; set; }
+        public TextureSampler.ETilingMode UTilingMode { get; set; }
+        public TextureSampler.ETilingMode VTilingMode { get; set; }
     }
     /// <summary>
     /// This class holds the data for the textures to be used on the 3D Model
