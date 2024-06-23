@@ -83,6 +83,24 @@ namespace xivModdingFramework.Textures
         }
 
         /// <summary>
+        /// Copies the alpha data from the mask into the base image.
+        /// </summary>
+        public static async Task MaskImage(byte[] baseImage, byte[] mask, int width, int height)
+        {
+            var expectedSize = width * height * 4;
+            if (expectedSize != baseImage.Length
+                || expectedSize != mask.Length)
+            {
+                throw new InvalidDataException("Images were not the expected size.");
+            }
+
+            await ModifyPixels((int offset) =>
+            {
+                baseImage[offset + 3] = mask[offset + 3];
+            }, width, height);
+        }
+
+        /// <summary>
         /// Merges a greyscale alpha overlay into the base image's alpha channel.
         /// </summary>
         /// <param name="baseImage"></param>
@@ -160,6 +178,28 @@ namespace xivModdingFramework.Textures
                 var original = data[i + 0];
                 data[i + 0] = data[i + 2];
                 data[i + 2] = data[original];
+            };
+            await ModifyPixels(act, width, height);
+        }
+
+
+        /// <summary>
+        /// Converts a single channel into a greyscale map on all color channels.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <returns></returns>
+        public static async Task ExpandChannel(byte[] data, int channel, int width, int height, bool includeAlpha = false)
+        {
+            var max = includeAlpha ? 4 : 3;
+            Action<int> act = (i) =>
+            {
+                var val = data[i + channel];
+                for (int z = 0; z < max; z++)
+                {
+                    data[i + z] = val;
+                }
             };
             await ModifyPixels(act, width, height);
         }
@@ -312,7 +352,7 @@ namespace xivModdingFramework.Textures
         /// <param name="newWidth"></param>
         /// <param name="newHeight"></param>
         /// <returns></returns>
-        public static async Task<byte[]> ResizeImage(byte[] pixelData, int width, int height, int newWidth, int newHeight)
+        public static async Task<byte[]> ResizeImage(byte[] pixelData, int width, int height, int newWidth, int newHeight, bool nearestNeighbor = false)
         {
             return await Task.Run(() =>
             {
@@ -323,6 +363,7 @@ namespace xivModdingFramework.Textures
                         Size = new Size(newWidth, newHeight),
                         PremultiplyAlpha = false,
                         Mode = ResizeMode.Stretch,
+                        Sampler = nearestNeighbor ? KnownResamplers.NearestNeighbor : KnownResamplers.Bicubic,
                     })
                 );
                 var data = new byte[newWidth * newHeight * 4];
