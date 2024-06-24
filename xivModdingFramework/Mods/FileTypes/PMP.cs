@@ -363,7 +363,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (settings.UpdateEndwalkerFiles)
                 {
                     progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(imported.Keys, _Source, imported, progress, tx);
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(imported.Keys, _Source, imported, settings.UpdatePartialEndwalkerFiles, progress, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(imported.Keys);

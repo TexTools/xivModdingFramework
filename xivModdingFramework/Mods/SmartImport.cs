@@ -1,4 +1,7 @@
 ﻿using HelixToolkit.SharpDX.Core.Helper;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Tga;
+using SixLabors.ImageSharp.Processing;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -14,8 +17,10 @@ using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
+using xivModdingFramework.Variants.FileTypes;
 
 namespace xivModdingFramework.Mods
 {
@@ -23,6 +28,7 @@ namespace xivModdingFramework.Mods
     public class SmartImportOptions : ICloneable
     {
         public XivTexFormat TextureFormat = XivTexFormat.INVALID;
+        public int MaxImageSize = 0;
         public ModelImportOptions ModelOptions = null;
 
         public object Clone()
@@ -206,9 +212,46 @@ namespace xivModdingFramework.Mods
             // Targa is horrible to detect by bytes, so only allow it for file endings.
             if(magic16 == BMPMagic || magic == PNGMagic || magic32 == DDSMagic || imageExtensions.Any(x => externalPath.ToLower().EndsWith(x)))
             {
+                var wasDds = true;
                 var ddsPath = externalPath;
                 if (magic32 != DDSMagic)
                 {
+                    wasDds = false;
+                    if (options.MaxImageSize > 0)
+                    {
+                        // We have to load and check if the image is over-size first.
+                        using (var img = Image.Load(externalPath))
+                        {
+                            var w = img.Width;
+                            var h = img.Height;
+                            var oversize = false;
+
+                            while (w > options.MaxImageSize || h > options.MaxImageSize)
+                            {
+                                oversize = true;
+                                w /= 2;
+                                h /= 2;
+                            }
+
+                            if (oversize)
+                            {
+                                var resizeOptions = new ResizeOptions
+                                {
+                                    Size = new Size(w, h),
+                                    PremultiplyAlpha = false,
+                                    Mode = ResizeMode.Stretch,
+                                };
+                                img.Mutate(x => x.Resize(resizeOptions));
+
+                                var tempPath = IOUtil.GetFrameworkTempFile() + ".tga";
+                                externalPath = tempPath;
+
+                                img.Save(tempPath, new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32, Compression = TgaCompression.None });
+                            }
+                        }
+                    }
+
+
                     // Our DDS Converter can't operate on Streams, so...
                     await Task.Run(async () =>
                     {
@@ -216,7 +259,29 @@ namespace xivModdingFramework.Mods
                     });
                 }
 
-                return Tex.DDSToUncompressedTex(ddsPath);
+                var texData = Tex.DDSToUncompressedTex(ddsPath);
+                if(wasDds && options.MaxImageSize > 0)
+                {
+                    // This part is slightly annoying.
+                    var tex = XivTex.FromUncompressedTex(texData);
+                    if(tex.Width > options.MaxImageSize || tex.Height > options.MaxImageSize)
+                    {
+                        // Blergh.
+                        var w = tex.Width;
+                        var h = tex.Height;
+
+                        while (w > options.MaxImageSize || h > options.MaxImageSize)
+                        {
+                            w /= 2;
+                            h /= 2;
+                        }
+                        await Tex.ResizeXivTx(tex, w, h);
+                        texData = tex.ToUncompressedTex();
+                    }
+                }
+
+
+                return texData;
             } else if(magic20b == FBXMagic || magic16b == SQLiteMagic || modelExtentions.Any(x => externalPath.ToLower().EndsWith(x)))
             {
                 // Do Model import.

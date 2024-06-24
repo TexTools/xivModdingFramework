@@ -67,6 +67,11 @@ namespace xivModdingFramework.Mods.FileTypes
         public bool UpdateEndwalkerFiles = true;
 
         /// <summary>
+        /// Should the Texture-Only files be processed for Dawntrail updates?
+        /// </summary>
+        public bool UpdatePartialEndwalkerFiles = true;
+
+        /// <summary>
         /// Function that should be called to determine root conversions based on the incoming file paths.
         /// Will be called during import once the final file list has been resolved.
         /// </summary>
@@ -827,7 +832,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     if (settings.UpdateEndwalkerFiles)
                     {
                         var modPack = filteredModsJson[0].ModPackEntry;
-                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, progress, tx);
+                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, settings.UpdatePartialEndwalkerFiles, progress, tx);
                     }
 
                     count = 0;
@@ -1119,7 +1124,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (settings.UpdateEndwalkerFiles)
                 {
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.ProgressReporter, tx);
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(paths);

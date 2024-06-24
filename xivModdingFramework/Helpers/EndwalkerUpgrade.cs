@@ -64,8 +64,9 @@ namespace xivModdingFramework.Helpers
         /// <param name="progress"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, IProgress<(int current, int total, string message)> progress, ModTransaction tx = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
+
             var ret = new Dictionary<string, UpgradeInfo>();
 #if ENDWALKER
             return ret;
@@ -90,13 +91,16 @@ namespace xivModdingFramework.Helpers
                 await EndwalkerUpgrade.UpdateEndwalkerModel(path, source, tx);
             }
 
-            progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-            await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures);
-
-            progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
-            foreach (var path in filePaths)
+            if (includePartials)
             {
-                await EndwalkerUpgrade.UpdateEyeMask(path, source, tx, _ConvertedTextures);
+                progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
+                await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures);
+
+                progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
+                foreach (var path in filePaths)
+                {
+                    await EndwalkerUpgrade.UpdateEyeMask(path, source, tx, _ConvertedTextures);
+                }
             }
 
 
@@ -143,9 +147,7 @@ namespace xivModdingFramework.Helpers
                 await EndwalkerUpgrade.UpdateEndwalkerModel(path, source, tx, files);
             }
 
-           // This introduces complication that is best skipped for the moment.
-           //progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-           // await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures, files);
+            // Texture-only upgrades are ignored in this route, and handled by the TT modpack upgrader afterwards.
 
             return ret;
 

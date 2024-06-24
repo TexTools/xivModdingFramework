@@ -413,6 +413,7 @@ namespace xivModdingFramework.Helpers
                     RootConversionFunction = null,
                     SourceApplication = "PenumbraLiveEdit",
                     UpdateEndwalkerFiles = false,
+                    UpdatePartialEndwalkerFiles = false,
                 };
 
                 await TTMP.ImportFiles(files, null, importSettings, tx);

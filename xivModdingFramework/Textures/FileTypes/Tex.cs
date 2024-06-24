@@ -304,6 +304,16 @@ namespace xivModdingFramework.Textures.FileTypes
             return mapNamePathDictonary;
         }
 
+
+        public static async Task ResizeXivTx(XivTex tex, int width, int height)
+        {
+            var data = await TextureHelpers.ResizeImage(tex, width, height);
+
+            tex.Height = height;
+            tex.Width = width;
+            await MergePixelData(tex, data);
+        }
+
         #endregion
 
         #region High-level File Exporting
@@ -503,8 +513,16 @@ namespace xivModdingFramework.Textures.FileTypes
         }
         public static async Task MergePixelData(XivTex tex, byte[] data)
         {
-            var root = await XivCache.GetFirstRoot(tex.FilePath);
-            bool useMips = root != null;
+            bool useMips = true;
+            if (string.IsNullOrWhiteSpace(tex.FilePath))
+            {
+                useMips = tex.MipMapCount > 1 ? true : false;
+            }
+            else
+            {
+                var root = await XivCache.GetFirstRoot(tex.FilePath);
+                useMips = root != null;
+            }
 
             // Ensure we're converting to a format we can actually process.
             CompressionFormat compressionFormat = CompressionFormat.BGRA;
