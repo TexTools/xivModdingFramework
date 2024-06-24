@@ -332,14 +332,14 @@ namespace xivModdingFramework.Textures
         /// <param name="newWidth"></param>
         /// <param name="newHeight"></param>
         /// <returns></returns>
-        public static async Task<byte[]> ResizeImage(XivTex tex, int newWidth, int newHeight)
+        public static async Task<byte[]> ResizeImage(XivTex tex, int newWidth, int newHeight, bool nearestNeighbor = false)
         {
             var pixels = await tex.GetRawPixels();
             if (newWidth == tex.Width && newHeight == tex.Height)
             {
                 return pixels;
             }
-            return await ResizeImage(pixels, tex.Width, tex.Height, newWidth, newHeight);
+            return await ResizeImage(pixels, tex.Width, tex.Height, newWidth, newHeight, nearestNeighbor);
         }
 
         /// <summary>

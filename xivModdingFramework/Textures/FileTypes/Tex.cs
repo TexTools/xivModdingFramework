@@ -305,9 +305,9 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
 
-        public static async Task ResizeXivTx(XivTex tex, int width, int height)
+        public static async Task ResizeXivTx(XivTex tex, int width, int height, bool nearestNeighbor = false)
         {
-            var data = await TextureHelpers.ResizeImage(tex, width, height);
+            var data = await TextureHelpers.ResizeImage(tex, width, height, nearestNeighbor);
 
             tex.Height = height;
             tex.Width = width;
