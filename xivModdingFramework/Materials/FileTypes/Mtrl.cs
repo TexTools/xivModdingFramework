@@ -1822,7 +1822,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     var material = GetXivMtrl(mtrlData);
 
-                    if(material.ShaderPack == EShaderPack.Invalid)
+                    if(material.ShaderPack == EShaderPack.Unknown)
                     {
                         Trace.WriteLine("Unknown SHPK: " + material.ShaderPackRaw);
                     }

@@ -519,8 +519,8 @@ namespace xivModdingFramework.Materials.DataContainers
         // Enum representation of the shader names used in mtrl files.
         public enum EShaderPack
         {
-            [Description("INVALID")]
-            Invalid,
+            [Description("UNKNOWN")]
+            Unknown,
 
             [Description("character.shpk")]
             Character,
