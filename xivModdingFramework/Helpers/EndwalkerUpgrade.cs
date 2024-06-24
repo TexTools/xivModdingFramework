@@ -1105,7 +1105,7 @@ namespace xivModdingFramework.Helpers
                         || files.ContainsKey(upgrade.Files["mask"]))
                     {
                         // One but not both.
-                        throw new FileNotFoundException("Unable to upgrade Hair Normal/Mask - Normal/Mask do not exist in the same file set.\n" + upgrade.Files["normal"] +"\n" + upgrade.Files["mask"]);
+                        throw new FileNotFoundException("Unable to upgrade Hair Normal/Mask - Normal and Mask do not exist in the same file set/modpack option.\n" + upgrade.Files["normal"] +"\n" + upgrade.Files["mask"]);
                     }
                 }
 

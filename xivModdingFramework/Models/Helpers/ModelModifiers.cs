@@ -943,6 +943,7 @@ namespace xivModdingFramework.Models.Helpers
                 foreach (var p in m.Parts)
                 {
                     ClearVColor_Part(p);
+                    ClearVColor2_Part(p);
                 }
             }
         }
@@ -961,9 +962,9 @@ namespace xivModdingFramework.Models.Helpers
         {
             foreach (var v in p.Vertices)
             {
-                v.VertexColor2[0] = 255;
-                v.VertexColor2[1] = 255;
-                v.VertexColor2[2] = 255;
+                v.VertexColor2[0] = 0;
+                v.VertexColor2[1] = 0;
+                v.VertexColor2[2] = 0;
             }
             UpdateShapeParts(p);
         }
@@ -981,15 +982,25 @@ namespace xivModdingFramework.Models.Helpers
             {
                 foreach (var p in m.Parts)
                 {
-                    ClearVAlpha(p);
+                    ClearVAlpha_Part(p);
+                    ClearVAlpha2_Part(p);
                 }
             }
         }
-        public static void ClearVAlpha(TTMeshPart p)
+
+        public static void ClearVAlpha_Part(TTMeshPart p)
         {
             foreach (var v in p.Vertices)
             {
                 v.VertexColor[3] = 255;
+            }
+            UpdateShapeParts(p);
+        }
+        public static void ClearVAlpha2_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.VertexColor2[3] = 255;
             }
             UpdateShapeParts(p);
         }
