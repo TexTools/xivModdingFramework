@@ -567,7 +567,6 @@ namespace xivModdingFramework.Materials.DataContainers
             [Description("characterinc.shpk")]
             CharacterInc,
 
-
             [Description("characterocclusion.shpk")]
             CharacterOcclusion,
 

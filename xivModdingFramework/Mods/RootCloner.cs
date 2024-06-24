@@ -37,6 +37,8 @@ namespace xivModdingFramework.Mods
             if (root.Info.PrimaryType == XivItemType.equipment) return true;
             if (root.Info.PrimaryType == XivItemType.accessory) return true;
             if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.hair) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.ear) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.tail) return true;
 
             return false;
         }
