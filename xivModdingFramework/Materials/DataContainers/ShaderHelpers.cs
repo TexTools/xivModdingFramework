@@ -521,42 +521,71 @@ namespace xivModdingFramework.Materials.DataContainers
         {
             [Description("INVALID")]
             Invalid,
+
             [Description("character.shpk")]
             Character,
+
             [Description("characterlegacy.shpk")]
             CharacterLegacy,
+
             [Description("characterglass.shpk")]
             CharacterGlass,
-            [Description("characterinc.shpk")]
-            CharacterInc,
-            [Description("skin.shpk")]
-            Skin,
-            [Description("hair.shpk")]
-            Hair,
-            [Description("iris.shpk")]
-            Iris,
-            [Description("bg.shpk")]
-            Bg,
-            [Description("bgprop.shpk")]
-            BgProp,
-            [Description("bgcolorchange.shpk")]
-            BgColorChange,
-            [Description("bguvscroll.shpk")]
-            BgUvScroll,
-            [Description("bgcrestchange.shpk")]
-            BgCrestChange,
+
+            [Description("characterstocking.shpk")]
+            CharacterStocking,
+
             [Description("charactertattoo.shpk")]
             CharacterTattoo,
-            [Description("characterocclusion.shpk")]
-            CharacterOcclusion,
+
+            [Description("skin.shpk")]
+            Skin,
+
+            [Description("hair.shpk")]
+            Hair,
+
+            [Description("iris.shpk")]
+            Iris,
+
+            [Description("bg.shpk")]
+            Bg,
+
+            [Description("bgprop.shpk")]
+            BgProp,
+
+            [Description("bgcolorchange.shpk")]
+            BgColorChange,
+
+            [Description("bguvscroll.shpk")]
+            BgUvScroll,
+
+            [Description("bgcrestchange.shpk")]
+            BgCrestChange,
+
             [Description("characterscroll.shpk")]
             CharacterScroll,
+
+            [Description("characterinc.shpk")]
+            CharacterInc,
+
+
+            [Description("characterocclusion.shpk")]
+            CharacterOcclusion,
+
             [Description("water.shpk")]
             Water,
+
             [Description("river.shpk")]
             River,
+
             [Description("crystal.shpk")]
             Crystal,
+
+            [Description("lightshaft.shpk")]
+            LightShaft,
+
+            [Description("verticalfog.shpk")]
+            VerticalFog,
+
         };
 
         public static EShaderPack GetShpkFromString(string s)

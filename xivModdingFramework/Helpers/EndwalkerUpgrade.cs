@@ -1276,13 +1276,11 @@ namespace xivModdingFramework.Helpers
                 return;
             }
 
-            bool replaceMtrl = true;
             // Update Material
             var baseMaterial = Mtrl.GetXivMtrl(await rTx.ReadFile(irisPath, true), irisPath);
 
             var mtrlTex = baseMaterial.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerDiffuse);
-            mtrlTex.TexturePath = newTexPath;
-            var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(baseMaterial);
+            newTexPath = mtrlTex.TexturePath;
 
             // Convert Mask to Diffuse
             var pixels = await tex.GetRawPixels();
@@ -1301,12 +1299,6 @@ namespace xivModdingFramework.Helpers
 
             // Write the updated material and texture.
             await WriteFile(maskData, newTexPath, files, tx, source);
-
-            if (replaceMtrl)
-            {
-                await WriteFile(mtrlData, irisPath, files, tx, source);
-            }
-
             _ConvertedTextures.Add(maskPath);
         }
 
