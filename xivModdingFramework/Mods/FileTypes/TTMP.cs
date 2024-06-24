@@ -728,6 +728,19 @@ namespace xivModdingFramework.Mods.FileTypes
                                 Trace.WriteLine(ex);
                                 continue;
                             }
+                        } else if(needsTexFix && modJson.FullPath.EndsWith(".mdl"))
+                        {
+                            try
+                            {
+                                // Have to fix old busted models.
+                                storeInfo = await EndwalkerUpgrade.FixOldModel(storeInfo);
+                            }
+                            catch (Exception ex)
+                            {
+                                // File is significantly/unreadably broken.
+                                Trace.WriteLine(ex);
+                                continue;
+                            }
                         }
 
 
@@ -1338,6 +1351,19 @@ namespace xivModdingFramework.Mods.FileTypes
                     {
                         // Have to fix old busted textures.
                         storeInfo = await FixOldTexData(storeInfo);
+                    }
+                    catch
+                    {
+                        // Hmm... What should we do about this?
+                        // Skip the file?
+                        continue;
+                    }
+                } else if(needsTexFix && file.FullPath.EndsWith(".mdl") && includeData)
+                {
+                    try
+                    {
+                        // Have to fix old busted models.
+                        storeInfo = await EndwalkerUpgrade.FixOldModel(storeInfo);
                     }
                     catch
                     {

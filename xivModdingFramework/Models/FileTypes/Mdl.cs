@@ -317,7 +317,7 @@ namespace xivModdingFramework.Models.FileTypes
             return ttModel;
         }
 
-        public static TTModel GetTTModel(byte[] mdlData, string mdlPath = "", ModTransaction tx = null)
+        public static TTModel GetTTModel(byte[] mdlData, string mdlPath = "")
         {
             var mdl = GetXivMdl(mdlData, mdlPath);
             var ttModel = TTModel.FromRaw(mdl);
@@ -1796,7 +1796,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 // Kind of clunky to have to convert this back off bytes, but w/e.
                 // This codepath is basically unused at this point anyways.
-                var ttm = Mdl.GetTTModel(bytes, internalFile, tx);
+                var ttm = Mdl.GetTTModel(bytes, internalFile);
                 await FillMissingMaterials(ttm, options.ReferenceItem, options.SourceApplication, tx);
             }
 

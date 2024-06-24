@@ -153,6 +153,70 @@ namespace xivModdingFramework.Helpers
 
         }
 
+        /// <summary>
+        /// Reimports the given .mdl in order to fix old TexTools quirks.
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        public static async Task<FileStorageInformation> FixOldModel(FileStorageInformation file)
+        {
+            var uncomp = await TransactionDataHandler.GetUncompressedFile(file);
+
+            var mdl = Mdl.GetXivMdl(uncomp);
+            var ttm = TTModel.FromRaw(mdl);
+
+            uncomp = Mdl.MakeUncompressedMdlFile(ttm, mdl);
+
+            var info = new FileStorageInformation()
+            {
+                FileSize = uncomp.Length,
+                RealOffset = 0,
+                StorageType = EFileStorageType.UncompressedIndividual,
+                RealPath = IOUtil.GetFrameworkTempFile()
+            };
+            File.WriteAllBytes(info.RealPath, uncomp);
+            return info;
+        }
+
+        /// <summary>
+        /// Reads an uncompressed v5 MDL and retrieves the offsets to the bone lists, in order to update them.
+        /// </summary>
+        /// <param name="br"></param>
+        /// <param name="offset"></param>
+        /// <returns></returns>
+        private static bool FixModelLoD(BinaryReader br, BinaryWriter bw, long offset = -1)
+        {
+
+            if (offset < 0)
+            {
+                offset = br.BaseStream.Position;
+            }
+
+            br.BaseStream.Seek(offset, SeekOrigin.Begin);
+            bw.BaseStream.Seek(offset, SeekOrigin.Begin);
+
+            var version = br.ReadUInt16();
+
+            br.BaseStream.Seek(offset + 12, SeekOrigin.Begin);
+            var meshCount = br.ReadUInt16();
+
+            br.BaseStream.Seek(offset + 64, SeekOrigin.Begin);
+
+            var lodOffset = br.BaseStream.Position;
+            var lods = br.ReadByte();
+
+            if(lods == 1)
+            {
+                return false;
+            }
+
+            // Write LoD count.
+            bw.BaseStream.Seek(lodOffset, SeekOrigin.Begin);
+            bw.Write((byte)1);
+
+            return true;
+        }
+
 
         public static async Task UpdateEndwalkerModel(string path, string source, ModTransaction tx, Dictionary<string, FileStorageInformation> files = null)
         {
