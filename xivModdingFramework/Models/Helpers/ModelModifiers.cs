@@ -929,7 +929,7 @@ namespace xivModdingFramework.Models.Helpers
             UpdateShapeParts(p);
         }
 
-        // Resets Vertex Color to White.
+        // Resets Vertex Color to White(c1)/Black(c2)
         public static void ClearVColor(TTModel model, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
