@@ -1053,7 +1053,7 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="model"></param>
         /// <param name="originalRace"></param>
         /// <param name="loggingFunction"></param>
-        public static async Task RaceConvert(TTModel incomingModel, XivRace modelRace, string originalModelPath, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
+        public static async Task RaceConvert(TTModel incomingModel, XivRace targetRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -1062,30 +1062,20 @@ namespace xivModdingFramework.Models.Helpers
 
             // Extract the original race from the ttModel if we weren't provided with one.
             var raceRegex = new Regex("c([0-9]{4})");
-            var match = raceRegex.Match(originalModelPath);
-            XivRace race = XivRace.All_Races;
+            var match = raceRegex.Match(incomingModel.Source);
+            XivRace sourceRace = XivRace.All_Races;
             if (match.Success)
             {
-                race = XivRaces.GetXivRace(match.Groups[1].Value);
-                if (modelRace == race)
+                sourceRace = XivRaces.GetXivRace(match.Groups[1].Value);
+                if (targetRace == sourceRace)
                 {
                     // Nothing needs to be done.
                     return;
                 }
 
-                loggingFunction(false, "Converting model from " + modelRace.GetDisplayName() + " to " + race.GetDisplayName() + "...");
+                loggingFunction(false, "Converting model from " + sourceRace.GetDisplayName() + " to " + targetRace.GetDisplayName() + "...");
 
-                var oSource = incomingModel.Source;
-                incomingModel.Source = originalModelPath;
-
-                try
-                {
-                    await RaceConvertRecursive(incomingModel, race, modelRace, loggingFunction, tx);
-                }
-                finally
-                {
-                    incomingModel.Source = oSource;
-                }
+                await RaceConvertRecursive(incomingModel, targetRace, sourceRace, loggingFunction, tx);
             }
             else
             {

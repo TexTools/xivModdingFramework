@@ -270,7 +270,7 @@ namespace xivModdingFramework.Cache
             {
                 // This is for stuff like human faces, where they use fake slot identifiers.
                 materialName = materialName.Replace("_" + Slot, "_" + fakeSlot);
-            } else if (string.IsNullOrWhiteSpace(fakeSlot))
+            } else if (string.IsNullOrWhiteSpace(fakeSlot) && string.IsNullOrWhiteSpace(Slot))
             {
                 // The base material we're starting from has no slot suffix.
                 materialName = materialName.Replace("_" + Slot, "");

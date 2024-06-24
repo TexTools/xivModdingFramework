@@ -4681,7 +4681,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (originalRace != newRace && (int)originalRace > 100 && (int) newRace > 100)
                 {
                     // Convert the model to the new race.
-                    await ModelModifiers.RaceConvert(model, originalRace, newPath, null, tx);
+                    await ModelModifiers.RaceConvert(model, newRace, null, tx);
                     ModelModifiers.FixUpSkinReferences(model, newPath);
                 }
 
@@ -5000,7 +5000,7 @@ namespace xivModdingFramework.Models.FileTypes
                 if (mainRace != mergeInRace)
                 {
                     // Convert the model to the new race.
-                    await ModelModifiers.RaceConvert(mergeInModel, mainRace, mainModel.Source, null, tx);
+                    await ModelModifiers.RaceConvert(mergeInModel, mainRace, null, tx);
                 }
 
                 // Merging the actual models is the simplest part of this whole affair...
