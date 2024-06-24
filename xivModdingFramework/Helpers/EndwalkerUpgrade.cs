@@ -24,6 +24,12 @@ using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes.PMP;
 using xivModdingFramework.Mods.Interfaces;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Tga;
+using Point = SixLabors.ImageSharp.Point;
+using xivModdingFramework.General.Enums;
 
 namespace xivModdingFramework.Helpers
 {
@@ -86,6 +92,13 @@ namespace xivModdingFramework.Helpers
 
             progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
             await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures);
+
+            progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
+            foreach (var path in filePaths)
+            {
+                await EndwalkerUpgrade.UpdateEyeMask(path, source, tx, _ConvertedTextures);
+            }
+
 
             progress?.Report((0, total, "Endwalker Upgrades Complete..."));
             return ret;
@@ -963,16 +976,29 @@ namespace xivModdingFramework.Helpers
 
 
 
-        private static async Task<bool> Exists(string path, Dictionary<string, FileStorageInformation> files, ModTransaction tx)
+        private static async Task<bool> Exists(string path, Dictionary<string, FileStorageInformation> files, ModTransaction tx, bool modifiedOnly = false)
         {
             if(files != null && files.ContainsKey(path))
             {
                 return true;
             }
-            
-            if(tx != null && await tx.FileExists(path))
+
+            if (modifiedOnly)
             {
-                return true;
+                if(tx != null)
+                {
+                    if (tx.ModifiedFiles.Contains(path))
+                    {
+                        return true;
+                    }
+                }
+            }
+            else
+            {
+                if (tx != null && await tx.FileExists(path))
+                {
+                    return true;
+                }
             }
 
             return false;
@@ -1082,6 +1108,204 @@ namespace xivModdingFramework.Helpers
                 }
 
             }
+        }
+
+
+
+        private static TgaEncoder Encoder = new TgaEncoder()
+        {
+            BitsPerPixel = TgaBitsPerPixel.Pixel32,
+            Compression = TgaCompression.None
+        };
+
+
+        /// <summary>
+        /// Takes the raw data of an old Endwalker mask image, and converts it into a Dawntrail style diffuse.
+        /// This only makes use of the Mask.Red channel data, all other data is discarded as it cannot be replicated.
+        /// </summary>
+        /// <param name="maskData"></param>
+        /// <param name="originalMaskWidth"></param>
+        /// <param name="originalMaskHeight"></param>
+        /// <returns></returns>
+        public static async Task<(byte[] PixelData, int Width, int Height)> ConvertEyeMaskToDiffuse(byte[] maskData, int originalMaskWidth, int originalMaskHeight)
+        {
+            // The Ratio of Iris to Sclera is 92/100 in old textures, but is
+            // 1/2.55 roughly in the new.
+            // Multiplying these terms together results in a ratio of roughly .44
+            double ratio = 0.442;
+
+
+            // In order to guarantee we're resizing up, not down, and are still a power-of-two, we have to 4x the
+            // dimensions of the original mask file, as a 2x would result in some amount of compression.
+            var w = originalMaskWidth * 4;
+            var h = originalMaskHeight * 4;
+
+            var irisW = (int)(w * ratio);
+            var irisH = (int)(h * ratio);
+
+            // Pull the base game eye files as our baseline.
+            var rTx = ModTransaction.BeginReadonlyTransaction();
+            var baseDiffuseTex = await Tex.GetXivTex("chara/common/texture/eye/eye01_base.tex", true, rTx);
+            var frameTex = await Tex.GetXivTex("chara/common/texture/eye/eye01_mask.tex", true, rTx);
+
+            var diffuseData = await baseDiffuseTex.GetRawPixels();
+            var frameData = await frameTex.GetRawPixels();
+
+            // Convert mask to greyscale copy of just the red channel data.
+            await TextureHelpers.ExpandChannel(maskData, 0, originalMaskWidth, originalMaskHeight);
+            var resizedMask = await TextureHelpers.ResizeImage(maskData, originalMaskWidth, originalMaskHeight, irisW, irisH);
+
+            // Convert eye frame to just the actual framing information
+            await TextureHelpers.ExpandChannel(frameData, 2, frameTex.Width, frameTex.Height, true);
+
+
+            // Resize and blur the frame slightly.
+            using (var frameImage = Image.LoadPixelData<Rgba32>(frameData, frameTex.Width, frameTex.Height))
+            {
+                var resizeOptions = new ResizeOptions
+                {
+                    Size = new SixLabors.ImageSharp.Size(w, h),
+                    PremultiplyAlpha = false,
+                    Mode = SixLabors.ImageSharp.Processing.ResizeMode.Stretch,
+                    Sampler = SixLabors.ImageSharp.Processing.KnownResamplers.NearestNeighbor,
+                };
+                frameImage.Mutate(x => x.Resize(resizeOptions));
+
+                // Box-blur the mask just a hair to reduce the harshness at the edges.
+                // This looks a little nicer than just bicubic upscaling the mask.
+                frameImage.Mutate(x => x.BoxBlur(w / 128));
+                frameData = IOUtil.GetImageSharpPixels(frameImage);
+                frameImage.SaveAsTga("E:\\img.tga", Encoder);
+            }
+
+            var maskPixels = new byte[w * h * 4];
+
+            // Draw the mask onto a new blank canvas and get the byte data back.
+            using (var blankImage = Image.LoadPixelData<Rgba32>(maskPixels, w, h))
+            {
+                using (var maskImage = Image.LoadPixelData<Rgba32>(resizedMask, irisW, irisH))
+                {
+                    var pt = new Point((w / 2) - (irisW / 2), (h / 2) - (irisH / 2));
+                    blankImage.Mutate(x => x.DrawImage(maskImage, pt, 1.0f));
+
+                    maskPixels = IOUtil.GetImageSharpPixels(blankImage);
+
+                }
+            }
+
+
+            // Use the frame to mask the mask.
+            await TextureHelpers.MaskImage(maskPixels, frameData, w, h);
+
+            // And finally, resize the diffuse and draw the masked image back in.
+            using (var mainImage = Image.LoadPixelData<Rgba32>(diffuseData, baseDiffuseTex.Width, baseDiffuseTex.Height))
+            {
+                using (var maskImage = Image.LoadPixelData<Rgba32>(maskPixels, w, h))
+                {
+                    maskImage.SaveAsTga("E:\\img2.tga", Encoder);
+                    var resizeOptions = new ResizeOptions
+                    {
+                        Size = new SixLabors.ImageSharp.Size(w, h),
+                        PremultiplyAlpha = false,
+                        Mode = SixLabors.ImageSharp.Processing.ResizeMode.Stretch,
+                        Sampler = SixLabors.ImageSharp.Processing.KnownResamplers.Bicubic,
+                    };
+                    mainImage.Mutate(x => x.Resize(resizeOptions));
+
+                    var ops = new GraphicsOptions()
+                    {
+                        AlphaCompositionMode = PixelAlphaCompositionMode.SrcAtop,
+                    };
+                    mainImage.Mutate(x => x.DrawImage(maskImage, ops));
+
+                    var finalData = IOUtil.GetImageSharpPixels(mainImage);
+                    return (finalData, mainImage.Width, mainImage.Height);
+                }
+            }
+        }
+
+        private static Regex EyeMaskPathRegex = new Regex("chara/human/c[0-9]{4}/obj/face/f[0-9]{4}/texture/--c[0-9]{4}f[0-9]{4}_iri_s.tex");
+
+        public static async Task UpdateEyeMask(string maskPath, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> files = null)
+        {
+            if (!EyeMaskPathRegex.IsMatch(maskPath))
+            {
+                return;
+            }
+
+            if(_ConvertedTextures == null)
+            {
+                _ConvertedTextures = new HashSet<string>();
+            }
+
+            if(!await Exists(maskPath, files, tx))
+            {
+                return;
+            }
+
+            if (_ConvertedTextures.Contains(maskPath))
+            {
+                return;
+            }
+            var newTexPath = maskPath.Replace(".tex", "_diffuse.tex").Replace("--","");
+
+            var data = await ResolveFile(maskPath, files, tx);
+
+            var tex = XivTex.FromUncompressedTex(data);
+
+            var facex = new Regex("f([0-9]{4})");
+            var match = facex.Match(Path.GetFileName(maskPath));
+            if (!match.Success)
+            {
+                return;
+            }
+
+            var race = IOUtil.GetRaceFromPath(maskPath);
+            var face = Int32.Parse(match.Groups[1].Value);
+
+            var irisFormat = "chara/human/c{0}/obj/face/f{1}/material/mt_c{0}f{1}_iri_a.mtrl";
+            var irisPath = string.Format(irisFormat, race.GetRaceCode(), face.ToString("D4"));
+
+            var rTx = ModTransaction.BeginReadonlyTransaction();
+
+            if(!await rTx.FileExists(irisPath, true))
+            {
+                // Hmmm...
+                return;
+            }
+
+            bool replaceMtrl = true;
+            // Update Material
+            var baseMaterial = Mtrl.GetXivMtrl(await rTx.ReadFile(irisPath, true), irisPath);
+
+            var mtrlTex = baseMaterial.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerDiffuse);
+            mtrlTex.TexturePath = newTexPath;
+            var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(baseMaterial);
+
+            // Convert Mask to Diffuse
+            var pixels = await tex.GetRawPixels();
+
+            var updated = await ConvertEyeMaskToDiffuse(pixels, tex.Width, tex.Height);
+
+            await TextureHelpers.SwizzleRB(updated.PixelData, updated.Width, updated.Height);
+
+            // Create MipMaps (And DDS header that we don't really need)
+            var maskData = await Tex.ConvertToDDS(updated.PixelData, XivTexFormat.A8R8G8B8, true, updated.Height, updated.Width);
+
+
+            // Convert DDS to uncompressed Tex
+            maskData = Tex.DDSToUncompressedTex(maskData);
+
+
+            // Write the updated material and texture.
+            await WriteFile(maskData, newTexPath, files, tx, source);
+
+            if (replaceMtrl)
+            {
+                await WriteFile(mtrlData, irisPath, files, tx, source);
+            }
+
+            _ConvertedTextures.Add(maskPath);
         }
 
     }

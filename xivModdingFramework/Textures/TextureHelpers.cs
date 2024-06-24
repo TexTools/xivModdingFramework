@@ -168,8 +168,6 @@ namespace xivModdingFramework.Textures
         /// <param name="data"></param>
         /// <param name="width"></param>
         /// <param name="height"></param>
-        /// <param name="channel"></param>
-        /// <param name="value"></param>
         /// <returns></returns>
         public static async Task SwizzleRB(byte[] data, int width, int height)
         {
@@ -177,7 +175,7 @@ namespace xivModdingFramework.Textures
             {
                 var original = data[i + 0];
                 data[i + 0] = data[i + 2];
-                data[i + 2] = data[original];
+                data[i + 2] = original;
             };
             await ModifyPixels(act, width, height);
         }

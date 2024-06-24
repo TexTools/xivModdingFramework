@@ -36,6 +36,7 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 using System.Diagnostics;
 using System.Threading;
+using xivModdingFramework.Cache;
 
 namespace xivModdingFramework.Helpers
 {
@@ -359,6 +360,9 @@ namespace xivModdingFramework.Helpers
             if (file.StartsWith(Path.GetTempPath()))
             {
                 File.Delete(file);
+            } else if (file.StartsWith(XivCache.TempDirectory))
+            {
+                File.Delete(file);
             }
         }
 
@@ -396,6 +400,9 @@ namespace xivModdingFramework.Helpers
                 return;
             }
             if (dir.StartsWith(Path.GetTempPath()))
+            {
+                RecursiveDeleteDirectory(dir);
+            } else if (dir.StartsWith(XivCache.TempDirectory))
             {
                 RecursiveDeleteDirectory(dir);
             }
@@ -747,7 +754,7 @@ namespace xivModdingFramework.Helpers
         }
         public static string GetFrameworkTempFolder()
         {
-            var path = Path.Combine(Path.GetTempPath(), "xivmf");
+            var path = Path.Combine(XivCache.TempDirectory, "xivmf");
             Directory.CreateDirectory(path);
             return path;
         }

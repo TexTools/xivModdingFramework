@@ -99,6 +99,27 @@ namespace xivModdingFramework.Cache
         }
 
 
+        private static string _TempDirectory = Path.GetTempPath();
+        public static string TempDirectory
+        {
+            get
+            {
+                return _TempDirectory;
+            }
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    _TempDirectory = Path.GetTempPath();
+                } else
+                {
+                    value = Path.GetFullPath(value);
+                    Directory.CreateDirectory(value);
+                    _TempDirectory = value;
+                }
+            }
+        }
+
 
         private static EModelingTool _ModelingTool = EModelingTool.Blender;
         public static EModelingTool ModelingTool
