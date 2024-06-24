@@ -333,7 +333,7 @@ namespace xivModdingFramework.Items.Categories
                 return new Dictionary<string, string>();
             }
 
-            foreach (var mdl in assets.MdlList)
+            foreach (var mdl in assets.Models)
             {
                 if (mdl.Contains("base"))
                 {
@@ -417,19 +417,48 @@ namespace xivModdingFramework.Items.Categories
 
             var path = assetFolder + "/" + assetFile;
             
-            if(!await tx.FileExists(path))
-            {
-                return null;
-            }
-
-            var assetData = await tx.ReadFile(path);
 
             //var sgb = Sgb.GetXivSgb(assetData);
 
             var housingAssets = new HousingAssets();
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
+                await GetAdditionalAssets(housingAssets, new List<string>() { path }, tx);
+            });
+
+            return housingAssets;
+        }
+
+        /// <summary>
+        /// Recursively retrieves all housing assets from a set of SGB files.
+        /// </summary>
+        private async Task GetAdditionalAssets(HousingAssets assets, IEnumerable<string> paths, ModTransaction tx = null, HashSet<string> scannedPaths = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            if(scannedPaths == null)
+            {
+                scannedPaths = new HashSet<string>();
+            }
+
+            foreach (var asset in paths)
+            {
+                if (scannedPaths.Contains(asset))
+                {
+                    continue;
+                }
+                if (!await tx.FileExists(asset))
+                {
+                    continue;
+                }
+
+                var assetData = await tx.ReadFile(asset);
+                var relatedSgbs = new HashSet<string>();
                 using (var br = new BinaryReader(new MemoryStream(assetData)))
                 {
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
@@ -465,137 +494,31 @@ namespace xivModdingFramework.Items.Categories
                         if (path.Equals(string.Empty)) continue;
 
                         // Add the attribute to the list
-                        if (pathCounts == 0)
+                        if (path.Contains(".mdl"))
                         {
-                            housingAssets.Shared = path;
+                            assets.Models.Add(path);
                         }
-                        else if (pathCounts == 1)
+                        else if (path.Contains(".sgb"))
                         {
-                            housingAssets.BaseFileName = path;
+                            relatedSgbs.Add(path);
                         }
-                        else
+                        else if (path.Contains("."))
                         {
-                            if (path.Contains(".mdl"))
-                            {
-                                housingAssets.MdlList.Add(path);
-                            }
-                            else if (path.Contains(".sgb"))
-                            {
-                                housingAssets.AdditionalAssetList.Add(path);
-                            }
-                            else if (!path.Contains("."))
-                            {
-                                housingAssets.BaseFolder = path;
-                            }
-                            else
-                            {
-                                housingAssets.OthersList.Add(path);
-                            }
+                            assets.OtherFiles.Add(path);
                         }
 
                         pathCounts++;
                     }
                 }
-            });
 
-            if (housingAssets.AdditionalAssetList.Count > 0)
-            {
-                await GetAdditionalAssets(housingAssets, tx);
-            }
-
-
-            return housingAssets;
-        }
-
-        /// <summary>
-        /// Gets additional assets when the original asset file contains asset file paths within it
-        /// </summary>
-        /// <param name="assets">The current asset object</param>
-        private async Task GetAdditionalAssets(HousingAssets assets, ModTransaction tx = null)
-        {
-            if(tx == null)
-            {
-                // Readonly TX if we don't have one.
-                tx = ModTransaction.BeginReadonlyTransaction();
-            }
-
-
-            foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
-            {
-
-                var assetData = await tx.ReadFile(additionalAsset);
-
-                await Task.Run(() =>
+                if (relatedSgbs.Count > 0)
                 {
-                    using (var br = new BinaryReader(new MemoryStream(assetData)))
-                    {
-                        br.BaseStream.Seek(20, SeekOrigin.Begin);
+                    await GetAdditionalAssets(assets, relatedSgbs, tx, scannedPaths);
+                }
 
-                        var skip = br.ReadInt32() + 20;
-
-                        br.BaseStream.Seek(skip + 4, SeekOrigin.Begin);
-
-                        var stringsOffset = br.ReadInt32();
-
-                        br.BaseStream.Seek(skip + stringsOffset, SeekOrigin.Begin);
-
-                        var pathCounts = 0;
-
-                        while (true)
-                        {
-                            // Because we don't know the length of the string, we read the data until we reach a 0 value
-                            // That 0 value is the space between strings
-                            byte a;
-                            var pathName = new List<byte>();
-                            while ((a = br.ReadByte()) != 0)
-                            {
-                                if (a == 0xFF) break;
-
-                                pathName.Add(a);
-                            }
-
-                            if (a == 0xFF) break;
-
-                            // Read the string from the byte array and remove null terminators
-                            var path = Encoding.ASCII.GetString(pathName.ToArray()).Replace("\0", "");
-
-                            if (path.Equals(string.Empty)) continue;
-
-                            // Add the attribute to the list
-                            if (pathCounts == 0)
-                            {
-                                assets.Shared = path;
-                            }
-                            else if (pathCounts == 1)
-                            {
-                                assets.BaseFileName = path;
-                            }
-                            else
-                            {
-                                if (path.Contains(".mdl"))
-                                {
-                                    assets.MdlList.Add(path);
-                                }
-                                else if (path.Contains(".sgb"))
-                                {
-                                    assets.AdditionalAssetList.Add(path);
-                                }
-                                else if (!path.Contains("."))
-                                {
-                                    assets.BaseFolder = path;
-                                }
-                                else
-                                {
-                                    assets.OthersList.Add(path);
-                                }
-                            }
-
-                            pathCounts++;
-                        }
-                    }
-                });
             }
         }
+
     }
 
     /// <summary>
@@ -603,16 +526,7 @@ namespace xivModdingFramework.Items.Categories
     /// </summary>
     public class HousingAssets
     {
-        public string Shared { get; set; }
-
-        public string BaseFileName { get; set; }
-
-        public List<string> MdlList { get; set; } = new List<string>();
-
-        public List<string> AdditionalAssetList { get; set; } = new List<string>();
-
-        public List<string> OthersList { get; set;} = new List<string>();
-
-        public string BaseFolder { get; set; }
+        public List<string> Models { get; set; } = new List<string>();
+        public List<string> OtherFiles { get; set;} = new List<string>();
     }
 }
