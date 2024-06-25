@@ -1241,7 +1241,6 @@ namespace xivModdingFramework.Helpers
                 // This looks a little nicer than just bicubic upscaling the mask.
                 frameImage.Mutate(x => x.BoxBlur(w / 128));
                 frameData = IOUtil.GetImageSharpPixels(frameImage);
-                frameImage.SaveAsTga("E:\\img.tga", Encoder);
             }
 
             var maskPixels = new byte[w * h * 4];
@@ -1268,7 +1267,6 @@ namespace xivModdingFramework.Helpers
             {
                 using (var maskImage = Image.LoadPixelData<Rgba32>(maskPixels, w, h))
                 {
-                    maskImage.SaveAsTga("E:\\img2.tga", Encoder);
                     var resizeOptions = new ResizeOptions
                     {
                         Size = new SixLabors.ImageSharp.Size(w, h),
