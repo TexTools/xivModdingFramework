@@ -34,8 +34,11 @@ namespace xivModdingFramework.Mods
         public object Clone()
         {
             var op = (SmartImportOptions) MemberwiseClone();
-            var mops = (ModelImportOptions) ModelOptions.Clone();
-            op.ModelOptions = mops;
+            if (ModelOptions != null)
+            {
+                var mops = (ModelImportOptions)ModelOptions.Clone();
+                op.ModelOptions = mops;
+            }
             return op;
         }
     }

@@ -57,8 +57,8 @@ namespace xivModdingFramework.Helpers
         private static bool _LOADING = false;
 
         // Debounced functions to trigger each update half.
-        private static Action DebouncedWatcherAction = Debounce(TakeWatcherAction, 500);
-        private static Action DebouncedUpdatePenumbra = Debounce(UpdatePenumbra, 500);
+        private static Action DebouncedWatcherAction = Debounce(TakeWatcherAction, 800);
+        private static Action DebouncedUpdatePenumbra = Debounce(UpdatePenumbra, 800);
 
         // Tracking vars for when we need to write files to Penumbra.
         private static bool _WantsGlobalWrite = false;
