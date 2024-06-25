@@ -33,20 +33,13 @@ namespace xivModdingFramework.HUD.FileTypes
     /// <summary>
     ///  This class contains the methods that deal with the .uld file type 
     /// </summary>
-    public class Uld
+    public static class Uld
     {
-        private readonly DirectoryInfo _gameDirectory;
-
-        public Uld(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
-
         /// <summary>
         /// Gets the texture paths from the uld file
         /// </summary>
         /// <returns>List of texture paths from the uld file</returns>
-        public async Task<List<string>> GetTexFromUld(ModTransaction tx = null)
+        public static async Task<List<string>> GetTexFromUld(ModTransaction tx = null)
         {
             var uldLock = new object();
             var hashedFolder = HashGenerator.GetHash("ui/uld");

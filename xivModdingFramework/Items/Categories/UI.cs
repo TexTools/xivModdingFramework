@@ -61,8 +61,7 @@ namespace xivModdingFramework.Items.Categories
             var uldList = new List<XivUi>();
 
             var _ex = new Ex();
-            var uld = new Uld(XivCache.GameInfo.GameDirectory);
-            var uldPaths = await uld.GetTexFromUld(tx);
+            var uldPaths = await Uld.GetTexFromUld(tx);
 
             await Task.Run(() => Parallel.ForEach(uldPaths, (uldPath) =>
             {
