@@ -1312,7 +1312,7 @@ namespace xivModdingFramework.Models.DataContainers
                 loggingFunction = ModelModifiers.NoOp;
             }
 
-            var connectionString = "Data Source=" + filePath + ";Pooling=False;";
+            var connectionString = "Data Source=" + filePath + ";Pooling=True;";
             TTModel model = new TTModel();
             model.Source = filePath;
 
@@ -1320,39 +1320,42 @@ namespace xivModdingFramework.Models.DataContainers
             using (var db = new SQLiteConnection(connectionString))
             {
                 db.Open();
+                SetPragmas(db);
                 // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
 
                 // Load Mesh Groups
                 var query = "select * from meshes order by mesh asc;";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
-                    using (var reader = new CacheReader(cmd.ExecuteReader()))
+                    using (var dr = cmd.ExecuteReader())
                     {
-                        while (reader.NextRow())
+                        using (var reader = new CacheReader(dr))
                         {
-                            var meshNum = reader.GetInt32("mesh");
-
-                            // Spawn mesh groups as needed.
-                            while (model.MeshGroups.Count <= meshNum)
+                            while (reader.NextRow())
                             {
-                                model.MeshGroups.Add(new TTMeshGroup());
-                            }
-                            var t = reader.GetString("type");
+                                var meshNum = reader.GetInt32("mesh");
 
-                            if (string.IsNullOrWhiteSpace(t))
-                            {
-                                model.MeshGroups[meshNum].MeshType = EMeshType.Standard;
-                            }
-                            else
-                            {
-                                model.MeshGroups[meshNum].MeshType = (EMeshType) Enum.Parse(typeof(EMeshType), t);
-                            }
+                                // Spawn mesh groups as needed.
+                                while (model.MeshGroups.Count <= meshNum)
+                                {
+                                    model.MeshGroups.Add(new TTMeshGroup());
+                                }
+                                var t = reader.GetString("type");
 
-                            model.MeshGroups[meshNum].Name = reader.GetString("name");
+                                if (string.IsNullOrWhiteSpace(t))
+                                {
+                                    model.MeshGroups[meshNum].MeshType = EMeshType.Standard;
+                                }
+                                else
+                                {
+                                    model.MeshGroups[meshNum].MeshType = (EMeshType) Enum.Parse(typeof(EMeshType), t);
+                                }
+
+                                model.MeshGroups[meshNum].Name = reader.GetString("name");
+                            }
                         }
                     }
                 }
-
 
                 // Load Mesh Parts
                 query = "select * from parts order by mesh asc, part asc;";
@@ -1377,7 +1380,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 model.MeshGroups[meshNum].Parts.Add(new TTMeshPart());
 
                             }
-                            
+
                             var attribs = reader.GetString("attributes");
                             var attributes = new string[0];
                             if (!String.IsNullOrWhiteSpace(attribs))
@@ -1407,102 +1410,96 @@ namespace xivModdingFramework.Models.DataContainers
                     }
                 }
 
-            }
-
-            // Loop for each part, to populate their internal data structures.
-            for (var mId = 0; mId < model.MeshGroups.Count; mId++)
-            {
-                var m = model.MeshGroups[mId];
-                for (var pId = 0; pId < m.Parts.Count; pId++)
+                // Loop for each part, to populate their internal data structures.
+                for (var mId = 0; mId < model.MeshGroups.Count; mId++)
                 {
-                    var p = m.Parts[pId];
-                    var where = new WhereClause();
-                    var mWhere = new WhereClause();
-                    mWhere.Column = "mesh";
-                    mWhere.Value = mId;
-                    var pWhere = new WhereClause();
-                    pWhere.Column = "part";
-                    pWhere.Value = pId;
-
-                    where.Inner.Add(mWhere);
-                    where.Inner.Add(pWhere);
-
-                    // Load Vertices
-                    // The reader handles coalescing the null types for us.
-                    p.Vertices = BuildListFromTable(connectionString, "vertices", where, async (reader) =>
+                    var m = model.MeshGroups[mId];
+                    for (var pId = 0; pId < m.Parts.Count; pId++)
                     {
-                        var vertex = new TTVertex();
+                        var p = m.Parts[pId];
+                        var where = new WhereClause();
+                        var mWhere = new WhereClause();
+                        mWhere.Column = "mesh";
+                        mWhere.Value = mId;
+                        var pWhere = new WhereClause();
+                        pWhere.Column = "part";
+                        pWhere.Value = pId;
 
-                        // Positions
-                        vertex.Position.X = reader.GetFloat("position_x");
-                        vertex.Position.Y = reader.GetFloat("position_y");
-                        vertex.Position.Z = reader.GetFloat("position_z");
+                        where.Inner.Add(mWhere);
+                        where.Inner.Add(pWhere);
 
-                        // Normals
-                        vertex.Normal.X = reader.GetFloat("normal_x");
-                        vertex.Normal.Y = reader.GetFloat("normal_y");
-                        vertex.Normal.Z = reader.GetFloat("normal_z");
-
-                        // Vertex Colors - Vertex color is RGBA
-                        vertex.VertexColor[0] = (byte)(Math.Round(reader.GetFloat("color_r") * 255));
-                        vertex.VertexColor[1] = (byte)(Math.Round(reader.GetFloat("color_g") * 255));
-                        vertex.VertexColor[2] = (byte)(Math.Round(reader.GetFloat("color_b") * 255));
-                        vertex.VertexColor[3] = (byte)(Math.Round(reader.GetFloat("color_a") * 255));
-
-                        // Vertex Colors - Vertex color is RGBA
-                        vertex.VertexColor2[0] = (byte)(Math.Round(reader.GetFloat("color2_r") * 255));
-                        vertex.VertexColor2[1] = (byte)(Math.Round(reader.GetFloat("color2_g") * 255));
-                        vertex.VertexColor2[2] = (byte)(Math.Round(reader.GetFloat("color2_b") * 255));
-                        vertex.VertexColor2[3] = (byte)(Math.Round(reader.GetFloat("color2_a") * 255));
-
-                        // UV Coordinates
-                        vertex.UV1.X = reader.GetFloat("uv_1_u");
-                        vertex.UV1.Y = reader.GetFloat("uv_1_v");
-                        vertex.UV2.X = reader.GetFloat("uv_2_u");
-                        vertex.UV2.Y = reader.GetFloat("uv_2_v");
-
-                        // Bone Ids
-                        vertex.BoneIds[0] = (byte)(reader.GetByte("bone_1_id"));
-                        vertex.BoneIds[1] = (byte)(reader.GetByte("bone_2_id"));
-                        vertex.BoneIds[2] = (byte)(reader.GetByte("bone_3_id"));
-                        vertex.BoneIds[3] = (byte)(reader.GetByte("bone_4_id"));
-                        vertex.BoneIds[4] = (byte)(reader.GetByte("bone_5_id"));
-                        vertex.BoneIds[5] = (byte)(reader.GetByte("bone_6_id"));
-                        vertex.BoneIds[6] = (byte)(reader.GetByte("bone_7_id"));
-                        vertex.BoneIds[7] = (byte)(reader.GetByte("bone_8_id"));
-
-                        // Weights
-                        vertex.Weights[0] = (byte)(Math.Round(reader.GetFloat("bone_1_weight") * 255));
-                        vertex.Weights[1] = (byte)(Math.Round(reader.GetFloat("bone_2_weight") * 255));
-                        vertex.Weights[2] = (byte)(Math.Round(reader.GetFloat("bone_3_weight") * 255));
-                        vertex.Weights[3] = (byte)(Math.Round(reader.GetFloat("bone_4_weight") * 255));
-                        vertex.Weights[4] = (byte)(Math.Round(reader.GetFloat("bone_5_weight") * 255));
-                        vertex.Weights[5] = (byte)(Math.Round(reader.GetFloat("bone_6_weight") * 255));
-                        vertex.Weights[6] = (byte)(Math.Round(reader.GetFloat("bone_7_weight") * 255));
-                        vertex.Weights[7] = (byte)(Math.Round(reader.GetFloat("bone_8_weight") * 255));
-
-                        return vertex;
-                    }).GetAwaiter().GetResult();
-
-                    p.TriangleIndices = BuildListFromTable(connectionString, "indices", where, async (reader) =>
-                    {
-                        try
+                        // Load Vertices
+                        // The reader handles coalescing the null types for us.
+                        p.Vertices = BuildListFromTable(db, "vertices", where, (reader) =>
                         {
-                            return reader.GetInt32("vertex_id");
-                        } catch(Exception ex)
+                            var vertex = new TTVertex();
+
+                            // Positions
+                            vertex.Position.X = reader.GetFloat("position_x");
+                            vertex.Position.Y = reader.GetFloat("position_y");
+                            vertex.Position.Z = reader.GetFloat("position_z");
+
+                            // Normals
+                            vertex.Normal.X = reader.GetFloat("normal_x");
+                            vertex.Normal.Y = reader.GetFloat("normal_y");
+                            vertex.Normal.Z = reader.GetFloat("normal_z");
+
+                            // Vertex Colors - Vertex color is RGBA
+                            vertex.VertexColor[0] = (byte)(Math.Round(reader.GetFloat("color_r") * 255));
+                            vertex.VertexColor[1] = (byte)(Math.Round(reader.GetFloat("color_g") * 255));
+                            vertex.VertexColor[2] = (byte)(Math.Round(reader.GetFloat("color_b") * 255));
+                            vertex.VertexColor[3] = (byte)(Math.Round(reader.GetFloat("color_a") * 255));
+
+                            // Vertex Colors - Vertex color is RGBA
+                            vertex.VertexColor2[0] = (byte)(Math.Round(reader.GetFloat("color2_r") * 255));
+                            vertex.VertexColor2[1] = (byte)(Math.Round(reader.GetFloat("color2_g") * 255));
+                            vertex.VertexColor2[2] = (byte)(Math.Round(reader.GetFloat("color2_b") * 255));
+                            vertex.VertexColor2[3] = (byte)(Math.Round(reader.GetFloat("color2_a") * 255));
+
+                            // UV Coordinates
+                            vertex.UV1.X = reader.GetFloat("uv_1_u");
+                            vertex.UV1.Y = reader.GetFloat("uv_1_v");
+                            vertex.UV2.X = reader.GetFloat("uv_2_u");
+                            vertex.UV2.Y = reader.GetFloat("uv_2_v");
+
+                            // Bone Ids
+                            vertex.BoneIds[0] = (byte)(reader.GetByte("bone_1_id"));
+                            vertex.BoneIds[1] = (byte)(reader.GetByte("bone_2_id"));
+                            vertex.BoneIds[2] = (byte)(reader.GetByte("bone_3_id"));
+                            vertex.BoneIds[3] = (byte)(reader.GetByte("bone_4_id"));
+                            vertex.BoneIds[4] = (byte)(reader.GetByte("bone_5_id"));
+                            vertex.BoneIds[5] = (byte)(reader.GetByte("bone_6_id"));
+                            vertex.BoneIds[6] = (byte)(reader.GetByte("bone_7_id"));
+                            vertex.BoneIds[7] = (byte)(reader.GetByte("bone_8_id"));
+
+                            // Weights
+                            vertex.Weights[0] = (byte)(Math.Round(reader.GetFloat("bone_1_weight") * 255));
+                            vertex.Weights[1] = (byte)(Math.Round(reader.GetFloat("bone_2_weight") * 255));
+                            vertex.Weights[2] = (byte)(Math.Round(reader.GetFloat("bone_3_weight") * 255));
+                            vertex.Weights[3] = (byte)(Math.Round(reader.GetFloat("bone_4_weight") * 255));
+                            vertex.Weights[4] = (byte)(Math.Round(reader.GetFloat("bone_5_weight") * 255));
+                            vertex.Weights[5] = (byte)(Math.Round(reader.GetFloat("bone_6_weight") * 255));
+                            vertex.Weights[6] = (byte)(Math.Round(reader.GetFloat("bone_7_weight") * 255));
+                            vertex.Weights[7] = (byte)(Math.Round(reader.GetFloat("bone_8_weight") * 255));
+
+                            return vertex;
+                        });
+
+                        p.TriangleIndices = BuildListFromTable(db, "indices", where, (reader) =>
                         {
-                            throw ex;
-                        }
-                    }).GetAwaiter().GetResult();
+                            try
+                            {
+                                return reader.GetInt32("vertex_id");
+                            } catch(Exception ex)
+                            {
+                                throw ex;
+                            }
+                        });
+                    }
                 }
-            }
 
-            // Spawn a DB connection to do the raw queries.
-            using (var db = new SQLiteConnection(connectionString))
-            {
-                db.Open();
                 // Load Shape Verts
-                var query = "select * from shape_vertices order by shape asc, mesh asc, part asc, vertex_id asc;";
+                query = "select * from shape_vertices order by shape asc, mesh asc, part asc, vertex_id asc;";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(cmd.ExecuteReader()))
@@ -1538,10 +1535,10 @@ namespace xivModdingFramework.Models.DataContainers
 
                             part.ShapeParts[shapeName].VertexReplacements.Add(vertexId, part.ShapeParts[shapeName].Vertices.Count);
                             part.ShapeParts[shapeName].Vertices.Add(vertex);
-
                         }
                     }
                 }
+                db.Close();
             }
 
 
@@ -1552,6 +1549,7 @@ namespace xivModdingFramework.Models.DataContainers
 
             // Convert the model to FFXIV's internal weirdness.
             ModelModifiers.MakeImportReady(model, loggingFunction);
+
             return model;
         }
 

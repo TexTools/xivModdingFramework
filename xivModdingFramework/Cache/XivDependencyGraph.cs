@@ -562,7 +562,7 @@ namespace xivModdingFramework.Cache
             // We specifically just want to know what cached files have us listed as childern; not what we have in the 
             // parents dependencies cache.
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var cachedParents = await XivCache.BuildListFromTable(XivCache.CacheConnectionString, "dependencies_children", wc, async (reader) =>
+            var cachedParents = XivCache.BuildListFromTable(XivCache.CacheConnectionString, "dependencies_children", wc, (reader) =>
             {
                 return reader.GetString("parent");
             });

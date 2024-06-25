@@ -49,6 +49,11 @@ namespace xivModdingFramework.Cache
 
         internal static void SetPragmas(SQLiteConnection db)
         {
+            if (db.IsReadOnly(db.Database))
+            {
+                return;
+            }
+
             using (var cmd = new SQLiteCommand("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;", db))
             {
                 cmd.ExecuteNonQuery();
@@ -1000,7 +1005,7 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("furniture", where, async (reader) =>
+            return BuildListFromTable("furniture", where, (reader) =>
             {
                 return MakeFurniture(reader);
             });
@@ -1023,7 +1028,7 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("ui", where, async (reader) =>
+            return BuildListFromTable("ui", where, (reader) =>
             {
                 return MakeUi(reader);
             });
@@ -1057,7 +1062,7 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                return await BuildListFromTable("monsters", where, async (reader) =>
+                return BuildListFromTable("monsters", where, (reader) =>
                 {
                     return (XivMinion)MakeMonster(reader);
                 });
@@ -1095,7 +1100,7 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                return await BuildListFromTable("monsters", where, async (reader) =>
+                return BuildListFromTable("monsters", where, (reader) =>
                 {
                     return (XivPet)MakeMonster(reader);
                 });
@@ -1142,7 +1147,7 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                return await BuildListFromTable("monsters", where, async (reader) =>
+                return BuildListFromTable("monsters", where, (reader) =>
                 {
                     return (XivMount)MakeMonster(reader);
                 });
@@ -1165,7 +1170,7 @@ namespace xivModdingFramework.Cache
             }
 
             List<XivCharacter> mainHands = new List<XivCharacter>();
-            var list = await BuildListFromTable("characters", where, async (reader) =>
+            var list = BuildListFromTable("characters", where, (reader) =>
             {
                 var item = MakeCharacter(reader);
 
@@ -1195,7 +1200,7 @@ namespace xivModdingFramework.Cache
 
             List<XivGear> mainHands = new List<XivGear>();
             List<XivGear> offHands = new List<XivGear>();
-            var list = await BuildListFromTable("items", where, async (reader) =>
+            var list = BuildListFromTable("items", where, (reader) =>
             {
                 var item = MakeGear(reader);
                 if (item.Name.Contains(XivStrings.Main_Hand))
@@ -1484,7 +1489,7 @@ namespace xivModdingFramework.Cache
         public static async Task<List<string>> GetChildFiles(string internalFilePath, ModTransaction tx = null)
         {
             var wc = new WhereClause() { Column = "parent", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+            var list = BuildListFromTable("dependencies_children", wc, (reader) =>
             {
                 return reader.GetString("child");
             });
@@ -1514,7 +1519,7 @@ namespace xivModdingFramework.Cache
         public static async Task<List<string>> GetParentFiles(string internalFilePath, ModTransaction tx = null)
         {
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies_parents", wc, async (reader) =>
+            var list = BuildListFromTable("dependencies_parents", wc, (reader) =>
             {
                 return reader.GetString("parent");
             });
@@ -2500,7 +2505,7 @@ namespace xivModdingFramework.Cache
         {
             
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            List<string> parents = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+            List<string> parents = BuildListFromTable("dependencies_children", wc, (reader) =>
             {
                 return reader.GetString("parent");
             });
@@ -2511,7 +2516,7 @@ namespace xivModdingFramework.Cache
             if (dx11Name != internalFilePath)
             {
                 wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = dx11Name };
-                List<string> dxParents = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+                List<string> dxParents = BuildListFromTable("dependencies_children", wc, (reader) =>
                 {
                     return reader.GetString("parent");
                 });
@@ -2563,9 +2568,9 @@ namespace xivModdingFramework.Cache
             return length;
         }
 
-        private static async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
+        private static List<T> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, T> func)
         {
-            return await BuildListFromTable<T>(CacheConnectionString, table, where, func);
+            return BuildListFromTable<T>(CacheConnectionString, table, where, func);
         }
 
         /// <summary>
@@ -2576,10 +2581,10 @@ namespace xivModdingFramework.Cache
         /// <param name="where"></param>
         /// <param name="func"></param>
         /// <returns></returns>
-        public static async Task<List<T>> BuildListFromTable<T>(string connectionString, string table, WhereClause where, Func<CacheReader, Task<T>> func)
+        public static List<T> BuildListFromTable<T>(string connectionString, string table, WhereClause where, Func<CacheReader, T> func)
         {
 
-            List<T> list = new List<T>();
+            List<T> list;
             using (var db = new SQLiteConnection(connectionString))
             {
                 db.BusyTimeout = 3;
@@ -2587,51 +2592,61 @@ namespace xivModdingFramework.Cache
 
                 SetPragmas(db);
 
-                // Check how large the result set will be so we're not constantly
-                // Reallocating the array.
-                var query = "select count(*) from " + table + " ";
+                list = BuildListFromTable<T>(db, table, where, func);
+                db.Close();
+            }
+            return list;
+        }
+
+        public static List<T> BuildListFromTable<T>(SQLiteConnection db, string table, WhereClause where, Func<CacheReader, T> func)
+        {
+
+            List<T> list = new List<T>();
+
+            // Check how large the result set will be so we're not constantly
+            // Reallocating the array.
+            var query = "select count(*) from " + table + " ";
+            if (where != null)
+            {
+                query += where.GetSql();
+            }
+
+            using (var cmd = new SQLiteCommand(query, db))
+            {
                 if (where != null)
                 {
-                    query += where.GetSql();
+                    where.AddParameters(cmd);
                 }
 
-                using (var cmd = new SQLiteCommand(query, db))
-                {
-                    if (where != null)
-                    {
-                        where.AddParameters(cmd);
-                    }
+                int val = (int)((long) cmd.ExecuteScalar());
+                list = new List<T>(val);
+            }
 
-                    int val = (int)((long)await cmd.ExecuteScalarAsync());
-                    list = new List<T>(val);
-                }
+            // Set up the actual full query.
+            query = "select * from " + table;
+            if (where != null)
+            {
+                query += where.GetSql();
+            }
 
-                // Set up the actual full query.
-                query = "select * from " + table;
+            using (var cmd = new SQLiteCommand(query, db))
+            {
                 if (where != null)
                 {
-                    query += where.GetSql();
+                    where.AddParameters(cmd);
                 }
 
-                using (var cmd = new SQLiteCommand(query, db))
+                using (var reader = new CacheReader(cmd.ExecuteReader()))
                 {
-                    if (where != null)
+                    while (reader.NextRow())
                     {
-                        where.AddParameters(cmd);
-                    }
-
-                    using (var reader = new CacheReader(cmd.ExecuteReader()))
-                    {
-                        while (reader.NextRow())
+                        try
                         {
-                            try
-                            {
-                                list.Add(await func(reader));
-                            }
-                            catch (Exception ex)
-                            {
-                                throw;
-                            }
+                            list.Add(func(reader));
+                        }
+                        catch (Exception ex)
+                        {
+                            throw;
                         }
                     }
                 }
@@ -2891,6 +2906,10 @@ namespace xivModdingFramework.Cache
 
             public void Dispose()
             {
+                if (_reader != null && !_reader.IsClosed)
+                {
+                    _reader.Close();
+                }
                 Dispose(true);
                 GC.SuppressFinalize(this);
             }
