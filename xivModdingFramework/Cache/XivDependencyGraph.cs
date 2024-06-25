@@ -44,11 +44,25 @@ namespace xivModdingFramework.Cache
     {
         public static XivDependencyRoot GetRoot(this IItem item)
         {
+            if (item == null)
+            {
+                return null;
+            }
             return XivDependencyGraph.CreateDependencyRoot(GetRootInfo(item));
         }
         public static XivDependencyRootInfo GetRootInfo(this IItem item)
         {
+            if(item == null)
+            {
+                return new XivDependencyRootInfo();
+            }
+
             var rootFolder = item.GetItemRootFolder();
+            if (string.IsNullOrWhiteSpace(rootFolder))
+            {
+                return new XivDependencyRootInfo();
+            }
+
             var info = XivDependencyGraph.ExtractRootInfo(rootFolder);
             info.Slot = item.GetItemSlotAbbreviation();
 

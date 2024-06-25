@@ -131,6 +131,17 @@ namespace xivModdingFramework.Items
         /// <returns></returns>
         public static XivItemType GetSecondaryItemType(this IItem item)
         {
+            if(item == null)
+            {
+                return XivItemType.none;
+            }
+
+            if(item.PrimaryCategory == null || item.SecondaryCategory == null)
+            {
+                // Item is not constructed properly.
+                return XivItemType.none;
+            }
+
             var itemType = XivItemType.none;
 
             // Weapons, Monsters of all kinds, and the character Body use the body type secondary identifier.
