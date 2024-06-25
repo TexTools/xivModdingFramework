@@ -39,6 +39,7 @@ namespace xivModdingFramework.Mods
             if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.hair) return true;
             if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.ear) return true;
             if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.tail) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.face) return true;
 
             return false;
         }
@@ -730,6 +731,18 @@ namespace xivModdingFramework.Mods
                 // Replace the entire root chunk for roots that have two identifiers.
                 var srcString = match.Groups[0].Value;
                 var dstString = Destination.Info.GetBaseFileName(true);
+
+                var fakeSlot = "";
+                if(match.Groups[2].Success)
+                {
+                    fakeSlot = match.Groups[2].Value.Substring(1);
+                    if(fakeSlot != Source.Info.Slot)
+                    {
+                        var info = Destination.Info;
+                        info.Slot = fakeSlot;
+                        dstString = info.GetBaseFileName(true);
+                    }
+                }
 
                 file = file.Replace(srcString, dstString);
             }
