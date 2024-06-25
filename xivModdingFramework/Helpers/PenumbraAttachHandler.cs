@@ -76,7 +76,7 @@ namespace xivModdingFramework.Helpers
         /// <param name="penumbraModFolder"></param>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public static async Task<ModTransaction> Attach(string penumbraModFolder, ModTransaction tx = null)
+        public static async Task<ModTransaction> Attach(string penumbraModFolder, ModTransaction tx = null, bool alreadyLoaded = false)
         {
             if(Transaction != null)
             {
@@ -122,7 +122,7 @@ namespace xivModdingFramework.Helpers
             Transaction = tx;
             try
             {
-                await ReloadPenumbraModpack();
+                await ReloadPenumbraModpack(alreadyLoaded);
 
                 Transaction.FileChanged += Transaction_FileChanged;
                 Transaction.TransactionStateChanged += Transaction_TransactionStateChanged;
@@ -379,7 +379,7 @@ namespace xivModdingFramework.Helpers
         /// Reload the target penumbra modpack back into the current Tx.
         /// </summary>
         /// <returns></returns>
-        private static async Task ReloadPenumbraModpack()
+        private static async Task ReloadPenumbraModpack(bool jsonOnly = false)
         {
             if (Transaction == null
                 || Transaction.State != ETransactionState.Open
@@ -400,11 +400,14 @@ namespace xivModdingFramework.Helpers
                 var tx = Transaction;
                 var penumbraFolder = tx.Settings.TargetPath;
 
-                // Get full unpacked list.
-                var files = await TTMP.ModPackToSimpleFileList(penumbraFolder, true, tx);
 
                 var pmpAndPath = await PMP.LoadPMP(penumbraFolder, true);
                 PmpInfo = pmpAndPath.pmp;
+
+                if (jsonOnly)
+                {
+                    return;
+                }
 
                 // Don't so anything fancy here, just strictly import the files.
                 var importSettings = new ModPackImportSettings()
@@ -416,6 +419,8 @@ namespace xivModdingFramework.Helpers
                     UpdatePartialEndwalkerFiles = false,
                 };
 
+                // Get full unpacked list.
+                var files = await TTMP.ModPackToSimpleFileList(penumbraFolder, true, tx);
                 await TTMP.ImportFiles(files, null, importSettings, tx);
 
                 // Now reset any files in this transaction that were not contained in the PMP.
@@ -638,6 +643,8 @@ namespace xivModdingFramework.Helpers
         private static void Watcher_FileRenamed(object sender, RenamedEventArgs e)
         {
             if (_LOADING) return;
+            if (sender != Watcher) return;
+            if (e.FullPath.ToLower().EndsWith(".ttproject")) return;
             _WantsGlobalRead = true;
             DebouncedWatcherAction();
         }
@@ -645,6 +652,8 @@ namespace xivModdingFramework.Helpers
         private static void Watcher_FileDeleted(object sender, FileSystemEventArgs e)
         {
             if (_LOADING) return;
+            if (sender != Watcher) return;
+            if (e.FullPath.ToLower().EndsWith(".ttproject")) return;
             _WantsGlobalRead = true;
             DebouncedWatcherAction();
         }
@@ -652,6 +661,8 @@ namespace xivModdingFramework.Helpers
         private static void Watcher_FileCreated(object sender, FileSystemEventArgs e)
         {
             if (_LOADING) return;
+            if (sender != Watcher) return;
+            if (e.FullPath.ToLower().EndsWith(".ttproject")) return;
             _WantsGlobalRead = true;
             DebouncedWatcherAction();
         }
@@ -659,6 +670,8 @@ namespace xivModdingFramework.Helpers
         private static void Watcher_FileChanged(object sender, FileSystemEventArgs e)
         {
             if (_LOADING) return;
+            if (sender != Watcher) return;
+            if (e.FullPath.ToLower().EndsWith(".ttproject")) return;
             var path = e.FullPath;
             if (string.IsNullOrWhiteSpace(path))
             {
