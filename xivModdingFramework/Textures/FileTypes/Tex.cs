@@ -1410,11 +1410,8 @@ namespace xivModdingFramework.Textures.FileTypes
             {13360, XivTexFormat.DXT3 },
             {13361, XivTexFormat.DXT5 },
             {16704, XivTexFormat.D16 },
-            
-            {24864, XivTexFormat.UnknownFacePaint },
-
             {25136, XivTexFormat.BC5 },
-            {25650, XivTexFormat.BC7 },
+            {25650, XivTexFormat.BC7 }
         };
 
         #endregion
