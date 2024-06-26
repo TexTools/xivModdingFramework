@@ -76,6 +76,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, XivTexFormat.DXT1 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM, XivTexFormat.DXT3 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM, XivTexFormat.DXT5 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM, XivTexFormat.BC4 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM, XivTexFormat.BC5 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM, XivTexFormat.BC7 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
@@ -408,6 +409,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 } else if (format == XivTexFormat.DXT5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
+                } else if (format == XivTexFormat.BC4)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM;					
                 } else if (format == XivTexFormat.BC5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM;
@@ -457,6 +461,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     mipLength = (newWidth * newHeight) / 2;
                     break;
                 case XivTexFormat.DXT5:
+                case XivTexFormat.BC4:
                 case XivTexFormat.BC5:
                 case XivTexFormat.A8:
                 case XivTexFormat.BC7:
@@ -543,6 +548,9 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.DXT5:
                         imageData = DxtUtil.DecompressDxt5(DdsCompressedPixelData, width, height * layers);
                         break;
+                    case XivTexFormat.BC4:
+                        imageData = DxtUtil.DecompressBc4(DdsCompressedPixelData, width, height * layers);
+                        break;						
                     case XivTexFormat.BC5:
                         imageData = DxtUtil.DecompressBc5(DdsCompressedPixelData, width, height * layers);
                         break;
@@ -561,10 +569,6 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.L8:
                     case XivTexFormat.A8:
                         imageData = await Read8bitImage(DdsCompressedPixelData, width, height * layers);
-                        break;
-                    case XivTexFormat.UnknownFacePaint:
-                        // This is wrong
-                        imageData = await ReadA8L8(DdsCompressedPixelData, width, height * layers);
                         break;
                     case XivTexFormat.A16B16G16R16F:
                         imageData = await ReadHalfFloatImage(DdsCompressedPixelData, width, height * layers);
@@ -704,35 +708,6 @@ namespace xivModdingFramework.Textures.FileTypes
                                 convertedBytes.Add((byte)pixel);
                                 convertedBytes.Add((byte)pixel);
                                 convertedBytes.Add(255);
-                            }
-                        }
-                    }
-                }
-            });
-
-            return convertedBytes.ToArray();
-        }
-        internal static async Task<byte[]> ReadA8L8(byte[] textureData, int width, int height)
-        {
-            var convertedBytes = new List<byte>();
-
-            await Task.Run(() =>
-            {
-                using (var ms = new MemoryStream(textureData))
-                {
-                    using (var br = new BinaryReader(ms))
-                    {
-                        for (var y = 0; y < height; y++)
-                        {
-                            for (var x = 0; x < width; x++)
-                            {
-                                var a = br.ReadByte();
-                                var l = br.ReadByte();
-
-                                convertedBytes.Add(l);
-                                convertedBytes.Add(l);
-                                convertedBytes.Add(l);
-                                convertedBytes.Add(a);
                             }
                         }
                     }

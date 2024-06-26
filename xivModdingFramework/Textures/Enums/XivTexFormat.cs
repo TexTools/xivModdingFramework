@@ -40,9 +40,7 @@ namespace xivModdingFramework.Textures.Enums
         [XivTexFormatDescription("13360", "DXT3 ARGB")] DXT3 = 13360,
         [XivTexFormatDescription("13361", "DXT5 ARGB")] DXT5 = 13361,
         [XivTexFormatDescription("16704", "D16")] D16 = 16704,
-
-        [XivTexFormatDescription("24864", "A8L8")] UnknownFacePaint = 24864,
-
+        [XivTexFormatDescription("24864", "BC4")] BC4 = 24864,
         [XivTexFormatDescription("25136", "BC5")] BC5 = 25136,
         [XivTexFormatDescription("25650", "BC7")] BC7 = 25650,
         [XivTexFormatDescription("0", "INVALID")] INVALID = 0,
