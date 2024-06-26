@@ -412,7 +412,6 @@ namespace xivModdingFramework.Materials.DataContainers
         public static XivTexType SamplerIdToTexUsage(ESamplerId samplerId, XivMtrl mtrl = null)
         {
             // Compatibility mode shader keys...
-#if DAWNTRAIL
             if (mtrl != null && mtrl.ShaderPack == EShaderPack.CharacterLegacy && mtrl.ShaderKeys.Any(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF)) {
                 if (!mtrl.ShaderKeys.Any(x => x.KeyId == 0xC8BD1DEF && x.Value == 0xA02F4828)) {
                     if (samplerId == ESamplerId.g_SamplerMask)
@@ -421,19 +420,6 @@ namespace xivModdingFramework.Materials.DataContainers
                     }
                 }
             }
-#endif
-
-#if ENDWALKER
-            if (mtrl != null && mtrl.ShaderPack == EShaderPack.Character && mtrl.ShaderKeys.Any(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF)) {
-                if (mtrl.ShaderKeys.Any(x => x.KeyId == 0xC8BD1DEF && x.Value == 0xA02F4828)) {
-                    if (samplerId == ESamplerId.g_SamplerSpecular)
-                    {
-                        return XivTexType.Mask;
-                    }
-                }
-            }
-#endif
-
             // At least for furniture, these are unconditionally masks and not specular maps
             if(mtrl != null && (mtrl.ShaderPack == EShaderPack.Bg || mtrl.ShaderPack == EShaderPack.BgProp || mtrl.ShaderPack == EShaderPack.BgColorChange)){
                 if (samplerId == ESamplerId.g_SamplerSpecularMap0 || samplerId == ESamplerId.g_SamplerSpecularMap1)

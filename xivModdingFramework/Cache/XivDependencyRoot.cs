@@ -731,9 +731,7 @@ namespace xivModdingFramework.Cache
 
                 // XXX: I noticed female hrothgar also have patterns so I'm gonna put them here too
                 if (Info.PrimaryId == XivRace.Hrothgar_Male.GetRaceCodeInt()
-#if DAWNTRAIL
                     || Info.PrimaryId == XivRace.Hrothgar_Female.GetRaceCodeInt()
-#endif
                     )
                 {
                     // JK, Hrothgar actually have 5 material sets (that's how their fur pattern stuff is set)

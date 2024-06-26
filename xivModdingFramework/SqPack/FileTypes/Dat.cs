@@ -230,13 +230,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return DatType.ModifiedPartial;
                 } else if(one == (int)DatType.Unmodified && two == (int)DatType.Unmodified)
                 {
-#if ENDWALKER
                     // Detection for old TexTools DATs.
                     if (IsOldTTDat(binaryReader))
                     {
                         return DatType.ModifiedFull;
                     }
-#endif
 
                     return DatType.Unmodified;
                 }
@@ -254,7 +252,6 @@ namespace xivModdingFramework.SqPack.FileTypes
             return datType == DatType.Unmodified;
         }
 
-#if ENDWALKER
         private static bool IsOldTTDat(BinaryReader br)
         {
             var _DataSizeOffset = 1024 + 12;
@@ -287,7 +284,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             return true;
         }
 
-#endif
+
 
         /// <summary>
         /// Gets the modded dat files

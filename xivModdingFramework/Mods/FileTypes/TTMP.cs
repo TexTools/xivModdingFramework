@@ -103,11 +103,7 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
-#if DAWNTRAIL
         internal const string _currentTTMPVersion = "2.0";
-#else
-        internal const string _currentTTMPVersion = "1.8";
-#endif
 
         internal const char _typeCodeSimple = 's';
         internal const char _typeCodeWizard = 'w';

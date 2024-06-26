@@ -68,9 +68,6 @@ namespace xivModdingFramework.Helpers
         {
 
             var ret = new Dictionary<string, UpgradeInfo>();
-#if ENDWALKER
-            return ret;
-#endif
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
 
@@ -120,9 +117,6 @@ namespace xivModdingFramework.Helpers
         public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(Dictionary<string, FileStorageInformation> files, IProgress<(int current, int total, string message)> progress = null)
         {
             var ret = new Dictionary<string, UpgradeInfo>();
-#if ENDWALKER
-            return ret;
-#endif
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
             var filePaths = files.Keys;
@@ -248,10 +242,6 @@ namespace xivModdingFramework.Helpers
         /// <returns></returns>
         private static bool FastMdlv6Upgrade(BinaryReader br, BinaryWriter bw, long offset = -1)
         {
-#if ENDWALKER
-            return false;
-#endif
-
             if(offset < 0)
             {
                 offset = br.BaseStream.Position;
@@ -406,9 +396,7 @@ namespace xivModdingFramework.Helpers
         private static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerMaterials(List<string> paths, string source, ModTransaction tx, IProgress<(int current, int total, string message)> progress, HashSet<string> _ConvertedTextures = null, Dictionary<string, FileStorageInformation> files = null)
         {
             var ret = new Dictionary<string, UpgradeInfo>();
-#if ENDWALKER
-            return ret;
-#endif
+
             if (_ConvertedTextures == null)
             {
                 _ConvertedTextures = new HashSet<string>();

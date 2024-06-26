@@ -331,9 +331,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 XivRace.Viera_Female => (PMPModelRace.Viera, PMPGender.Female),
 
                 XivRace.Hrothgar_Male => (PMPModelRace.Hrothgar, PMPGender.Male),
-#if DAWNTRAIL
                 XivRace.Hrothgar_Female => (PMPModelRace.Hrothgar, PMPGender.Female),
-#endif
 
                 _ => (PMPModelRace.Unknown, PMPGender.Unknown)
             };

@@ -2373,10 +2373,6 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
 
-#if ENDWALKER
-            mdlVersion = 5;
-#endif
-
             // Debug Code
             /*
             var root = XivCache.GetFilePathRoot(ogMdl.MdlPath);

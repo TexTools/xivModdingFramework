@@ -135,7 +135,6 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public byte[] AdditionalData { get; set; } = new byte[4];
 
-#if DAWNTRAIL
         /// <summary>
         /// The list of half floats containing the ColorSet data
         /// </summary>
@@ -145,17 +144,6 @@ namespace xivModdingFramework.Materials.DataContainers
         /// </summary>
         public byte[] ColorSetDyeData { get; set; } = new byte[128];
 
-#else
-        /// <summary>
-        /// The list of half floats containing the ColorSet data
-        /// </summary>
-        public List<Half> ColorSetData { get; set; } = new List<Half>(new Half[256]);
-        /// <summary>
-        /// The byte array containing the extra ColorSet data
-        /// </summary>
-        public byte[] ColorSetDyeData { get; set; } = new byte[32];
-
-#endif
 
         /// <summary>
         /// The size of the additional MTRL Data

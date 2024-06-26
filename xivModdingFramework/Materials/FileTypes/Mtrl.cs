@@ -998,11 +998,8 @@ namespace xivModdingFramework.Materials.FileTypes
 
         public static XivMtrl CreateDefaultMaterial(string path)
         {
-#if ENDWALKER
-            var defaultFilePath = "Resources/DefaultTextures/default_material.mtrl";
-#else
             var defaultFilePath = "Resources/DefaultTextures/default_material_dt.mtrl";
-#endif
+
             if (!File.Exists(defaultFilePath))
             {
                 var dud = new XivMtrl();
