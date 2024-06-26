@@ -440,32 +440,32 @@ namespace xivModdingFramework.Helpers
             {
                 for (int blockX = 0; blockX < 4; blockX++)
                 {
-                    byte r = 0, g = 0, b = 0, a = 255;
+                    byte r = 0;
 
                     uint index = (uint)((lookupTable >> 3 * (4 * blockY + blockX)) & 0x07);
                     if (index == 0)
                     {
-                        r = g = b = red0;
+                        r = red0;
                     }
                     else if (index == 1)
                     {
-                        r = g = b = red1;
+                        r = red1;
                     }
                     else if (red0 > red1)
                     {
-                        r = g = b = (byte)(((8 - index) * red0 + (index - 1) * red1) / 7);
+                        r = (byte)(((8 - index) * red0 + (index - 1) * red1) / 7);
                     }
                     else if (index == 6)
                     {
-                        r = g = b = 0;
+                        r = 0;
                     }
                     else if (index == 7)
                     {
-                        r = g = b = 255;
+                        r = 255;
                     }
                     else
                     {
-                        r = g = b = (byte)(((6 - index) * red0 + (index - 1) * red1) / 5);
+                        r = (byte)(((6 - index) * red0 + (index - 1) * red1) / 5);
                     }
 
                     int px = (x << 2) + blockX;
@@ -474,9 +474,9 @@ namespace xivModdingFramework.Helpers
                     {
                         int offset = ((py * width) + px) << 2;
                         imageData[offset] = r;
-                        imageData[offset + 1] = g;
-                        imageData[offset + 2] = b;
-                        imageData[offset + 3] = a;
+                        imageData[offset + 1] = r;
+                        imageData[offset + 2] = r;
+                        imageData[offset + 3] = 255;
                     }
                 }
             }
