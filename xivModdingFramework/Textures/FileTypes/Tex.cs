@@ -626,6 +626,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 case XivTexFormat.DXT5:
                     compressionFormat = CompressionFormat.BC3;
                     break;
+                case XivTexFormat.BC4:
+                    compressionFormat = CompressionFormat.BC4;
+                    break;					
                 case XivTexFormat.BC5:
                     compressionFormat = CompressionFormat.BC5;
                     break;
