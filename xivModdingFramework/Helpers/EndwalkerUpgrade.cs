@@ -49,8 +49,8 @@ namespace xivModdingFramework.Helpers
             public EUpgradeTextureUsage Usage;
             public Dictionary<string, string> Files;
         }
-        
 
+        private const string _SampleHair = "chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl";
 
         /// <summary>
         /// Performs Endwalker => Dawntrail Upgrades on an arbitrary set of internal files as part of a transaction.
@@ -798,7 +798,7 @@ namespace xivModdingFramework.Helpers
             }
 
             // Arbitrary base game hair file to use to replace our shader constants.
-            var constantBase = await Mtrl.GetXivMtrl("chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl", true, tx);
+            var constantBase = await Mtrl.GetXivMtrl(_SampleHair, true, tx);
             mtrl.ShaderConstants = constantBase.ShaderConstants;
 
             ret.Add(normalTexSampler.Dx11Path, new UpgradeInfo()
@@ -1087,6 +1087,20 @@ namespace xivModdingFramework.Helpers
                     }
 
                     await UpdateEndwalkerHairTextures(normTex.Dx11Path, maskTex.Dx11Path, source, tx, _ConvertedTextures, fileInfos);
+
+                    if(hairset == TailRegexes && (mtrl.MaterialFlags & EMaterialFlags1.HideBackfaces) == 0)
+                    {
+                        // Flip backface bit to match old mtrls.
+                        mtrl.MaterialFlags |= EMaterialFlags1.HideBackfaces;
+
+
+                        // Rip constants from standard hair to better match usages.
+                        var constantBase = await Mtrl.GetXivMtrl(_SampleHair, true, tx);
+                        mtrl.ShaderConstants = constantBase.ShaderConstants;
+
+                        var data = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+                        await WriteFile(data, mtrl.MTRLPath, fileInfos, tx, source);
+                    }
                 }
             }
         }
