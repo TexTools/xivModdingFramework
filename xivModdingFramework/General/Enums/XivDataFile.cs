@@ -44,7 +44,6 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ffxiv/0a0000", "exd/")] _0A_Exd,
         [XivDataFileDescription("ffxiv/0c0000", "music/")] _0C_Music,
 
-#if ENDWALKER
 
         // Heavensward
         [XivDataFileDescription("ex1/020101", "bg/ex1/01_")] _EX1_BG_01,
@@ -84,10 +83,12 @@ namespace xivModdingFramework.General.Enums
         [XivDataFileDescription("ex4/030400", "cut/ex4/")] _EX4_Cut,
         [XivDataFileDescription("ex4/0c0400", "music/ex4/")] _EX4_Music,
 
-#else
-        // Dawntrail (Benchmark)
+        // Dawntrail
+        [XivDataFileDescription("ex5/020501", "bg/ex5/01")] _EX5_BG_01,
         [XivDataFileDescription("ex5/020502", "bg/ex5/02")] _EX5_BG_02,
-#endif
+        [XivDataFileDescription("ex5/020505", "bg/ex5/05")] _EX5_BG_05,
+        [XivDataFileDescription("ex5/030500", "cut/ex5/")] _EX5_Cut,
+        [XivDataFileDescription("ex5/0c0500", "music/ex5/")] _EX5_Music,
 
         // Empty or virtually empty indexes.
         // These have very inconsistent behavior on whether their empty offsets are written or not,
@@ -100,6 +101,7 @@ namespace xivModdingFramework.General.Enums
         //[XivDataFileDescription("ex2/020200", "bg/ex2/00_")] _EX2_BG_00,
         //[XivDataFileDescription("ex3/020300", "bg/ex3/00_")] _EX3_BG_00,
         //[XivDataFileDescription("ex4/020400", "bg/ex4/00_")] _EX4_BG_00,
+        //[XivDataFileDescription("ex4/020500", "bg/ex4/00_")] _EX4_BG_00,
 
         // This oddball has a folder entry with Hash [0] in it, that points to the end of the File Entries table, but claims it has 1 file.
         // Since we naturally drop the folder on write, it causes a hashing difference if this index is ever re-saved.

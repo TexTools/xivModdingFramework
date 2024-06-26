@@ -570,6 +570,12 @@ namespace xivModdingFramework.Materials.DataContainers
             [Description("characterocclusion.shpk")]
             CharacterOcclusion,
 
+            [Description("characterreflection.shpk")]
+            CharacterReflection,
+
+            [Description("charactertransparency.shpk")]
+            CharacterTransparency,
+
             [Description("water.shpk")]
             Water,
 
