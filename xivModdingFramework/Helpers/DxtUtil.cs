@@ -424,6 +424,7 @@ namespace xivModdingFramework.Helpers
             return result;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void DecompressBc4Block(byte[] source, int sourceOffset, int x, int y, int width, int height, byte[] imageData)
         {
             byte red0 = source[sourceOffset];
