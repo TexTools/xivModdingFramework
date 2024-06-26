@@ -402,6 +402,86 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+        internal static byte[] DecompressBc4(byte[] imageData, int width, int height)
+        {
+            var result = new byte[width * height * 4];
+
+            int blockCountX = (width + 3) / 4;
+            int blockCountY = (height + 3) / 4;
+
+            Parallel.ForEach(Partitioner.Create(0, blockCountY), range =>
+            {
+                for (int y = range.Item1; y < range.Item2; y++)
+                {
+                    for (int x = 0; x < blockCountX; x++)
+                    {
+                        int offset = (y * blockCountX + x) * 8;
+                        DecompressBc4Block(imageData, offset, x, y, width, height, result);
+                    }
+                }
+            });
+
+            return result;
+        }
+
+        private static void DecompressBc4Block(byte[] source, int sourceOffset, int x, int y, int width, int height, byte[] imageData)
+        {
+            byte red0 = source[sourceOffset];
+            byte red1 = source[sourceOffset + 1];
+
+            ulong lookupTable = (ulong)source[sourceOffset + 2]
+                              | (ulong)source[sourceOffset + 3] << 8
+                              | (ulong)source[sourceOffset + 4] << 16
+                              | (ulong)source[sourceOffset + 5] << 24
+                              | (ulong)source[sourceOffset + 6] << 32
+                              | (ulong)source[sourceOffset + 7] << 40;
+
+            for (int blockY = 0; blockY < 4; blockY++)
+            {
+                for (int blockX = 0; blockX < 4; blockX++)
+                {
+                    byte r = 0, g = 0, b = 0, a = 255;
+
+                    uint index = (uint)((lookupTable >> 3 * (4 * blockY + blockX)) & 0x07);
+                    if (index == 0)
+                    {
+                        r = g = b = red0;
+                    }
+                    else if (index == 1)
+                    {
+                        r = g = b = red1;
+                    }
+                    else if (red0 > red1)
+                    {
+                        r = g = b = (byte)(((8 - index) * red0 + (index - 1) * red1) / 7);
+                    }
+                    else if (index == 6)
+                    {
+                        r = g = b = 0;
+                    }
+                    else if (index == 7)
+                    {
+                        r = g = b = 255;
+                    }
+                    else
+                    {
+                        r = g = b = (byte)(((6 - index) * red0 + (index - 1) * red1) / 5);
+                    }
+
+                    int px = (x << 2) + blockX;
+                    int py = (y << 2) + blockY;
+                    if ((px < width) && (py < height))
+                    {
+                        int offset = ((py * width) + px) << 2;
+                        imageData[offset] = r;
+                        imageData[offset + 1] = g;
+                        imageData[offset + 2] = b;
+                        imageData[offset + 3] = a;
+                    }
+                }
+            }
+        }
+
         internal static byte[] DecompressBc5(byte[] imageData, int width, int height)
         {
             var result = new byte[width * height * 4];
