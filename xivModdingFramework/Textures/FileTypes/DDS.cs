@@ -53,6 +53,7 @@ namespace xivModdingFramework.Textures.FileTypes
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT1"), 0) , XivTexFormat.DXT1 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT3"), 0) , XivTexFormat.DXT3 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT5"), 0) , XivTexFormat.DXT5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI1"), 0) , XivTexFormat.BC4 },	
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC4U"), 0) , XivTexFormat.BC4 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI2"), 0) , XivTexFormat.BC5 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
