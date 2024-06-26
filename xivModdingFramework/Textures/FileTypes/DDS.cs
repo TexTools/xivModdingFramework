@@ -46,7 +46,8 @@ namespace xivModdingFramework.Textures.FileTypes
 
         internal static uint _DX10 = (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DX10"), 0);
         /// <summary>
-        /// A dictionary containing the int represntations of known file types for DDS
+        /// A dictionary containing the int representations of known DDS FourCC Values to Xiv Tex Enum
+        /// File types not listed here will fall over to DXGI header extension writing using "DX10" and their DxgiTypeToXivTex enum value.
         /// </summary>
         internal static readonly Dictionary<uint, XivTexFormat> DdsTypeToXivTex = new Dictionary<uint, XivTexFormat>
         {
@@ -71,7 +72,7 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
         /// <summary>
-        /// A dictionary containing the int represntations of known DXGI formats for DDS
+        /// A dictionary containing the int representations of known DXGI header extension enum values to Xiv Tex Enum
         /// </summary>
         internal static readonly Dictionary<uint, XivTexFormat> DxgiTypeToXivTex = new Dictionary<uint, XivTexFormat>
         {
