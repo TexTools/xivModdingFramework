@@ -524,7 +524,7 @@ namespace xivModdingFramework.Textures.FileTypes
             else
             {
                 var root = await XivCache.GetFirstRoot(tex.FilePath);
-                useMips = root != null;
+                useMips = root != null || tex.MipMapCount > 1;
             }
 
             // Ensure we're converting to a format we can actually process.
