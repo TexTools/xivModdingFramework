@@ -94,7 +94,7 @@ namespace xivModdingFramework.Helpers
             if (includePartials)
             {
                 progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-                await EndwalkerUpgrade.CheckImportForOldHairJank(filePaths.ToList(), source, tx, _ConvertedTextures);
+                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths.ToList(), source, tx, _ConvertedTextures);
 
                 progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
                 foreach (var path in filePaths)
@@ -902,12 +902,43 @@ namespace xivModdingFramework.Helpers
             return row;
         }
 
-        // Resolves for old-style default hair textures.
-        private static Regex OldHairTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})h([0-9]{4})_hir_([ns])\\.tex");
-        private static Regex OldHairMaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})h([0-9]{4})_hir_a\\.mtrl");
-        private static string OldHairMaterialFormat = "chara/human/c{0}/obj/hair/h{1}/material/v0001/mt_c{0}h{1}_hir_a.mtrl";
-        private static string NewHairTextureFormat = "chara/human/c{0}/obj/hair/h{1}/texture/c{0}h{1}_hir_{2}.tex";
 
+        private class HairRegexSet
+        {
+            public Regex OldTextureRegex;
+            public Regex MaterialRegex;
+
+            public string MaterialFormat;
+        }
+
+        private static HairRegexSet HairRegexes = new HairRegexSet()
+        {
+            OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})h([0-9]{4})_hir_([ns])\\.tex"),
+            MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})h([0-9]{4})_hir_a\\.mtrl"),
+            MaterialFormat = "chara/human/c{0}/obj/hair/h{1}/material/v0001/mt_c{0}h{1}_hir_a.mtrl",
+        };
+
+        //chara/human/c0801/obj/tail/t0003/material/v0001/mt_c0801t0003_a.mtrl
+        private static HairRegexSet TailRegexes = new HairRegexSet()
+        {
+            OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/tail\\/t[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})t([0-9]{4})_etc_([ns])\\.tex"),
+            MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/tail\\/t[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})t([0-9]{4})_a\\.mtrl"),
+            MaterialFormat = "chara/human/c{0}/obj/tail/t{1}/material/v0001/mt_c{0}t{1}_a.mtrl",
+        };
+        private static HairRegexSet EarRegexes = new HairRegexSet()
+        {
+            OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/zear\\/z[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})z([0-9]{4})_etc_([ns])\\.tex"),
+            MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/zear\\/z[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})z([0-9]{4})_a\\.mtrl"),
+            MaterialFormat = "chara/human/c{0}/obj/zear/z{1}/material/v0001/mt_c{0}z{1}_a.mtrl",
+        };
+
+
+        public static async Task UpdateUnclaimedHairTextures(List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
+        {
+            await UpdateUnclaimedHairTextures(HairRegexes, files, source, tx, _ConvertedTextures, fileInfos);
+            await UpdateUnclaimedHairTextures(TailRegexes, files, source, tx, _ConvertedTextures, fileInfos);
+            await UpdateUnclaimedHairTextures(EarRegexes, files, source, tx, _ConvertedTextures, fileInfos);
+        }
 
         /// <summary>
         /// This function does some jank analysis of inbound hair texture files,
@@ -918,14 +949,14 @@ namespace xivModdingFramework.Helpers
         /// <param name="source"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static async Task CheckImportForOldHairJank(List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
+        private static async Task UpdateUnclaimedHairTextures(HairRegexSet hairset, List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
         {
             var results = new Dictionary<int, Dictionary<int, List<(string Path, XivTexType TexType)>>>();
 
             var materials = new List<(int Race, int Hair)>();
             foreach (var file in files)
             {
-                var matMatch = OldHairMaterialRegex.Match(file);
+                var matMatch = hairset.MaterialRegex.Match(file);
                 if (matMatch.Success)
                 {
                     var rid = Int32.Parse(matMatch.Groups[1].Value);
@@ -934,7 +965,7 @@ namespace xivModdingFramework.Helpers
                     continue;
                 }
 
-                var match = OldHairTextureRegex.Match(file);
+                var match = hairset.OldTextureRegex.Match(file);
                 if (!match.Success) continue;
 
                 var raceId = Int32.Parse(match.Groups[1].Value);
@@ -993,14 +1024,39 @@ namespace xivModdingFramework.Helpers
 
             if (results.Count == 0) return;
 
+            var rtx = ModTransaction.BeginReadonlyTransaction();
             foreach (var rKv in results)
             {
                 var race = rKv.Key.ToString("D4");
                 foreach (var hKv in rKv.Value)
                 {
                     var hair = hKv.Key.ToString("D4");
-                    var material = string.Format(OldHairMaterialFormat, race, hair);
-                    var root = await XivCache.GetFirstRoot(material);
+                    var matPath = string.Format(hairset.MaterialFormat, race, hair);
+
+                    if(!await rtx.FileExists(matPath, true))
+                    {
+                        // Invalid path or non-existent in DT or some other shenanigans.
+                        continue;
+                    }
+
+                    var mtrl = await Mtrl.GetXivMtrl(matPath, true, rtx);
+
+                    if(mtrl.ShaderPack != EShaderPack.Hair)
+                    {
+                        // Au Ra or some other shenanigans here.
+                        continue;
+                    }
+
+                    var normTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerNormal);
+                    var maskTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
+
+                    if(normTex == null || maskTex == null)
+                    {
+                        // Sus...
+                        continue;
+                    }
+
+                    var root = await XivCache.GetFirstRoot(matPath);
                     IItem item = null;
                     if (root != null)
                     {
@@ -1009,11 +1065,11 @@ namespace xivModdingFramework.Helpers
 
                     foreach (var tex in hKv.Value)
                     {
-                        var suffix = tex.TexType == XivTexType.Normal ? "norm" : "mask";
-                        var newPath = string.Format(NewHairTextureFormat, race, hair, suffix);
+                        var newPath = tex.TexType == XivTexType.Normal ? normTex.Dx11Path : maskTex.Dx11Path;
 
                         if (files.Contains(newPath))
                         {
+                            // Already converted.
                             continue;
                         }
 
@@ -1030,9 +1086,7 @@ namespace xivModdingFramework.Helpers
                         files.Add(newPath);
                     }
 
-                    var newNorm = string.Format(NewHairTextureFormat, race, hair, "norm");
-                    var newMask = string.Format(NewHairTextureFormat, race, hair, "mask");
-                    await UpdateEndwalkerHairTextures(newNorm, newMask, source, tx, _ConvertedTextures, fileInfos);
+                    await UpdateEndwalkerHairTextures(normTex.Dx11Path, maskTex.Dx11Path, source, tx, _ConvertedTextures, fileInfos);
                 }
             }
         }
