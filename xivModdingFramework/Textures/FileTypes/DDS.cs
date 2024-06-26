@@ -76,6 +76,7 @@ namespace xivModdingFramework.Textures.FileTypes
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, XivTexFormat.DXT1 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM, XivTexFormat.DXT3 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM, XivTexFormat.DXT5 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM, XivTexFormat.BC4 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM, XivTexFormat.BC5 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM, XivTexFormat.BC7 },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
@@ -408,6 +409,9 @@ namespace xivModdingFramework.Textures.FileTypes
                 } else if (format == XivTexFormat.DXT5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
+                } else if (format == XivTexFormat.BC4)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM;					
                 } else if (format == XivTexFormat.BC5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM;
@@ -457,6 +461,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     mipLength = (newWidth * newHeight) / 2;
                     break;
                 case XivTexFormat.DXT5:
+                case XivTexFormat.BC4:
                 case XivTexFormat.BC5:
                 case XivTexFormat.A8:
                 case XivTexFormat.BC7:
@@ -543,6 +548,9 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.DXT5:
                         imageData = DxtUtil.DecompressDxt5(DdsCompressedPixelData, width, height * layers);
                         break;
+                    case XivTexFormat.BC4:
+                        imageData = DxtUtil.DecompressBc4(DdsCompressedPixelData, width, height * layers);
+                        break;						
                     case XivTexFormat.BC5:
                         imageData = DxtUtil.DecompressBc5(DdsCompressedPixelData, width, height * layers);
                         break;
