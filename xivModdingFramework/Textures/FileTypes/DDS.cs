@@ -562,6 +562,10 @@ namespace xivModdingFramework.Textures.FileTypes
                     case XivTexFormat.A8:
                         imageData = await Read8bitImage(DdsCompressedPixelData, width, height * layers);
                         break;
+                    case XivTexFormat.UnknownFacePaint:
+                        // This is wrong
+                        imageData = await ReadA8L8(DdsCompressedPixelData, width, height * layers);
+                        break;
                     case XivTexFormat.A16B16G16R16F:
                         imageData = await ReadHalfFloatImage(DdsCompressedPixelData, width, height * layers);
                         break;
@@ -700,6 +704,35 @@ namespace xivModdingFramework.Textures.FileTypes
                                 convertedBytes.Add((byte)pixel);
                                 convertedBytes.Add((byte)pixel);
                                 convertedBytes.Add(255);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+        internal static async Task<byte[]> ReadA8L8(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var a = br.ReadByte();
+                                var l = br.ReadByte();
+
+                                convertedBytes.Add(l);
+                                convertedBytes.Add(l);
+                                convertedBytes.Add(l);
+                                convertedBytes.Add(a);
                             }
                         }
                     }
