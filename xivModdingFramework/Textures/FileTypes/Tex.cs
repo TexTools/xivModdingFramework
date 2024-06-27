@@ -516,16 +516,8 @@ namespace xivModdingFramework.Textures.FileTypes
         }
         public static async Task MergePixelData(XivTex tex, byte[] data)
         {
-            bool useMips = true;
-            if (string.IsNullOrWhiteSpace(tex.FilePath))
-            {
-                useMips = tex.MipMapCount > 1 ? true : false;
-            }
-            else
-            {
-                var root = await XivCache.GetFirstRoot(tex.FilePath);
-                useMips = root != null || tex.MipMapCount > 1;
-            }
+            // Always retain mip settings.
+            bool useMips = tex.MipMapCount > 1 ? true : false;
 
             // Ensure we're converting to a format we can actually process.
             CompressionFormat compressionFormat = CompressionFormat.BGRA;
