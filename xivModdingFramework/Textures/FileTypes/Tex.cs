@@ -604,10 +604,6 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns></returns>
         public static async Task<byte[]> ConvertToDDS(byte[] rgbaData, XivTexFormat texFormat, bool useMipMaps, int width, int height,  bool allowFast8888 = true)
         {
-            if(allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
-            {
-                return CreateFast8888DDS(rgbaData, width, height);
-            }
 
             // Ensure we're converting to a format we can actually process.
             CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
@@ -624,7 +620,13 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             else
             {
-                    var sizePerPixel = 4;
+                await TextureHelpers.SwizzleRB(rgbaData, width, height);
+                if (allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
+                {
+                    return CreateFast8888DDS(rgbaData, width, height);
+                }
+
+                var sizePerPixel = 4;
                 var mipData = new MipData(width, height, width * sizePerPixel);
                 Marshal.Copy(rgbaData, 0, mipData.Data, rgbaData.Length);
 
@@ -634,9 +636,6 @@ namespace xivModdingFramework.Textures.FileTypes
                     compressor.Input.SetMipmapGeneration(true, maxMipCount);
                     compressor.Input.SetData(mipData, true);
                     compressor.Compression.Format = compressionFormat;
-                    compressor.Compression.SetRGBAPixelFormat();
-
-                    //compressor.Compression.SetRGBAPixelFormat
                     //compressor.Compression.Quality = CompressionQuality.Fastest;
 
                     compressor.Output.OutputHeader = true;

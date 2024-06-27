@@ -524,8 +524,8 @@ namespace xivModdingFramework.Materials.DataContainers
             [Description("characterglass.shpk")]
             CharacterGlass,
 
-            [Description("characterstocking.shpk")]
-            CharacterStocking,
+            [Description("characterstockings.shpk")]
+            CharacterStockings,
 
             [Description("charactertattoo.shpk")]
             CharacterTattoo,
