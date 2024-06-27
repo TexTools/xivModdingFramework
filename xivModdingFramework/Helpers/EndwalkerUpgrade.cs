@@ -96,7 +96,14 @@ namespace xivModdingFramework.Helpers
                 progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
                 foreach (var path in filePaths)
                 {
-                    await EndwalkerUpgrade.UpdateEyeMask(path, source, tx, _ConvertedTextures);
+                    try
+                    {
+                        await EndwalkerUpgrade.UpdateEyeMask(path, source, tx, _ConvertedTextures);
+                    }
+                    catch(Exception ex)
+                    {
+                        Trace.WriteLine(ex);
+                    }
                 }
             }
 
@@ -1075,7 +1082,14 @@ namespace xivModdingFramework.Helpers
                         files.Add(newPath);
                     }
 
-                    await UpdateEndwalkerHairTextures(normTex.Dx11Path, maskTex.Dx11Path, source, tx, _ConvertedTextures, fileInfos);
+                    try
+                    {
+                        await UpdateEndwalkerHairTextures(normTex.Dx11Path, maskTex.Dx11Path, source, tx, _ConvertedTextures, fileInfos);
+                    } catch (Exception ex)
+                    {
+                        Trace.WriteLine(ex);
+                        continue;
+                    }
 
                     if(hairset == TailRegexes && (mtrl.MaterialFlags & EMaterialFlags1.HideBackfaces) == 0)
                     {
