@@ -357,13 +357,14 @@ namespace xivModdingFramework.Mods
             var possiblyFormat = BitConverter.ToInt32(data, 4);
             var possiblyWidth = BitConverter.ToUInt16(data, 8);
             var possiblyHeight = BitConverter.ToUInt16(data, 10);
+            var possiblyMipCount = data[12] & 0xF;
 
             const ushort _SaneMaxImageSize = 16384;
 
             if (Enum.IsDefined(typeof(XivTexFormat), possiblyFormat)) {
-                if(IOUtil.IsPowerOfTwo(possiblyWidth) && possiblyWidth <= _SaneMaxImageSize)
+                if((IOUtil.IsPowerOfTwo(possiblyWidth) || possiblyMipCount == 1) && possiblyWidth <= _SaneMaxImageSize)
                 {
-                    if (IOUtil.IsPowerOfTwo(possiblyHeight) && possiblyHeight <= _SaneMaxImageSize)
+                    if ((IOUtil.IsPowerOfTwo(possiblyHeight) || possiblyMipCount == 1) && possiblyHeight <= _SaneMaxImageSize)
                     {
                         // There's an extremely high chance this is an uncompressed tex file.
                         return await Tex.CompressTexFile(data);

@@ -1406,7 +1406,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 using (var br = new BinaryReader(ms))
                 {
                     var header = Tex.TexHeader.ReadTexHeader(br);
-                    if (!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height))
+                    if ((!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height)) && header.MipCount > 1)
                     {
                         throw new InvalidDataException("Texture dimensions must be a power of two. (Ex. 256, 512, 1024, ...)");
                     }
