@@ -592,7 +592,23 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
             tex.TexData = ddsData;
+
+            if (useMips)
+            {
+                var calc = GetMipCount(tex.Width, tex.Height);
+                tex.MipMapCount = calc;
+            }
         }
+
+        public static int GetMipCount(int width, int height)
+        {
+            return GetMipCount(width > height ? width : height);
+        }
+        public static int GetMipCount(int largestSize)
+        {
+            return (int) Math.Floor(Math.Log(largestSize, 2) + 1);
+        }
+
 
 
         /// <summary>
