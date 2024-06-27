@@ -781,12 +781,12 @@ namespace xivModdingFramework.Textures.FileTypes
         #endregion
 
 
-        public static async Task<byte[]> TexConvRawPixels(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false, bool omitHeader = true)
+        public static async Task<byte[]> TexConvRawPixels(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false, bool omitHeader = true, bool bgra = false)
         {
             return await Task.Run(async () =>
             {
                 // ImageSharp => TexConv Route.
-                var ddsFile = await DDS.TexConv(rgbaData, width, height, format, generateMipMaps);
+                var ddsFile = await DDS.TexConv(rgbaData, width, height, format, generateMipMaps, bgra);
                 try
                 {
                     using (var fs = File.OpenRead(ddsFile))
@@ -817,17 +817,32 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="format"></param>
         /// <param name="generateMipMaps"></param>
         /// <returns></returns>
-        public static async Task<string> TexConv(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false)
+        public static async Task<string> TexConv(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false, bool bgra = false)
         {
             var tmpDir = IOUtil.GetFrameworkTempFolder();
             Directory.CreateDirectory(tmpDir);
             var input = Path.Combine(tmpDir, Guid.NewGuid().ToString() + ".tga");
-            using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
+
+            
+            if(bgra)
             {
-                var encoder = new TgaEncoder();
-                encoder.Compression = TgaCompression.None;
-                encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
-                img.SaveAsTga(input,encoder);
+                using (var img = Image.LoadPixelData<Bgra32>(rgbaData, width, height))
+                {
+                    var encoder = new TgaEncoder();
+                    encoder.Compression = TgaCompression.None;
+                    encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
+                    img.SaveAsTga(input, encoder);
+                }
+            }
+            else
+            {
+                using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
+                {
+                    var encoder = new TgaEncoder();
+                    encoder.Compression = TgaCompression.None;
+                    encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
+                    img.SaveAsTga(input, encoder);
+                }
             }
 
             try

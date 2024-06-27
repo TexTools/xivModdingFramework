@@ -600,13 +600,13 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <summary>
         /// Returns the raw bytes of a DDS file.
         /// </summary>
-        /// <param name="data">8.8.8.8 Pixel format data.</param>
+        /// <param name="rgbaData">8.8.8.8 Pixel format data.</param>
         /// <returns></returns>
-        public static async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int width, int height,  bool allowFast8888 = true)
+        public static async Task<byte[]> ConvertToDDS(byte[] rgbaData, XivTexFormat texFormat, bool useMipMaps, int width, int height,  bool allowFast8888 = true)
         {
             if(allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
             {
-                return CreateFast8888DDS(data, width, height);
+                return CreateFast8888DDS(rgbaData, width, height);
             }
 
             // Ensure we're converting to a format we can actually process.
@@ -620,13 +620,13 @@ namespace xivModdingFramework.Textures.FileTypes
 
             if (compressionFormat == CompressionFormat.BC7)
             {
-                return await DDS.TexConvRawPixels(data, width, height, "BC7_UNORM", useMipMaps, false);
+                return await DDS.TexConvRawPixels(rgbaData, width, height, "BC7_UNORM", useMipMaps, false);
             }
             else
             {
                     var sizePerPixel = 4;
                 var mipData = new MipData(width, height, width * sizePerPixel);
-                Marshal.Copy(data, 0, mipData.Data, data.Length);
+                Marshal.Copy(rgbaData, 0, mipData.Data, rgbaData.Length);
 
                 using (var compressor = new Compressor())
                 {
@@ -634,7 +634,7 @@ namespace xivModdingFramework.Textures.FileTypes
                     compressor.Input.SetMipmapGeneration(true, maxMipCount);
                     compressor.Input.SetData(mipData, true);
                     compressor.Compression.Format = compressionFormat;
-                    compressor.Compression.SetBGRAPixelFormat();
+                    compressor.Compression.SetRGBAPixelFormat();
 
                     //compressor.Compression.SetRGBAPixelFormat
                     //compressor.Compression.Quality = CompressionQuality.Fastest;
