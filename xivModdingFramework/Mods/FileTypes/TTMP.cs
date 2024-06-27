@@ -1401,6 +1401,18 @@ namespace xivModdingFramework.Mods.FileTypes
             // 3. The block sizes are incorrect.  This can only be fixed by unzipping and rewriting the blocks.
 
             var data = await TransactionDataHandler.GetUncompressedFile(info);
+
+            using(var ms = new MemoryStream(data)) {
+                using (var br = new BinaryReader(ms))
+                {
+                    var header = Tex.TexHeader.ReadTexHeader(br);
+                    if (!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height))
+                    {
+                        throw new InvalidDataException("Texture dimensions must be a power of two. (Ex. 256, 512, 1024, ...)");
+                    }
+                }
+            }
+
             var recomp = await Tex.CompressTexFile(data);
 
             var originalSize = info.FileSize;
