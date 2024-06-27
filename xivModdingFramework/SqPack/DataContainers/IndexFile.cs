@@ -36,7 +36,7 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public class IndexFile
     {
-        public const bool _BENCHMARK_HACK = false;
+        public const bool _BENCHMARK_HACK = true;
         public bool ReadOnlyMode
         {
             get; private set;
