@@ -360,7 +360,7 @@ namespace xivModdingFramework.Helpers
             if (file.StartsWith(Path.GetTempPath()))
             {
                 File.Delete(file);
-            } else if (file.StartsWith(XivCache.TempDirectory))
+            } else if (file.StartsWith(XivCache.FrameworkSettings.TempDirectory))
             {
                 File.Delete(file);
             }
@@ -402,7 +402,7 @@ namespace xivModdingFramework.Helpers
             if (dir.StartsWith(Path.GetTempPath()))
             {
                 RecursiveDeleteDirectory(dir);
-            } else if (dir.StartsWith(XivCache.TempDirectory))
+            } else if (dir.StartsWith(XivCache.FrameworkSettings.TempDirectory))
             {
                 RecursiveDeleteDirectory(dir);
             }
@@ -754,7 +754,7 @@ namespace xivModdingFramework.Helpers
         }
         public static string GetFrameworkTempFolder()
         {
-            var path = Path.Combine(XivCache.TempDirectory, "xivmf");
+            var path = Path.Combine(XivCache.FrameworkSettings.TempDirectory, "xivmf");
             Directory.CreateDirectory(path);
             return path;
         }

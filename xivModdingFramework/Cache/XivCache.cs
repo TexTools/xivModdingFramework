@@ -17,6 +17,7 @@ using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.Enums;
 
 namespace xivModdingFramework.Cache
 {
@@ -27,6 +28,44 @@ namespace xivModdingFramework.Cache
         public CacheException(Exception ex) {
             InnerException = ex;
         }
+
+    }
+
+    public class FrameworkSettings
+    {
+        private string _TempDirectory = Path.GetTempPath();
+        public string TempDirectory
+        {
+            get
+            {
+                return _TempDirectory;
+            }
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    _TempDirectory = Path.GetTempPath();
+                }
+                else
+                {
+                    value = Path.GetFullPath(value);
+                    Directory.CreateDirectory(value);
+                    _TempDirectory = value;
+                }
+            }
+        }
+
+        private EModelingTool _ModelingTool = EModelingTool.Blender;
+        public EModelingTool ModelingTool
+        {
+            get => _ModelingTool;
+            set
+            {
+                _ModelingTool = value;
+            }
+        }
+
+        public XivTexFormat DefaultTextureFormat { get; set; } = XivTexFormat.A8R8G8B8;
 
     }
 
@@ -93,6 +132,8 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public static FrameworkSettings FrameworkSettings { get; set; } = new FrameworkSettings();
+
         private static bool _GameWriteEnbled = false;
         public static bool GameWriteEnabled {
             get => _GameWriteEnbled;
@@ -100,39 +141,6 @@ namespace xivModdingFramework.Cache
             {
                 _GameWriteEnbled = value;
                 GameWriteStateChanged?.Invoke(_GameWriteEnbled);
-            }
-        }
-
-
-        private static string _TempDirectory = Path.GetTempPath();
-        public static string TempDirectory
-        {
-            get
-            {
-                return _TempDirectory;
-            }
-            set
-            {
-                if (string.IsNullOrWhiteSpace(value))
-                {
-                    _TempDirectory = Path.GetTempPath();
-                } else
-                {
-                    value = Path.GetFullPath(value);
-                    Directory.CreateDirectory(value);
-                    _TempDirectory = value;
-                }
-            }
-        }
-
-
-        private static EModelingTool _ModelingTool = EModelingTool.Blender;
-        public static EModelingTool ModelingTool
-        {
-            get => _ModelingTool;
-            set
-            {
-                _ModelingTool = value;
             }
         }
 

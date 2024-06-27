@@ -1641,7 +1641,7 @@ namespace xivModdingFramework.Models.DataContainers
                             cmd.ExecuteScalar();
 
                             // Good old 3DS jank.
-                            var for3ds = XivCache.ModelingTool == EModelingTool.Max;
+                            var for3ds = XivCache.FrameworkSettings.ModelingTool == EModelingTool.Max;
                             cmd.Parameters.AddWithValue("key", "for_3ds_max");
                             cmd.Parameters.AddWithValue("value", for3ds ? "1" : "0");
                             cmd.ExecuteScalar();
