@@ -891,9 +891,9 @@ namespace xivModdingFramework.Textures.FileTypes
             ddsStream.ReadBytes(8);
             var newMipCount = ddsStream.ReadInt32();
 
-            if (newHeight % 2 != 0 || newWidth % 2 != 0)
+            if (!IOUtil.IsPowerOfTwo(newHeight) || !IOUtil.IsPowerOfTwo(newHeight))
             {
-                throw new Exception("Resolution must be a multiple of 2");
+                throw new Exception("Resolution must be a multiple of 2.  (Ex. 256, 512, 1024, ...)");
             }
 
             ddsStream.BaseStream.Seek(offset + DDS._DDS_PixelFormatOffset, SeekOrigin.Begin);

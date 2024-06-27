@@ -361,9 +361,9 @@ namespace xivModdingFramework.Mods
             const ushort _SaneMaxImageSize = 16384;
 
             if (Enum.IsDefined(typeof(XivTexFormat), possiblyFormat)) {
-                if(IsPowerOfTwo(possiblyWidth) && possiblyWidth <= _SaneMaxImageSize)
+                if(IOUtil.IsPowerOfTwo(possiblyWidth) && possiblyWidth <= _SaneMaxImageSize)
                 {
-                    if (IsPowerOfTwo(possiblyHeight) && possiblyHeight <= _SaneMaxImageSize)
+                    if (IOUtil.IsPowerOfTwo(possiblyHeight) && possiblyHeight <= _SaneMaxImageSize)
                     {
                         // There's an extremely high chance this is an uncompressed tex file.
                         return await Tex.CompressTexFile(data);
@@ -374,11 +374,6 @@ namespace xivModdingFramework.Mods
 
             // This some kind of binary data to get type 2 compressed.
             return await Dat.CompressType2Data(data);
-        }
-
-        private static bool IsPowerOfTwo(ulong x)
-        {
-            return (x != 0) && ((x & (x - 1)) == 0);
         }
 
 

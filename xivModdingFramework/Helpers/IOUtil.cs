@@ -788,5 +788,14 @@ namespace xivModdingFramework.Helpers
             return GetParentIfExists(par.FullName, target, caseSensitive);
         }
 
+        public static bool IsPowerOfTwo(long x)
+        {
+            return IsPowerOfTwo((ulong)x);
+        }
+        public static bool IsPowerOfTwo(ulong x)
+        {
+            return (x != 0) && ((x & (x - 1)) == 0);
+        }
+
     }
 }
