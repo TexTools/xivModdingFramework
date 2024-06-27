@@ -247,10 +247,18 @@ namespace xivModdingFramework.Cache
 
             var basePath = GetRootFolder();
 
+            if (PrimaryType == XivItemType.human && SecondaryType == XivItemType.hair)
+            {
+                // Stupid hair exception handling.
+                var hairRoot = Mtrl.GetHairMaterialRoot(this);
+                basePath = hairRoot.GetRootFolder();
+            }
+
             if (UsesMaterialSets())
             {
                 basePath = String.Format(MaterialFolderWithVariant, basePath, materialVersion.ToString("D4"));
-            } else
+            }
+            else
             {
                 basePath = String.Format(MaterialFolderWithoutVariant, basePath);
             }

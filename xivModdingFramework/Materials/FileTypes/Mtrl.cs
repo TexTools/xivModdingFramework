@@ -1290,23 +1290,26 @@ namespace xivModdingFramework.Materials.FileTypes
                 mdlFolder = mdlFolder.Replace("\\", "/");
                 var baseFolder = mdlFolder.Substring(0, mdlFolder.LastIndexOf("/"));
                 mtrlFolder = baseFolder + "/material";
-            }
-
+            } 
             else {
 
-                var mdlMatch = _raceRegex.Match(mdlPath);
-                var mtrlMatch = _raceRegex.Match(mtrlName);
-
-                // Both items have racaial information in their path, and the races DON'T match.
-                if(mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
+                if (mdlPath.Contains("/hair/h"))
                 {
-                    // In this case, we need to replace the MDL path's racial string with the racial string from the MTRL.
-                    // This only really happens in hair items, that have unique racial model paths, but often share materials still.
-                    mdlPath = mdlPath.Replace(mdlMatch.Groups[1].Value, mtrlMatch.Groups[1].Value);
+                    var root = XivCache.GetFileNameRootInfo(mdlPath);
+                    var hairRoot = Mtrl.GetHairMaterialRoot(root);
+
+                    var basename = root.GetBaseFileName();
+                    var newName = hairRoot.GetBaseFileName();
+
+                    var rex = new Regex("c[0-9]{4}");
+                    mdlPath = rex.Replace(mdlPath, "c" + hairRoot.PrimaryId.ToString("D4"));
+
+                    // SE hard-forces these internally, much like skin.
+                    mtrlName = mtrlName.Replace(basename, newName);
                 }
 
-                mdlMatch = _weaponMatch.Match(mdlPath);
-                mtrlMatch = _weaponMatch.Match(mtrlName);
+                var mdlMatch = _weaponMatch.Match(mdlPath);
+                var mtrlMatch = _weaponMatch.Match(mtrlName);
 
                 // Both items have weapon model information in their path, and the weapons DON'T match.
                 if (mdlMatch.Success && mtrlMatch.Success && mdlMatch.Groups[1].Value != mtrlMatch.Groups[1].Value)
@@ -1648,7 +1651,16 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var tx = ModTransaction.BeginReadonlyTransaction();
 
-            var index = await tx.GetIndexFile(dataFile);
+            IndexFile index;
+            try
+            {
+                index = await tx.GetIndexFile(dataFile);
+            }
+            catch
+            {
+                // Index doesn't exist.
+                return new List<SimplifiedMtrlInfo>();
+            }
 
 
             // Populate dictionaries.

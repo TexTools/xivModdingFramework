@@ -2471,6 +2471,8 @@ namespace xivModdingFramework.Models.DataContainers
             ttModel.Source = rawMdl.MdlPath;
             ttModel.MdlVersion = rawMdl.MdlVersion;
 
+            ModelModifiers.FixUpSkinReferences(ttModel, rawMdl.MdlPath);
+
             return ttModel;
         }
 

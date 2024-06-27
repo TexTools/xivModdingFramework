@@ -56,10 +56,17 @@ namespace xivModdingFramework.SqPack.FileTypes
                     var index1Path = XivDataFiles.GetFullPath(df, IndexExtension);
                     var index2Path = XivDataFiles.GetFullPath(df, Index2Extension);
 
-                    var fs = File.OpenWrite(index1Path);
-                    fs.Dispose();
-                    var fs2 = File.OpenWrite(index2Path);
-                    fs2.Dispose();
+                    if (File.Exists(index1Path))
+                    {
+                        var fs = File.OpenWrite(index1Path);
+                        fs.Dispose();
+                    }
+
+                    if (File.Exists(index2Path))
+                    {
+                        var fs2 = File.OpenWrite(index2Path);
+                        fs2.Dispose();
+                    }
                 }
             }
             catch(Exception ex)
@@ -341,8 +348,16 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             var index1Path = XivDataFiles.GetFullPath(index, Index.IndexExtension);
             var index2Path = XivDataFiles.GetFullPath(index, Index.Index2Extension);
-            UNSAFE_SetIndexDatCount(index1Path, value);
-            UNSAFE_SetIndexDatCount(index2Path, value);
+
+            if (File.Exists(index1Path))
+            {
+                UNSAFE_SetIndexDatCount(index1Path, value);
+            }
+
+            if (File.Exists(index2Path))
+            {
+                UNSAFE_SetIndexDatCount(index2Path, value);
+            }
         }
 
         /// <summary>

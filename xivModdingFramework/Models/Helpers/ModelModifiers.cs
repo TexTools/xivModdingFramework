@@ -20,6 +20,8 @@ using System.Globalization;
 using SharpDX.Direct2D1;
 using System.Diagnostics;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Cache;
+using xivModdingFramework.Materials.FileTypes;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -1927,6 +1929,7 @@ namespace xivModdingFramework.Models.Helpers
 
 
         public static readonly Regex SkinMaterialRegex = new Regex("^/mt_c([0-9]{4})b([0-9]{4})_.+\\.mtrl$");
+        public static readonly Regex HairMaterialRegex = new Regex("^/mt_c([0-9]{4})h([0-9]{4})_hir");
 
 
 
@@ -1987,6 +1990,16 @@ namespace xivModdingFramework.Models.Helpers
             var raceRegex = new Regex("(c[0-9]{4})");
             var bodyRegex = new Regex("(b[0-9]{4})");
 
+            var modelRoot = XivCache.GetFileNameRootInfo(model.Source);
+            bool hairFix = false;
+            XivDependencyRootInfo hairInfo = new XivDependencyRootInfo();
+            if (modelRoot.IsValid() && modelRoot.SecondaryType == Items.Enums.XivItemType.hair)
+            {
+                hairFix = true;
+                hairInfo = Mtrl.GetHairMaterialRoot(modelRoot);
+            }
+
+
             foreach (var m in model.MeshGroups)
             {
                 if (m.Material == null) continue;
@@ -2008,6 +2021,12 @@ namespace xivModdingFramework.Models.Helpers
                         m.Material = bodyRegex.Replace(m.Material, bodyReplacement);
                     }
                 }
+
+                if (hairFix && HairMaterialRegex.IsMatch(m.Material))
+                {
+                    m.Material = m.Material.Replace(modelRoot.GetBaseFileName(), hairInfo.GetBaseFileName());
+                }
+
             }
 
         }
