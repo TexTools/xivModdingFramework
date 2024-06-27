@@ -54,6 +54,8 @@ using xivModdingFramework.Exd.Enums;
 using SharpDX.Toolkit.Graphics;
 using xivModdingFramework.Models.DataContainers;
 using SixLabors.ImageSharp.PixelFormats;
+using Image = SixLabors.ImageSharp.Image;
+using SixLabors.ImageSharp.Formats.Tga;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -435,25 +437,63 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
+            // If no format was specified...
+            if (texFormat == XivTexFormat.INVALID)
+            {
+                // Use the current internal format.
+                var xivt = await Tex.GetXivTex(internalPath, false, tx);
+                texFormat = xivt.TextureFormat;
+            }
+
+            // Ensure we're converting to a format we can actually process.
+            CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
+
+            if (compressionFormat == CompressionFormat.BC7)
+            {
+                return await DDS.TexConv(externalPath, "BC7_UNORM", useMips);
+            }
+
+            // We have to check the image size here to be sure it won't nuke TexImpNet.
+            // Extremely small (<64x64) image sizes will cause it to memory error and nuke the entire application.
+            using (var img = Image.Load(externalPath))
+            {
+                if(img.Width < 64 || img.Height < 64)
+                {
+                    var w = 0;
+                    var h = 0;
+                    if(img.Width < img.Height)
+                    {
+                        w = 64;
+                        var mul = 64.0f / img.Width;
+                        h = (int) Math.Floor(img.Height * mul);
+                    }
+                    else
+                    {
+                        h = 64;
+                        var mul = 64.0f / img.Height;
+                        w = (int)Math.Floor(img.Width * mul);
+                    }
+                    var rOptions = new ResizeOptions()
+                    {
+                        Size = new Size(w, h),
+                        PremultiplyAlpha = false,
+                        Mode = SixLabors.ImageSharp.Processing.ResizeMode.Stretch,
+                        Sampler = KnownResamplers.NearestNeighbor,
+                    };
+
+                    img.Mutate(x => x.Resize(rOptions));
+
+                    var encoder = new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32, Compression = TgaCompression.None };
+
+                    var path = IOUtil.GetFrameworkTempFile() + ".tga";
+                    img.Save(path, encoder);
+                    externalPath = path;
+                }
+            }
+
             var ddsContainer = new DDSContainer();
             try
             {
-                // If no format was specified...
-                if (texFormat == XivTexFormat.INVALID)
-                {
-                    // Use the current internal format.
-                    var xivt = await Tex.GetXivTex(internalPath, false, tx);
-                    texFormat = xivt.TextureFormat;
-                }
-
-                // Ensure we're converting to a format we can actually process.
-                CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
-
-                if(compressionFormat == CompressionFormat.BC7)
-                {
-                    return await DDS.TexConv(externalPath, "BC7_UNORM", useMips);
-                }
-
                 using (var surface = Surface.LoadFromFile(externalPath))
                 {
                     if (surface == null)
@@ -510,6 +550,12 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             else
             {
+                if(tex.Width < 64 || tex.Height < 64)
+                {
+                    // The TexImpNet compressor will hard crash the entire application with a memory error with small sizes.
+                    throw new InvalidDataException("Image is too small for DDS Compressor. (64x64 Minimum Size)");
+                }
+
                 // TexImpNet Route
                 unsafe
                 {
