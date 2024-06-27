@@ -841,7 +841,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     if (settings.UpdateEndwalkerFiles)
                     {
                         var modPack = filteredModsJson[0].ModPackEntry;
-                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, settings.UpdatePartialEndwalkerFiles, progress, tx);
+                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, progress, tx);
                     }
 
                     count = 0;
@@ -1133,7 +1133,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (settings.UpdateEndwalkerFiles)
                 {
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(paths);

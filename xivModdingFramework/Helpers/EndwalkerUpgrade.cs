@@ -64,9 +64,9 @@ namespace xivModdingFramework.Helpers
         /// <param name="progress"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> paths, string source, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-
+            var filePaths = paths.ToList();
             var ret = new Dictionary<string, UpgradeInfo>();
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
@@ -91,7 +91,7 @@ namespace xivModdingFramework.Helpers
             if (includePartials)
             {
                 progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths.ToList(), source, tx, _ConvertedTextures);
+                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths, source, tx, _ConvertedTextures);
 
                 progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
                 foreach (var path in filePaths)
