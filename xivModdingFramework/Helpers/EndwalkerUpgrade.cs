@@ -764,8 +764,9 @@ namespace xivModdingFramework.Helpers
             var indexData = new byte[normalTex.Width * normalTex.Height * 4];
             await TextureHelpers.CreateIndexTexture(normalData, indexData, normalTex.Width, normalTex.Height);
 
+            var format = XivCache.FrameworkSettings.DefaultTextureFormat == XivTexFormat.A8R8G8B8 ? XivTexFormat.A8R8G8B8 : XivTexFormat.BC5;
             // Create MipMaps (And DDS header that we don't really need)
-            indexData = await Tex.ConvertToDDS(indexData, XivTexFormat.A8R8G8B8, true, normalTex.Height, normalTex.Width, true);
+            indexData = await Tex.ConvertToDDS(indexData, format, true, normalTex.Width, normalTex.Height, true);
 
             // Convert DDS to uncompressed Tex
             indexData = Tex.DDSToUncompressedTex(indexData);
@@ -848,7 +849,7 @@ namespace xivModdingFramework.Helpers
             if (!_ConvertedTextures.Contains(normalPath))
             {
                 // Normal
-                var normalData = await Tex.ConvertToDDS(data.TexA, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
+                var normalData = await Tex.ConvertToDDS(data.TexA, XivCache.FrameworkSettings.DefaultTextureFormat, true, data.Width, data.Height, true);
                 normalData = Tex.DDSToUncompressedTex(normalData);
                 await WriteFile(normalData, normalPath, files, tx, source);
                 _ConvertedTextures.Add(normalPath);
@@ -857,7 +858,7 @@ namespace xivModdingFramework.Helpers
             if (!_ConvertedTextures.Contains(maskPath))
             {
                 // Mask
-                var maskData = await Tex.ConvertToDDS(data.TexB, XivTexFormat.A8R8G8B8, true, data.Height, data.Width, true);
+                var maskData = await Tex.ConvertToDDS(data.TexB, XivCache.FrameworkSettings.DefaultTextureFormat, true, data.Width, data.Height, true);
                 maskData = Tex.DDSToUncompressedTex(maskData);
                 await WriteFile(maskData, maskPath, files, tx, source);
                 _ConvertedTextures.Add(maskPath);
@@ -1408,7 +1409,7 @@ namespace xivModdingFramework.Helpers
             await TextureHelpers.SwizzleRB(updated.PixelData, updated.Width, updated.Height);
 
             // Create MipMaps (And DDS header that we don't really need)
-            var maskData = await Tex.ConvertToDDS(updated.PixelData, XivTexFormat.A8R8G8B8, true, updated.Height, updated.Width);
+            var maskData = await Tex.ConvertToDDS(updated.PixelData, XivCache.FrameworkSettings.DefaultTextureFormat, true, updated.Width, updated.Height);
 
 
             // Convert DDS to uncompressed Tex

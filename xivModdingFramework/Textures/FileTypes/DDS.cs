@@ -781,7 +781,7 @@ namespace xivModdingFramework.Textures.FileTypes
         #endregion
 
 
-        public static async Task<byte[]> TexConvRawPixels(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false)
+        public static async Task<byte[]> TexConvRawPixels(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false, bool omitHeader = true)
         {
             return await Task.Run(async () =>
             {
@@ -793,8 +793,10 @@ namespace xivModdingFramework.Textures.FileTypes
                     {
                         using (var br = new BinaryReader(fs))
                         {
-                            br.BaseStream.Seek(148, SeekOrigin.Begin);
-
+                            if (omitHeader)
+                            {
+                                br.BaseStream.Seek(148, SeekOrigin.Begin);
+                            }
                             return br.ReadAllBytes();
                         }
                     }

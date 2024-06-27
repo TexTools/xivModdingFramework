@@ -447,30 +447,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
 
                 // Ensure we're converting to a format we can actually process.
-                CompressionFormat compressionFormat = CompressionFormat.BGRA;
-                switch (texFormat)
-                {
-                    case XivTexFormat.DXT1:
-                        compressionFormat = CompressionFormat.BC1a;
-                        break;
-                    case XivTexFormat.DXT5:
-                        compressionFormat = CompressionFormat.BC3;
-                        break;
-                    case XivTexFormat.BC4:
-                        compressionFormat = CompressionFormat.BC4;
-                        break;						
-                    case XivTexFormat.BC5:
-                        compressionFormat = CompressionFormat.BC5;
-                        break;
-                    case XivTexFormat.BC7:
-                        compressionFormat = CompressionFormat.BC7;
-                        break;
-                    case XivTexFormat.A8R8G8B8:
-                        compressionFormat = CompressionFormat.BGRA;
-                        break;
-                    default:
-                        throw new Exception($"Format {texFormat} is not currently supported for Non-DDS import\n\nPlease use the DDS import option instead.");
-                }
+                CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
 
                 if(compressionFormat == CompressionFormat.BC7)
                 {
@@ -519,32 +496,11 @@ namespace xivModdingFramework.Textures.FileTypes
             // Always retain mip settings.
             bool useMips = tex.MipMapCount > 1 ? true : false;
 
-            // Ensure we're converting to a format we can actually process.
-            CompressionFormat compressionFormat = CompressionFormat.BGRA;
-            switch (tex.TextureFormat)
+            CompressionFormat compressionFormat = GetCompressionFormat(tex.TextureFormat);
+
+            if(compressionFormat == CompressionFormat.BGRA)
             {
-                case XivTexFormat.DXT1:
-                    compressionFormat = CompressionFormat.BC1a;
-                    break;
-                case XivTexFormat.DXT5:
-                    compressionFormat = CompressionFormat.BC3;
-                    break;
-                case XivTexFormat.BC4:
-                    compressionFormat = CompressionFormat.BC4;
-                    break;					
-                case XivTexFormat.BC5:
-                    compressionFormat = CompressionFormat.BC5;
-                    break;
-                case XivTexFormat.BC7:
-                    compressionFormat = CompressionFormat.BC7;
-                    break;
-                case XivTexFormat.A8R8G8B8:
-                    compressionFormat = CompressionFormat.BGRA;
-                    break;
-                default:
-                    tex.TextureFormat = XivTexFormat.A8R8G8B8;
-                    compressionFormat = CompressionFormat.BGRA;
-                    break;
+                tex.TextureFormat = XivTexFormat.A8R8G8B8;
             }
 
             byte[] ddsData = null;
@@ -610,23 +566,11 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
 
-
-        /// <summary>
-        /// Convert a raw pixel byte array into a DDS data block.
-        /// </summary>
-        /// <param name="data">8.8.8.8 Pixel format data.</param>
-        /// <param name="allowNonsense">Cursed argument that allows generating fake DDS files for speed.</param>
-        /// <returns></returns>
-        public static async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int height, int width, bool allowFast8888 = true)
+        public static CompressionFormat GetCompressionFormat(XivTexFormat format)
         {
-            if(allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
-            {
-                return CreateFast8888DDS(data, height, width);
-            }
-
             // Ensure we're converting to a format we can actually process.
-            CompressionFormat compressionFormat = CompressionFormat.BGRA;
-            switch (texFormat)
+            CompressionFormat compressionFormat;
+            switch (format)
             {
                 case XivTexFormat.DXT1:
                     compressionFormat = CompressionFormat.BC1a;
@@ -636,16 +580,37 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
                 case XivTexFormat.BC4:
                     compressionFormat = CompressionFormat.BC4;
-                    break;					
+                    break;
                 case XivTexFormat.BC5:
                     compressionFormat = CompressionFormat.BC5;
+                    break;
+                case XivTexFormat.BC7:
+                    compressionFormat = CompressionFormat.BC7;
                     break;
                 case XivTexFormat.A8R8G8B8:
                     compressionFormat = CompressionFormat.BGRA;
                     break;
                 default:
-                    throw new Exception($"Format {texFormat} is not currently supported for Non-DDS import\n\nPlease use the DDS import option instead.");
+                    throw new InvalidDataException("Format is currently unsupported: " + format.ToString());
             }
+
+            return compressionFormat;
+        }
+
+        /// <summary>
+        /// Returns the raw bytes of a DDS file.
+        /// </summary>
+        /// <param name="data">8.8.8.8 Pixel format data.</param>
+        /// <returns></returns>
+        public static async Task<byte[]> ConvertToDDS(byte[] data, XivTexFormat texFormat, bool useMipMaps, int width, int height,  bool allowFast8888 = true)
+        {
+            if(allowFast8888 && texFormat == XivTexFormat.A8R8G8B8)
+            {
+                return CreateFast8888DDS(data, width, height);
+            }
+
+            // Ensure we're converting to a format we can actually process.
+            CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
 
             var maxMipCount = 1;
             if (useMipMaps)
@@ -653,40 +618,47 @@ namespace xivModdingFramework.Textures.FileTypes
                 maxMipCount = 13;
             }
 
-            var sizePerPixel = 4;
-            var mipData = new MipData(width, height, width * sizePerPixel);
-            Marshal.Copy(data, 0, mipData.Data, data.Length);
-
-            using (var compressor = new Compressor())
+            if (compressionFormat == CompressionFormat.BC7)
             {
-                // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
-                compressor.Input.SetMipmapGeneration(true, maxMipCount);
-                compressor.Input.SetData(mipData, true);
-                compressor.Compression.Format = compressionFormat;
-                compressor.Compression.SetBGRAPixelFormat();
+                return await DDS.TexConvRawPixels(data, width, height, "BC7_UNORM", useMipMaps, false);
+            }
+            else
+            {
+                    var sizePerPixel = 4;
+                var mipData = new MipData(width, height, width * sizePerPixel);
+                Marshal.Copy(data, 0, mipData.Data, data.Length);
 
-                //compressor.Compression.SetRGBAPixelFormat
-                //compressor.Compression.Quality = CompressionQuality.Fastest;
-
-                compressor.Output.OutputHeader = true;
-                byte[] ddsData = null;
-
-
-
-                // Normal, well-behaved DDS conversion.
-                await Task.Run(() =>
+                using (var compressor = new Compressor())
                 {
-                    using (var ms = new MemoryStream())
-                    {
-                        if (!compressor.Process(ms))
-                        {
-                            throw new ImageProcessingException("Compressor was unable to convert image to DDS format.");
-                        }
-                        ddsData = ms.ToArray();
-                    }
-                });
+                    // UI/Paintings only have a single mipmap and will crash if more are generated, for everything else generate max levels
+                    compressor.Input.SetMipmapGeneration(true, maxMipCount);
+                    compressor.Input.SetData(mipData, true);
+                    compressor.Compression.Format = compressionFormat;
+                    compressor.Compression.SetBGRAPixelFormat();
 
-                return ddsData;
+                    //compressor.Compression.SetRGBAPixelFormat
+                    //compressor.Compression.Quality = CompressionQuality.Fastest;
+
+                    compressor.Output.OutputHeader = true;
+                    byte[] ddsData = null;
+
+
+
+                    // Normal, well-behaved DDS conversion.
+                    await Task.Run(() =>
+                    {
+                        using (var ms = new MemoryStream())
+                        {
+                            if (!compressor.Process(ms))
+                            {
+                                throw new ImageProcessingException("Compressor was unable to convert image to DDS format.");
+                            }
+                            ddsData = ms.ToArray();
+                        }
+                    });
+                    return ddsData;
+                }
+
             }
         }
 
@@ -700,7 +672,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="height"></param>
         /// <param name="width"></param>
         /// <returns></returns>
-        private static byte[] CreateFast8888DDS(byte[] data, int height, int width)
+        private static byte[] CreateFast8888DDS(byte[] data, int width, int height)
         {
             var header = new byte[128];
             var pixelSizeBits = 32;
