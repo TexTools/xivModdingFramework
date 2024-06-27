@@ -368,7 +368,7 @@ namespace xivModdingFramework.Materials.FileTypes
                     {
                         if (xivMtrl.Textures[textureIndex] != null
                             && xivMtrl.Textures[textureIndex].Sampler != null
-                            && xivMtrl.Textures[textureIndex].Sampler.SamplerId != ESamplerId.Invalid)
+                            && xivMtrl.Textures[textureIndex].Sampler.SamplerId != ESamplerId.Unknown)
                         {
                             // We already added a sampler.
 
@@ -1833,7 +1833,14 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     if(material.ShaderPack == EShaderPack.Unknown)
                     {
-                        Trace.WriteLine("Unknown SHPK: " + material.ShaderPackRaw);
+                       Trace.WriteLine("Unknown SHPK: " + material.ShaderPackRaw);
+                    }
+                    foreach(var tex in material.Textures)
+                    {
+                        if(tex.Sampler != null && tex.Sampler.SamplerId == ESamplerId.Unknown)
+                        {
+                            Trace.WriteLine("Unknown Texture Sampler: " + tex.Sampler.SamplerIdRaw.ToString("X"));
+                        }
                     }
 
                     materials.Add(new SimplifiedMtrlInfo(dataFile, file, material, index1Dict, index2Dict));

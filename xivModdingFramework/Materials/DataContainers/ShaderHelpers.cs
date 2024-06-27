@@ -462,7 +462,7 @@ namespace xivModdingFramework.Materials.DataContainers
             // This isn't ALL samplers in existence in FFXIV,
             // But it is all the samplers used with Material Textures,
             // So they're the only ones we care about.
-            Invalid = 0,
+            Unknown = 0,
             g_SamplerNormal = 0x0C5EC1F1,
             g_SamplerNormalMap0 = 0xAAB4D9E9,
             g_SamplerNormalMap1 = 0xDDB3E97F,
@@ -486,12 +486,19 @@ namespace xivModdingFramework.Materials.DataContainers
             g_SamplerTileNormal = 0x92F03E53,
             g_SamplerWaveMap = 0xE6321AFC,
             g_SamplerWaveMap1 = 0xE5338C17,
+            g_SamplerWaveletMap0 = 0x574E22D6,
+            g_SamplerWaveletMap1 = 0x20491240,
             g_SamplerWhitecapMap = 0x95E1F64D,
             g_SamplerEnvMap = 0xF8D7957A,
             g_SamplerTable = 0x2005679F,
             g_SamplerGBuffer = 0xEBBB29BD,
             g_SamplerSphereMap = 0x3334D3CA,
+            g_SamplerCatchlight = 0xFEA0F3D2,
             tPerlinNoise2D = 0xC06FEB5B,
+            g_Sampler = 0x88408C04,
+            g_Sampler0 = 0x213CB439,
+            g_Sampler1 = 0x563B84AF,
+
         };
 
         // Enum representation of the format map data is used as.

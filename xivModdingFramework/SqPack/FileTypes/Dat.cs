@@ -1774,7 +1774,8 @@ namespace xivModdingFramework.SqPack.FileTypes
             string targetDatFile = null;
             foreach (var file in tempDats)
             {
-                var datId = Int32.Parse(rex.Match(targetDatFile).Groups[1].Value);
+                var datMatch = rex.Match(file);
+                var datId = Int32.Parse(datMatch.Groups[1].Value);
 
                 if (!File.Exists(file))
                 {

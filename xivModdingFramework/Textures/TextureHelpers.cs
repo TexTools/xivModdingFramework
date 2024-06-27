@@ -253,10 +253,10 @@ namespace xivModdingFramework.Textures
                 var newRow = (byte) (((originalRow / 2) * 17) + 8);
 
 
-                // BRGRA format output.
-                indexPixelData[offset + 0] = 0;
+                // RGBA format output.
+                indexPixelData[offset + 0] = newRow;
                 indexPixelData[offset + 1] = newBlend;
-                indexPixelData[offset + 2] = newRow;
+                indexPixelData[offset + 2] = 0;
                 indexPixelData[offset + 3] = 255;
             }, width, height);
         }
@@ -271,23 +271,19 @@ namespace xivModdingFramework.Textures
                 // at least bump 0 to 1.
                 newGreen = RemapByte(newGreen, 0, 255, 10, 255);
 
-                // Output is BGRA
+                // Output is RGBA
 
-                // Normal Red (Swizzle)
-                normalPixelData[offset + 2] = normalPixelData[offset + 0];
-                
                 // Normal Blue - Highlight Color
-                normalPixelData[offset + 0] = maskPixelData[offset + 3];
+                normalPixelData[offset + 2] = maskPixelData[offset + 3];
 
-
+                // Mask Alpha - Albedo
+                maskPixelData[offset + 3] = maskPixelData[offset + 0];
                 // Mask Red - Specular Power
-                maskPixelData[offset + 2] = maskPixelData[offset + 1];
+                maskPixelData[offset + 0] = maskPixelData[offset + 1];
                 // Mask Green - Roughness
                 maskPixelData[offset + 1] = newGreen;
-                // Mask Alpha - Albedo
-                maskPixelData[offset + 3] = maskPixelData[offset];
                 // Mask Blue - SSS Thickness Map
-                maskPixelData[offset + 0] = 49;
+                maskPixelData[offset + 2] = 49;
 
             }, width, height);
         }
