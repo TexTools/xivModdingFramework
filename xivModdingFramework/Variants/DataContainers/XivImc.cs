@@ -47,6 +47,37 @@ namespace xivModdingFramework.Variants.DataContainers
         /// </remarks>
         public ushort Mask { get; set; }
 
+        public ushort AttributeMask
+        {
+            get
+            {
+                return (ushort)(Mask & (ushort)0x3FF);
+            }
+            set
+            {
+                value &= (ushort)0x3FF;
+                int mask = ~0x3FF;
+                Mask &= (ushort)mask;
+                Mask |= value;
+            }
+        }
+
+        public byte SoundId
+        {
+            get
+            {
+                var val = Mask >> 10;
+                return (byte)val;
+            }
+            set
+            {
+                var val = value << 10;
+                var mask = ~(0x3F << 10);
+                Mask &= (ushort)mask;
+                Mask |= (ushort)val;
+            }
+        }
+
         /// <summary>
         /// The IMC VFX data
         /// </summary>

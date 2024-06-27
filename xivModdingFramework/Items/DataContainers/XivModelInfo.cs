@@ -60,12 +60,6 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public int ImcSubsetID { get; set; }
 
-        /// <summary>
-        /// The items full model key value.
-        /// This is not actually used anywhere, and may be invalid/misunderstood data.
-        /// </summary>
-        public Quad ModelKey { get; set; }
-
         public object Clone()
         {
             return MemberwiseClone();

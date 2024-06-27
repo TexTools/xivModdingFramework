@@ -23,6 +23,7 @@ using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.FileTypes;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
@@ -32,40 +33,30 @@ namespace xivModdingFramework.HUD.FileTypes
     /// <summary>
     ///  This class contains the methods that deal with the .uld file type 
     /// </summary>
-    public class Uld
+    public static class Uld
     {
-        private readonly DirectoryInfo _gameDirectory;
-
-        public Uld(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
-
         /// <summary>
         /// Gets the texture paths from the uld file
         /// </summary>
         /// <returns>List of texture paths from the uld file</returns>
-        public async Task<List<string>> GetTexFromUld()
+        public static async Task<List<string>> GetTexFromUld(ModTransaction tx = null)
         {
             var uldLock = new object();
             var hashedFolder = HashGenerator.GetHash("ui/uld");
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
 
             var uldStringList = new HashSet<string>();
-            var uldOffsetList = await index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui);
+            var uldOffsetList = await Index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui, tx);
 
-            await Task.Run(() => Parallel.ForEach(uldOffsetList, (offset) =>
+            await Task.Run(() => Parallel.ForEach(uldOffsetList, async (offset) =>
             {
                 byte[] uldData;
-                try
+                var type = await tx.GetSqPackType(XivDataFile._06_Ui, offset, false);
+                if (type == 2)
                 {
-                    uldData = dat.GetType2Data(offset, XivDataFile._06_Ui).Result;
+                    uldData = await tx.ReadFile(XivDataFile._06_Ui, offset);
                 }
-                catch (Exception ex)
+                else
                 {
-                    Debug.WriteLine($"Error at offset: {offset}");
-                    Debug.WriteLine($"Message: {ex.Message}");
                     return;
                 }
 

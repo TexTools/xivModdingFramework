@@ -54,6 +54,7 @@ namespace xivModdingFramework.Items.DataContainers
         /// This is currently not used for the Pet Category, but may be used in the future
         /// </remarks>
         public string TertiaryCategory { get; set; }
+        public uint IconId { get; set; }
 
         /// <summary>
         /// The data file the item belongs to

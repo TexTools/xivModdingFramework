@@ -16,6 +16,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
@@ -41,33 +43,27 @@ namespace xivModdingFramework.Items
         /// <returns>The XivItemType containing the type of the item</returns>
         public static XivItemType GetPrimaryItemType(this IItem item)
         {
-            XivItemType itemType;
+            XivItemType itemType = XivItemType.unknown;
 
             if (item.PrimaryCategory == null || item.SecondaryCategory == null) return XivItemType.unknown;
 
-            if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) || 
+            if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) ||
                 item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Dual_Wield) || item.SecondaryCategory.Equals(XivStrings.Food))
             {
                 itemType = XivItemType.weapon;
 
-                try
+                var asIm = item as IItemModel;
+                if (asIm != null)
                 {
-                    // Check to see if we're an equipment item masquerading as a weapon.
-                    var mi = (XivGearModelInfo)((IItemModel)item).ModelInfo;
-                    if (mi != null)
+                    var gearinfo = asIm.ModelInfo as XivGearModelInfo;
+                    if(gearinfo != null && !gearinfo.IsWeapon)
                     {
-                        if (!mi.IsWeapon)
-                        {
-                            itemType = XivItemType.equipment;
-                        }
+                        itemType = XivItemType.equipment;
+
                     }
                 }
-                catch
-                {
-                    //No-op.
-                }
             }
-            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Earring) || item.SecondaryCategory.Equals(XivStrings.Neck) || 
+            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Earring) || item.SecondaryCategory.Equals(XivStrings.Neck) ||
                      item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings) || item.SecondaryCategory.Equals(XivStrings.LeftRing)))
             {
                 itemType = XivItemType.accessory;
@@ -81,7 +77,7 @@ namespace xivModdingFramework.Items
                 {
                     var modelInfo = (XivMonsterModelInfo)(((IItemModel)item).ModelInfo);
                     itemType = modelInfo.ModelType;
-                } catch(Exception ex)
+                } catch (Exception ex)
                 {
                     itemType = XivItemType.monster;
                 }
@@ -100,20 +96,29 @@ namespace xivModdingFramework.Items
             }
             else if (item.PrimaryCategory.Equals(XivStrings.Housing))
             {
-                if(item.SecondaryCategory.Equals(XivStrings.Paintings))
+                if (item.SecondaryCategory.Equals(XivStrings.Paintings))
                 {
-                    itemType = XivItemType.ui;
-                } else
+                    itemType = XivItemType.painting;
+                } else if (item.SecondaryCategory.Equals(XivStrings.Furniture_Indoor))
                 {
-                    itemType = XivItemType.furniture;
+                    itemType = XivItemType.indoor;
+                } else if (item.SecondaryCategory.Equals(XivStrings.Furniture_Outdoor))
+                {
+                    itemType = XivItemType.outdoor;
+                } else if (item.SecondaryCategory.Equals(XivStrings.Fish))
+                {
+                    itemType = XivItemType.fish;
                 }
             } else if(item.SecondaryCategory.Equals(XivStrings.Equipment_Decals) || item.SecondaryCategory.Equals(XivStrings.Face_Paint))
             {
                 itemType = XivItemType.decal;
             }
-            else
+            else if(item.PrimaryCategory == XivStrings.Gear)
             {
                 itemType = XivItemType.equipment;
+            } else
+            {
+                itemType = XivItemType.unknown;
             }
 
             return itemType;
@@ -126,6 +131,17 @@ namespace xivModdingFramework.Items
         /// <returns></returns>
         public static XivItemType GetSecondaryItemType(this IItem item)
         {
+            if(item == null)
+            {
+                return XivItemType.none;
+            }
+
+            if(item.PrimaryCategory == null || item.SecondaryCategory == null)
+            {
+                // Item is not constructed properly.
+                return XivItemType.none;
+            }
+
             var itemType = XivItemType.none;
 
             // Weapons, Monsters of all kinds, and the character Body use the body type secondary identifier.
@@ -239,7 +255,6 @@ namespace xivModdingFramework.Items
 
         public static readonly Dictionary<XivItemType, char> XivItemTypePrefixes = new Dictionary<XivItemType, char>()
         {
-            { XivItemType.unknown, '-' },
             { XivItemType.weapon, 'w' },
             { XivItemType.equipment, 'e' },
             { XivItemType.accessory, 'a' },
@@ -250,9 +265,6 @@ namespace xivModdingFramework.Items
             { XivItemType.tail, 't' },
             { XivItemType.hair, 'h' },
             { XivItemType.ear, 'z' },
-            { XivItemType.human, '-' },
-            { XivItemType.ui, '-' },
-            { XivItemType.furniture, '-' },
         };
 
 
@@ -362,21 +374,22 @@ namespace xivModdingFramework.Items
             var secondaryType = item.GetSecondaryItemType();
             var primaryId = "";
             var secondaryId = "";
+            var secondIdRaw = 0;
             XivModelInfo modelInfo = null;
-            try {
-                // Hitting this catch 60,000 time for all the UI elements is really slow.
-                if (item != null && primaryType != XivItemType.ui)
+
+            if (item != null && primaryType != XivItemType.ui)
+            {
+                var im = item as IItemModel;
+                if (im != null && im.ModelInfo != null)
                 {
-                    modelInfo = ((IItemModel)item).ModelInfo;
+                    modelInfo = im.ModelInfo;
                     if (modelInfo != null)
                     {
                         primaryId = modelInfo.PrimaryID.ToString().PadLeft(4, '0');
                         secondaryId = modelInfo.SecondaryID.ToString().PadLeft(4, '0');
+                        secondIdRaw = modelInfo.SecondaryID;
                     }
                 }
-            } catch(Exception ex)
-            {
-                // No-op.  If it failed it's one of the types we're not going to use it modelInfo on anyways.
             }
 
 
@@ -388,7 +401,7 @@ namespace xivModdingFramework.Items
             {
                 return "chara/demihuman/d" + primaryId + "/obj/equipment/e" + secondaryId;
             }
-            else if(primaryType == XivItemType.equipment)
+            else if (primaryType == XivItemType.equipment)
             {
                 return "chara/equipment/e" + primaryId;
             }
@@ -398,62 +411,37 @@ namespace xivModdingFramework.Items
             }
             else if (primaryType == XivItemType.ui)
             {
-                if (item.SecondaryCategory == XivStrings.Paintings)
-                {
-                    try
-                    {
-                        var furnitureItem = (IItemModel)item;
-                        modelInfo = furnitureItem.ModelInfo;
-                        return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
-                    } catch
-                    {
-                        var uiItem = (XivUi)item;
-                        return "ui/icon/" + uiItem.IconNumber.ToString().PadLeft(6, '0');
-                    }
-                }
-                else
-                {
-                    var uiItem = (XivUi)item;
-                    return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
-                }
+                var uiItem = (XivUi)item;
+                return uiItem.UiPath + uiItem.IconNumber.ToString().PadLeft(6, '0');
             }
-            else if (primaryType == XivItemType.furniture)
+            else if (primaryType == XivItemType.indoor)
             {
-                if (item.SecondaryCategory == XivStrings.Paintings)
+                return "bgcommon/hou/indoor/general/" + primaryId;
+            }
+            else if (primaryType == XivItemType.outdoor)
+            {
+                return "bgcommon/hou/outdoor/general/" + primaryId;
+            }
+            else if (primaryType == XivItemType.fish)
+            {
+                if (secondIdRaw == 0)
                 {
-                    try
-                    {
-                        var furnitureItem = (IItemModel)item;
-                        modelInfo = furnitureItem.ModelInfo;
-                        return "ui/icon/" + modelInfo.PrimaryID.ToString().PadLeft(6, '0');
-                    }
-                    catch
-                    {
-                        var uiItem = (XivUi)item;
-                        return "ui/icon/" + uiItem.IconNumber.ToString().PadLeft(6, '0');
-                    }
+                    return "";
                 }
-                else
-                {
-                    var ret = "bgcommon/hou/";
-                    if (item.SecondaryCategory == XivStrings.Furniture_Indoor)
-                    {
-                        ret += "indoor/";
-                    }
-                    else if (item.SecondaryCategory == XivStrings.Furniture_Outdoor)
-                    {
-                        ret += "outdoor/";
-                    }
 
-                    ret += "general/" + primaryId;
-                    return ret;
-                }
+                var folder = XivFish.IntSizeToString(secondIdRaw);
+
+                return "bgcommon/hou/indoor/gyo/" + folder + "/" + primaryId;
+            }
+            else if (primaryType == XivItemType.painting)
+            {
+                return "bgcommon/hou/indoor/pic/ta/" + primaryId;
             }
             else if (primaryType == XivItemType.weapon)
             {
                 return "chara/weapon/w" + primaryId + "/obj/body/b" + secondaryId;
-            } 
-            else if(primaryType == XivItemType.human)
+            }
+            else if (primaryType == XivItemType.human)
             {
                 var ret = "chara/human/c" + primaryId + "/obj/";
                 if (secondaryType == XivItemType.body)
@@ -479,8 +467,8 @@ namespace xivModdingFramework.Items
 
                 ret += secondaryId;
                 return ret;
-            } 
-            else if(primaryType == XivItemType.decal)
+            }
+            else if (primaryType == XivItemType.decal)
             {
                 if (item.SecondaryCategory == XivStrings.Face_Paint)
                 {

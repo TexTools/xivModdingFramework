@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
@@ -13,16 +13,61 @@ using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
-using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Mods;
-using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
-
-using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using xivModdingFramework.Textures.Enums;
 
 namespace xivModdingFramework.Cache
 {
+
+    public class CacheException : Exception
+    {
+        new public Exception InnerException;
+        public CacheException(Exception ex) {
+            InnerException = ex;
+        }
+
+    }
+
+    public class FrameworkSettings
+    {
+        private string _TempDirectory = Path.GetTempPath();
+        public string TempDirectory
+        {
+            get
+            {
+                return _TempDirectory;
+            }
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    _TempDirectory = Path.GetTempPath();
+                }
+                else
+                {
+                    value = Path.GetFullPath(value);
+                    Directory.CreateDirectory(value);
+                    _TempDirectory = value;
+                }
+            }
+        }
+
+        private EModelingTool _ModelingTool = EModelingTool.Blender;
+        public EModelingTool ModelingTool
+        {
+            get => _ModelingTool;
+            set
+            {
+                _ModelingTool = value;
+            }
+        }
+
+        public XivTexFormat DefaultTextureFormat { get; set; } = XivTexFormat.A8R8G8B8;
+
+    }
 
     /// <summary>
     /// Item Dependency Cache for keeping track of item dependency information.
@@ -32,23 +77,40 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.2.7");
+        public static readonly Version CacheVersion = new Version("1.0.2.9");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
         private const string rootCacheCreationScript = "CreateRootCacheDB.sql";
+
+        public delegate void WriteStateChangedEventHandler(bool newState);
+        public static event WriteStateChangedEventHandler GameWriteStateChanged;
+
+        internal static void SetPragmas(SQLiteConnection db)
+        {
+            if (db.IsReadOnly(db.Database))
+            {
+                return;
+            }
+
+            using (var cmd = new SQLiteCommand("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;", db))
+            {
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         internal static string CacheConnectionString
         {
             get
             {
-                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
+                return "Data Source=" + _dbPath + ";Pooling=True;Max Pool Size=100;";
             }
         }
         internal static string RootsCacheConnectionString
         {
             get
             {
-                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100; PRAGMA journal_mode=WAL;";
+                return "Data Source=" + _rootCachePath + ";Pooling=True;Max Pool Size=100;";
             }
         }
 
@@ -70,6 +132,18 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public static FrameworkSettings FrameworkSettings { get; set; } = new FrameworkSettings();
+
+        private static bool _GameWriteEnbled = false;
+        public static bool GameWriteEnabled {
+            get => _GameWriteEnbled;
+            set
+            {
+                _GameWriteEnbled = value;
+                GameWriteStateChanged?.Invoke(_GameWriteEnbled);
+            }
+        }
+
         public static bool Initialized
         {
             get
@@ -84,7 +158,7 @@ namespace xivModdingFramework.Cache
             {
                 return _cacheWorker != null;
             }
-            set
+            private set
             {
                 // State cannot be changed during a rebuild.
                 // This shouldn't normally ever occur anyways, but
@@ -106,20 +180,23 @@ namespace xivModdingFramework.Cache
                 {
                     // Sleep until the cache worker actually stops.
                     _cacheWorker.CancelAsync();
-                    var duration = 0;
-                    while (_cacheWorker != null)
-                    {
-                        Thread.Sleep(10);
-                        duration += 10;
+                }
+            }
+        }
 
-                        if (duration >= 3000)
-                        {
-                            // Something went wrong with the shutdown of the cache worker thread.
-                            // Hopefully whatever went wrong fully crashed the thread.
-                            _cacheWorker = null;
-                            break;
-                        }
-                    }
+        public static void SetCacheWorkerStateSync(bool state)
+        {
+            CacheWorkerEnabled = state;
+        }
+
+        public static async Task SetCacheWorkerState(bool state)
+        {
+            CacheWorkerEnabled = state;
+            if(state == false)
+            {
+                while(_cacheWorker != null)
+                {
+                    await Task.Delay(10);
                 }
             }
         }
@@ -148,14 +225,18 @@ namespace xivModdingFramework.Cache
         /// <param name="gameDirectory"></param>
         /// <param name="language"></param>
         /// <param name="validateCache"></param>
-        public static void SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, int dxMode = 11, bool validateCache = true, bool enableCacheWorker = true,
-            DirectoryInfo luminaDirectory = null, bool useLumina = false)
+        public static async Task SetGameInfo(DirectoryInfo gameDirectory = null, XivLanguage language = XivLanguage.None, bool enableCacheWorker = true)
         {
-            var gi = new GameInfo(gameDirectory, language, dxMode, luminaDirectory, useLumina);
-            SetGameInfo(gi, enableCacheWorker);
+            var gi = new GameInfo(gameDirectory, language);
+            await SetGameInfo(gi, enableCacheWorker);
         }
-        public static void SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
+        public static async Task SetGameInfo(GameInfo gameInfo = null, bool enableCacheWorker = true)
         {
+            if(ModTransaction.ActiveTransaction != null)
+            {
+                throw new Exception("Cannot change GameInfo settings while there is an open write-enabled transaction.");
+            }
+
             // We need to either have a valid game directory reference in the static already or need one in the constructor.
             if (_gameInfo == null && (gameInfo == null || gameInfo.GameDirectory == null)) {
                 throw new Exception("First call to cache must include a valid game directoy.");
@@ -166,6 +247,7 @@ namespace xivModdingFramework.Cache
                 throw new Exception("Provided Game Directory does not exist.");
             }
 
+
             // Sleep and lock this thread until rebuild is done.
             while (_REBUILDING)
             {
@@ -175,6 +257,19 @@ namespace xivModdingFramework.Cache
             if (gameInfo != null)
             {
                 _gameInfo = gameInfo;
+            }
+
+            Modding.CreateModlist();
+
+            if(GameInfo != null)
+            {
+                var gameWritingTxSettings = new ModTransactionSettings()
+                {
+                    Target = ETransactionTarget.GameFiles,
+                    StorageType = EFileStorageType.CompressedIndividual,
+                    TargetPath = XivCache.GameInfo.GameDirectory.FullName
+                };
+                ModTransaction.SetDefaultTransactionSettings(gameWritingTxSettings);
             }
 
 
@@ -192,21 +287,13 @@ namespace xivModdingFramework.Cache
 						reason == CacheRebuildReason.CacheVersionUpdate 
 							? new Version(GetMetaValue("cache_version")) : CacheVersion;
 
-					RebuildCache(ver, reason);
+					await RebuildCache(ver, reason);
                 }
             }
-
-            if (enableCacheWorker)
-            {
-                CacheWorkerEnabled = true;
-            } else
-            {
-                // Explicitly shut down the cache worker if not allowed.
-                // This is potentially necessary if a cache rebuild automatically started it.
-                CacheWorkerEnabled = false;
-            }
+            await SetCacheWorkerState(enableCacheWorker);
 
         }
+
 
         /// <summary>
         /// Tests if the cache needs to be rebuilt (and starts the process if it does.)
@@ -224,7 +311,7 @@ namespace xivModdingFramework.Cache
 
                     // FFXIV Updated?  This one always gets highest priority for reason.
                     var val = GetMetaValue("ffxiv_version");
-                    var version = new Version(val);
+                    Version version = val == null ? null : new Version(val);
                     if (version != _gameInfo.GameVersion)
                     {
                         return CacheRebuildReason.FFXIVUpdate;
@@ -282,77 +369,92 @@ namespace xivModdingFramework.Cache
         /// help ensure it's never accidentally called
         /// without an await.
         /// </summary>
-        public static void RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest)
+        public static async Task RebuildCache(Version previousVersion, CacheRebuildReason reason = CacheRebuildReason.ManualRequest, ModTransaction tx = null)
         {
-            CacheWorkerEnabled = false;
+            var workerStatus = CacheWorkerEnabled;
+            await SetCacheWorkerState(false);
             _REBUILDING = true;
-
-            if (CacheRebuilding != null)
+            try
             {
-                // If there are any event listeners, invoke them.
-                CacheRebuilding.Invoke(null, reason);
-            }
 
-            Task.Run(async () =>
-            {
-                if (_gameInfo.GameLanguage == XivLanguage.None)
+
+                if (CacheRebuilding != null)
                 {
-                    throw new NotSupportedException("A valid language must be specified when rebuilding the Cache.");
+                    // If there are any event listeners, invoke them.
+                    CacheRebuilding.Invoke(null, reason);
                 }
 
-                try
+                Task.Run(async () =>
                 {
-                    CreateCache();
 
-                    var tasks = new List<Task>();
+                    if (_gameInfo.GameLanguage == XivLanguage.None)
+                    {
+                        throw new NotSupportedException("A valid language must be specified when rebuilding the Cache.");
+                    }
 
-                    var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-                    tasks.Add(RebuildItemsCache());
-                    tasks.Add(RebuildCharactersCache());
-                    tasks.Add(RebuildMonstersCache());
-                    tasks.Add(RebuildUiCache());
-                    tasks.Add(RebuildFurnitureCache());
-                    tasks.Add(BuildModdedItemDependencies());
+                    if (tx == null)
+                    {
+                        tx = ModTransaction.BeginReadonlyTransaction();
+                    }
 
-                    // This was originally running only if the reason was cache update,
-                    // but if the cache gets messed up in one way or another, and has to
-                    // rebuild on a new TT version for any reason other than CacheUpdate
-                    // or whatever, it will prevent the migration from occurring properly
-	                tasks.Add(MigrateCache(previousVersion));
-
-	                await Task.WhenAll(tasks);
-
-                    var post = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
-
-                    var result = post - pre;
-
-                    SetMetaValue("cache_version", CacheVersion.ToString());
-                    SetMetaValue("ffxiv_version", _gameInfo.GameVersion.ToString());
-                    SetMetaValue("language", _gameInfo.GameLanguage.ToString());
-                    SetMetaValue("build_time", result.ToString());
-
-                } catch (Exception Ex)
-                {
                     try
                     {
-                        // If we failed an update due to a post-patch error, keep us stuck in that state
-                        // until a TexTools update and a proper completed rebuild.
-                        if (reason == CacheRebuildReason.FFXIVUpdate)
-                        {
-                            SetMetaValue("ffxiv_version", new Version(0, 0, 0, 0).ToString());
-                        }
+                        CreateCache();
 
-                        SetMetaValue("needs_rebuild", "1");
+                        var tasks = new List<Task>();
+
+                        var pre = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+                        tasks.Add(RebuildItemsCache(tx));
+                        tasks.Add(RebuildCharactersCache(tx));
+                        tasks.Add(RebuildMonstersCache(tx));
+                        tasks.Add(RebuildUiCache(tx));
+                        tasks.Add(RebuildFurnitureCache(tx));
+                        tasks.Add(BuildModdedItemDependencies(tx));
+
+                        // This was originally running only if the reason was cache update,
+                        // but if the cache gets messed up in one way or another, and has to
+                        // rebuild on a new TT version for any reason other than CacheUpdate
+                        // or whatever, it will prevent the migration from occurring properly
+                        tasks.Add(MigrateCache(previousVersion));
+
+                        await Task.WhenAll(tasks);
+
+                        var post = (DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+
+                        var result = post - pre;
+
+                        SetMetaValue("cache_version", CacheVersion.ToString());
+                        SetMetaValue("ffxiv_version", _gameInfo.GameVersion.ToString());
+                        SetMetaValue("language", _gameInfo.GameLanguage.ToString());
+                        SetMetaValue("build_time", result.ToString());
+
                     }
-                    catch {
-                        // No-op.  We're pretty fucked at this point.
+                    catch (Exception Ex)
+                    {
+                        try
+                        {
+                            // If we failed an update due to a post-patch error, keep us stuck in that state
+                            // until a TexTools update and a proper completed rebuild.
+                            if (reason == CacheRebuildReason.FFXIVUpdate)
+                            {
+                                SetMetaValue("ffxiv_version", new Version(0, 0, 0, 0).ToString());
+                            }
+
+                            SetMetaValue("needs_rebuild", "1");
+                        }
+                        catch
+                        {
+                            // No-op.  We're pretty fucked at this point.
+                        }
+                        _REBUILDING = false;
+                        throw;
                     }
-                    _REBUILDING = false;
-                    throw;
-                }
-            }).Wait();
-            _REBUILDING = false;
-            CacheWorkerEnabled = true;
+                }).Wait();
+            } finally
+            {
+                _REBUILDING = false;
+                await XivCache.SetCacheWorkerState(workerStatus);
+            }
         }
 
         #region Cache Rebuilding
@@ -400,6 +502,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", creationScript));
                 var sqlCmd = String.Join("\n", lines);
 
@@ -431,6 +536,9 @@ namespace xivModdingFramework.Cache
                     using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
                         db.Open();
+
+                        SetPragmas(db);
+
                         var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                         var sqlCmd = String.Join("\n", lines);
 
@@ -464,72 +572,51 @@ namespace xivModdingFramework.Cache
 
         private static async Task MigrateCache(Version lastCacheVersion) {
 
-            // Tex file fix migration
-            // This technically has nothing to do with the cache version,
-            // but I think this is one of the only places that this can go
-            if (lastCacheVersion < new Version(1, 0, 2, 2)) {
-	            var m = new Modding(_gameInfo.GameDirectory);
-	            var modList = m.GetModList();
-	            foreach (var mod in modList.Mods) {
-		            if (mod.data.dataType != 4) continue;
+            // No migration tasks currently.
 
-		            var datNum = (int)((mod.data.modOffset / 8) & 0x0F) / 2;
-		            var dat = XivDataFiles.GetXivDataFile(mod.datFile);
-
-		            var datPath = $"{_gameInfo.GameDirectory}/{dat.GetDataFileName()}{Dat.DatExtension}{datNum}";
-
-		            int uncompressedSize = -1;
-                    long seekTo = Dat.OffsetCorrection(datNum, mod.data.modOffset) + 8;
-
-                    // Seek to and read the uncompressed texture size catching any exceptions
-                    // because we handle further processing with the initial value of -1
-                    try
-                    {
-	                    using var reader = new BinaryReader(File.OpenRead(datPath));
-	                    reader.BaseStream.Position = seekTo;
-
-	                    uncompressedSize = reader.ReadInt32();
-                    } catch (Exception) {}
-                    
-                    // If we read an uncompressed size, seek to the same position and write the fixed uncompressed texture size
-                    if (uncompressedSize != -1)
-                    {
-	                    using var writer = new BinaryWriter(File.OpenWrite(datPath));
-	                    writer.BaseStream.Position = seekTo;
-
-	                    var tmp = BitConverter.GetBytes(uncompressedSize + 80);
-                        writer.Write(tmp);
-                    }
-	            }
-            }
         }
 
         /// <summary>
         /// Populate the ui table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildUiCache()
+        private static async Task RebuildUiCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
-                var _ui = new UI(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _ui.GetActionList();
-                list.AddRange(await _ui.GetLoadingImageList());
-                list.AddRange(await _ui.GetMapList());
-                list.AddRange(await _ui.GetMapSymbolList());
-                list.AddRange(await _ui.GetOnlineStatusList());
-                list.AddRange(await _ui.GetStatusList());
-                list.AddRange(await _ui.GetWeatherList());
-                list.AddRange(await _ui.GetUldList());
+                var _ui = new UI();
+                List<XivUi> list = new List<XivUi>();
+                List<Task<List<XivUi>>> tasks = new List<Task<List<XivUi>>>();
+                tasks.Add(_ui.GetActionList(tx));
+                tasks.Add(_ui.GetLoadingImageList(tx));
+                tasks.Add(_ui.GetMapList(tx));
+                tasks.Add(_ui.GetMapSymbolList(tx));
+                tasks.Add(_ui.GetOnlineStatusList(tx));
+                tasks.Add(_ui.GetStatusList(tx));
+                tasks.Add(_ui.GetWeatherList(tx));
+                tasks.Add(_ui.GetUldList(tx));
+                tasks.Add(_ui.GetPaintingUiImages(tx));
+                await Task.WhenAll(tasks);
+
+                var sum = tasks.Sum(x => x.Result.Count);
+                list.Capacity = sum;
+
+                foreach(var t in tasks)
+                {
+                    list.AddRange(t.Result);
+                }
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
                     {
                         var query = @"
-                            insert into ui ( name,  category,  subcategory,  path,  icon_id,  root) 
-                                    values ($name, $category, $subcategory, $path, $icon_id, $root)
+                            insert into ui ( name,  category,  subcategory,  path,  icon_id,  root,  mapzonecategory) 
+                                    values ($name, $category, $subcategory, $path, $icon_id, $root, $mapzonecategory)
                                 on conflict do nothing";
                         using (var cmd = new SQLiteCommand(query, db))
                         {
@@ -538,6 +625,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
                             cmd.Parameters.AddWithValue("path", item.UiPath);
                             cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("mapzonecategory", item.MapZoneCategory);
                             cmd.Parameters.AddWithValue("root", null);  // Unsupported for UI elements for now.
                             cmd.ExecuteScalar();
                         }
@@ -552,35 +640,41 @@ namespace xivModdingFramework.Cache
         /// Populate the monsters table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildMonstersCache()
+        private static async Task RebuildMonstersCache(ModTransaction tx)
         {
             // Mounts, Minions, etc. are really just monsters.
-            await RebuildMinionsCache();
-            await RebuildMountsCache();
-            await RebuildPetsCache();
+            var tasks = new List<Task>();
+            tasks.Add(RebuildMinionsCache(tx));
+            tasks.Add(RebuildMountsCache(tx));
+            tasks.Add(RebuildPetsCache(tx));
+
+            await Task.WhenAll(tasks);
         }
 
         /// <summary>
         /// Populate the housing table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildFurnitureCache()
+        private static async Task RebuildFurnitureCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _housing = new Housing(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _housing.GetUncachedFurnitureList();
+                var _housing = new Housing();
+                var list = await _housing.GetUncachedFurnitureList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
                     {
 
                         var query = @"
-                            insert into furniture ( name,  category,  subcategory,  primary_id,  icon_id,  root) 
-                                          values($name, $category, $subcategory, $primary_id, $icon_id, $root)";
+                            insert into furniture ( name,  category,  subcategory,  primary_id,  icon_id,  root, secondary_id) 
+                                          values($name, $category, $subcategory, $primary_id, $icon_id, $root, $secondary_id)";
 
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
@@ -588,8 +682,9 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("name", item.Name);
                             cmd.Parameters.AddWithValue("category", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("subcategory", item.TertiaryCategory);
-                            cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("icon_id", item.IconId);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                            cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                             if (root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
@@ -609,21 +704,24 @@ namespace xivModdingFramework.Cache
         /// Populate the mounts table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildMountsCache()
+        private static async Task RebuildMountsCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _companions.GetUncachedMountList();
+                var _companions = new Companions();
+                var list = await _companions.GetUncachedMountList(tx);
 
                 // Don't get the ornament list for the Chinese or Korean clients as they don't have them yet
                 if (_gameInfo.GameLanguage != XivLanguage.Chinese && _gameInfo.GameLanguage != XivLanguage.Korean)
                 {
-                    list.AddRange(await _companions.GetUncachedOrnamentList());
+                    list.AddRange(await _companions.GetUncachedOrnamentList(tx));
                 }
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -668,15 +766,18 @@ namespace xivModdingFramework.Cache
         /// Populate the pets.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildPetsCache()
+        private static async Task RebuildPetsCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _companions.GetUncachedPetList();
+                var _companions = new Companions();
+                var list = await _companions.GetUncachedPetList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -722,15 +823,18 @@ namespace xivModdingFramework.Cache
         /// Populate the minions table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildMinionsCache()
+        private static async Task RebuildMinionsCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
 
-                var _companions = new Companions(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var list = await _companions.GetUncachedMinionList();
+                var _companions = new Companions();
+                var list = await _companions.GetUncachedMinionList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in list)
@@ -770,32 +874,38 @@ namespace xivModdingFramework.Cache
             }
         }
 
-        private static async Task RebuildCharactersCache()
+        private static async Task RebuildCharactersCache(ModTransaction tx)
         {
-            var _character = new Character(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-            var items = await _character.GetUnCachedCharacterList();
+            var _character = new Character();
+            var items = await _character.GetUnCachedCharacterList(tx);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in items)
                     {
-                        var query = @"insert into characters ( primary_id, slot, slot_full, name, root) 
-                                                  values    ( $primary_id,$slot,$slot_full,$name,$root)";
+                        var query = @"insert into characters ( primary_id, slot, slot_full, name, root, race, secondary_id) 
+                                                  values    ( $primary_id,$slot,$slot_full,$name,$root,$race,$secondary_id)";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             if (item.ModelInfo != null)
                             {
                                 cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
+                                cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                             } else
                             {
                                 cmd.Parameters.AddWithValue("primary_id", 0);
+                                cmd.Parameters.AddWithValue("secondary_id", null);
                             }
                             cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("name", item.Name);
+                            cmd.Parameters.AddWithValue("race", item.TertiaryCategory);
                             if (root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
@@ -811,24 +921,27 @@ namespace xivModdingFramework.Cache
                 }
             }
         }
-        private static async Task RebuildItemsCache()
+        private static async Task RebuildItemsCache(ModTransaction tx)
         {
-            await RebuildGearCache();
+            await RebuildGearCache(tx);
         }
 
         /// <summary>
         /// Populate the items table.
         /// </summary>
         /// <returns></returns>
-        private static async Task RebuildGearCache()
+        private static async Task RebuildGearCache(ModTransaction tx)
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 Gear gear = null;
-                gear = new Gear(_gameInfo.GameDirectory, _gameInfo.GameLanguage);
-                var items = await gear.GetUnCachedGearList();
+                gear = new Gear();
+                var items = await gear.GetUnCachedGearList(tx);
 
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     foreach (var item in items)
@@ -846,7 +959,7 @@ namespace xivModdingFramework.Cache
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                             cmd.Parameters.AddWithValue("name", item.Name);
-                            cmd.Parameters.AddWithValue("icon_id", item.IconNumber);
+                            cmd.Parameters.AddWithValue("icon_id", item.IconId);
                             if(root.IsValid())
                             {
                                 cmd.Parameters.AddWithValue("root", root.ToString());
@@ -868,26 +981,15 @@ namespace xivModdingFramework.Cache
         /// all the file children of the modded files in the modlist.
         /// </summary>
         /// <returns></returns>
-        private static async Task BuildModdedItemDependencies()
+        private static async Task BuildModdedItemDependencies(ModTransaction tx = null)
         {
-            var _modding = new Modding(GameInfo.GameDirectory);
-            var modList = _modding.GetModList();
-
-            var paths = new List<string>(modList.Mods.Count);
-            foreach (var m in modList.Mods)
+            if(tx == null)
             {
-                try
-                {
-                    if (m.fullPath != null && m.fullPath != "")
-                    {
-                        paths.Add(m.fullPath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    throw;
-                }
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
+            var modList = await tx.GetModList();
+            var paths = modList.Mods.Keys.ToList();
+
             QueueDependencyUpdate(paths);
         }
 
@@ -911,7 +1013,7 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("furniture", where, async (reader) =>
+            return BuildListFromTable("furniture", where, (reader) =>
             {
                 return MakeFurniture(reader);
             });
@@ -934,7 +1036,7 @@ namespace xivModdingFramework.Cache
                 where.Value = "%" + substring + "%";
             }
 
-            return await BuildListFromTable("ui", where, async (reader) =>
+            return BuildListFromTable("ui", where, (reader) =>
             {
                 return MakeUi(reader);
             });
@@ -968,7 +1070,7 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                return await BuildListFromTable("monsters", where, async (reader) =>
+                return BuildListFromTable("monsters", where, (reader) =>
                 {
                     return (XivMinion)MakeMonster(reader);
                 });
@@ -1006,7 +1108,7 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                return await BuildListFromTable("monsters", where, async (reader) =>
+                return BuildListFromTable("monsters", where, (reader) =>
                 {
                     return (XivPet)MakeMonster(reader);
                 });
@@ -1053,7 +1155,7 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                return await BuildListFromTable("monsters", where, async (reader) =>
+                return BuildListFromTable("monsters", where, (reader) =>
                 {
                     return (XivMount)MakeMonster(reader);
                 });
@@ -1076,7 +1178,7 @@ namespace xivModdingFramework.Cache
             }
 
             List<XivCharacter> mainHands = new List<XivCharacter>();
-            var list = await BuildListFromTable("characters", where, async (reader) =>
+            var list = BuildListFromTable("characters", where, (reader) =>
             {
                 var item = MakeCharacter(reader);
 
@@ -1106,7 +1208,7 @@ namespace xivModdingFramework.Cache
 
             List<XivGear> mainHands = new List<XivGear>();
             List<XivGear> offHands = new List<XivGear>();
-            var list = await BuildListFromTable("items", where, async (reader) =>
+            var list = BuildListFromTable("items", where, (reader) =>
             {
                 var item = MakeGear(reader);
                 if (item.Name.Contains(XivStrings.Main_Hand))
@@ -1205,12 +1307,13 @@ namespace xivModdingFramework.Cache
             {
                 PrimaryCategory = XivStrings.Character,
                 SecondaryCategory = reader.GetString("slot_full"),
+                TertiaryCategory = reader.GetString("race"),
                 ModelInfo = mi,
             };
 
             item.Name = reader.GetString("name");
             mi.PrimaryID = reader.GetInt32("primary_id");
-            mi.SecondaryID = 0;
+            mi.SecondaryID = reader.GetInt32("secondary_id");
             return item;
         }
 
@@ -1232,8 +1335,8 @@ namespace xivModdingFramework.Cache
             };
 
             item.Name = reader.GetString("name");
-            item.IconNumber = (uint)reader.GetInt32("icon_id");
-            primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
+            item.IconId = (uint)reader.GetInt32("icon_id");
+            //primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
             primaryMi.PrimaryID = reader.GetInt32("primary_id");
             primaryMi.SecondaryID = reader.GetInt32("secondary_id");
             primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");
@@ -1253,6 +1356,7 @@ namespace xivModdingFramework.Cache
                 PrimaryCategory = XivStrings.UI,
                 SecondaryCategory = reader.GetString("category"),
                 TertiaryCategory = reader.GetString("subcategory"),
+                MapZoneCategory = reader.GetString("mapzonecategory"),
                 Name = reader.GetString("name"),
                 IconNumber = reader.GetInt32("icon_id"),
                 UiPath = reader.GetString("path"),
@@ -1273,10 +1377,11 @@ namespace xivModdingFramework.Cache
                 SecondaryCategory = reader.GetString("category"),
                 TertiaryCategory = reader.GetString("subcategory"),
                 Name = reader.GetString("name"),
-                IconNumber = (uint)reader.GetInt32("icon_id"),
+                IconId = (uint)reader.GetInt32("icon_id"),
                 ModelInfo = new XivModelInfo()
                 {
-                    PrimaryID = reader.GetInt32("primary_id")
+                    PrimaryID = reader.GetInt32("primary_id"),
+                    SecondaryID = reader.GetInt32("secondary_id")
                 }
             };
             return item;
@@ -1286,14 +1391,11 @@ namespace xivModdingFramework.Cache
         {
             var items = new List<IItem>();
 
-            var gameDir = GameInfo.GameDirectory;
-            var language = GameInfo.GameLanguage;
-
-            var gear = new Gear(gameDir, language);
-            var companions = new Companions(gameDir, language);
-            var housing = new Housing(gameDir, language);
-            var ui = new UI(gameDir, language);
-            var character = new Character(gameDir, language);
+            var gear = new Gear();
+            var companions = new Companions();
+            var housing = new Housing();
+            var ui = new UI();
+            var character = new Character();
 
 
             items.AddRange(await gear.GetGearList());
@@ -1320,6 +1422,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var query = "insert into meta(key, value) values($key,$value) on conflict(key) do update set value = excluded.value";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
@@ -1355,6 +1460,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var query = "select value from meta where key = $key";
 
                 // Double Using statements are important here to ensure
@@ -1386,10 +1494,10 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetChildFiles(string internalFilePath, bool cachedOnly = false)
+        public static async Task<List<string>> GetChildFiles(string internalFilePath, ModTransaction tx = null)
         {
             var wc = new WhereClause() { Column = "parent", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+            var list = BuildListFromTable("dependencies_children", wc, (reader) =>
             {
                 return reader.GetString("child");
             });
@@ -1400,67 +1508,26 @@ namespace xivModdingFramework.Cache
                 return new List<string>();
             }
 
-            if (cachedOnly)
-            {
-                return list;
-            }
-
-
             
-            if (list.Count == 0)
+            if (list.Count == 0 || list[0] == null)
             {
                 // No cache data, have to update.
-                list = await XivDependencyGraph.GetChildFiles(internalFilePath);
-                await UpdateChildFiles(internalFilePath, list);
+                list = await XivDependencyGraph.GetChildFiles(internalFilePath, tx);
+                await UpdateChildFiles(internalFilePath, list, tx);
             }
             return list;
         }
 
-        /// <summary>
-        /// Determines if a file is orphaned or not in the file system.
-        /// An Orphaned file is a custom file which no longer has any files in the filesystem actively referencing it.
-        /// These files may be safely deleted IFF all mods are currently active in ModList.
-        ///     ( Determining if any deactivated mods use the file is much more annoying )
-        /// </summary>
-        /// <param name="internalFilePath"></param>
-        /// <returns></returns>
-        public static async Task<bool> IsOrphanedFile(string internalFilePath)
-        {
-            var index = new Index(GameInfo.GameDirectory);
-            // So to be orphaned, a file has to pass(fail) a few criteria.
-
-            // 1. It cannot be a default FFXIV file.  Default files are never treated as orphans for safety.
-            var def = await index.IsDefaultFilePath(internalFilePath);
-            if(def) return false;
-
-            // 2. It has to have updated cache data.
-            await GetParentFiles(internalFilePath);
-
-            // 3. That cache data must specifically have exactly one parent listed, and that parent must be NULL.
-            var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies_parents", wc, async (reader) =>
-            {
-                return reader.GetString("parent");
-            });
-
-            if(list.Count == 1 && list[0] == null)
-            {
-                return true;
-            }
-            return false;
-
-
-        }
 
         /// <summary>
         /// Retreives the parent files in the dependency graph for this file.
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetParentFiles(string internalFilePath, bool cachedOnly = false)
+        public static async Task<List<string>> GetParentFiles(string internalFilePath, ModTransaction tx = null)
         {
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            var list = await BuildListFromTable("dependencies_parents", wc, async (reader) =>
+            var list = BuildListFromTable("dependencies_parents", wc, (reader) =>
             {
                 return reader.GetString("parent");
             });
@@ -1471,16 +1538,11 @@ namespace xivModdingFramework.Cache
                 return new List<string>();
             }
 
-            if (cachedOnly)
-            {
-                return list;
-            }
-
             if (list.Count == 0)
             {
                 // 0 Length list means there was no cached data.
-                list = await XivDependencyGraph.GetParentFiles(internalFilePath);
-                await UpdateParentFiles(internalFilePath, list);
+                list = await XivDependencyGraph.GetParentFiles(internalFilePath, tx);
+                await UpdateParentFiles(internalFilePath, list, tx);
             }
             return list;
         }
@@ -1501,6 +1563,8 @@ namespace xivModdingFramework.Cache
                     // Time to go root hunting.
                     var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
                     db.Open();
+
+                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1537,6 +1601,8 @@ namespace xivModdingFramework.Cache
                     // Gotta do this for all the supporting types...
                     var query = "select root from items";
                     db.Open();
+
+                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1647,6 +1713,29 @@ namespace xivModdingFramework.Cache
             return null;
         }
 
+        /// <summary>
+        /// Attempts to resolve the item's root purely by file path.
+        /// Not always accurate, but fast/synchronous.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static XivDependencyRoot GetFilePathRoot(string path)
+        {
+            return XivDependencyGraph.CreateDependencyRoot(XivDependencyGraph.ExtractRootInfo(path));
+        }
+
+        /// <summary>
+        /// Very fast, but possibly innacurate method for establishing an item's root information.
+        /// Mostly useful for resolving information about materials or models quickly.
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
+        public static XivDependencyRootInfo GetFileNameRootInfo(string fileName, bool validate = true)
+        {
+            var name = Path.GetFileNameWithoutExtension(fileName);
+            return XivDependencyGraph.ExtractRootInfoFilenameOnly(name, validate);
+        }
+
         public static async Task<List<XivDependencyRoot>> GetRoots(string internalPath)
         {
             return await XivDependencyGraph.GetDependencyRoots(internalPath);
@@ -1665,6 +1754,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 var lines = File.ReadAllLines(Path.Combine(cwd, "Resources", "SQL", rootCacheCreationScript));
                 var sqlCmd = String.Join("\n", lines);
 
@@ -1723,10 +1815,14 @@ namespace xivModdingFramework.Cache
         /// <param name="files"></param>
         /// <param name="cachedOnly"></param>
         /// <returns></returns>
-        public static Dictionary<string, List<string>> GetModListParents()
+        public static async Task<Dictionary<string, List<string>>> GetModListParents(ModTransaction tx = null)
         {
-            var modding = new Modding(GameInfo.GameDirectory);
-            var modList = modding.GetModList();
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            var modList = await tx.GetModList();
             var dict = new Dictionary<string, List<string>>(modList.Mods.Count);
             if(modList.Mods.Count == 0)
             {
@@ -1736,15 +1832,12 @@ namespace xivModdingFramework.Cache
             bool anyValidMods = false;
 
             var query = "select child, parent from dependencies_parents where child in(";
-            foreach(var mod in modList.Mods)
+            var files = modList.Mods.Keys.ToList();
+            foreach(var file in files)
             {
-                if(mod.fullPath == null || mod.fullPath == "")
-                {
-                    continue;
-                }
 
                 anyValidMods = true;
-                query += "'" + mod.fullPath + "',";
+                query += "'" + file + "',";
             }
 
 
@@ -1760,6 +1853,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     using (var reader = new CacheReader(cmd.ExecuteReader()))
@@ -1791,9 +1887,9 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<List<string>> GetSiblingFiles(string internalFilePath)
+        public static async Task<List<string>> GetSiblingFiles(string internalFilePath, ModTransaction tx = null)
         {
-            return await XivDependencyGraph.GetSiblingFiles(internalFilePath);
+            return await XivDependencyGraph.GetSiblingFiles(internalFilePath, tx);
         }
 
         /// <summary>
@@ -1828,12 +1924,12 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
-        public static async Task<HashSet<string>> GetChildrenRecursive(string file)
+        public static async Task<HashSet<string>> GetChildrenRecursive(string file, ModTransaction tx = null)
         {
             var files = new HashSet<string>();
             files.Add(file);
 
-            var baseChildren = await XivCache.GetChildFiles(file);
+            var baseChildren = await XivCache.GetChildFiles(file, tx);
             if (baseChildren == null || baseChildren.Count == 0)
             {
                 // No children, just us.
@@ -1845,7 +1941,7 @@ namespace xivModdingFramework.Cache
                 foreach (var child in baseChildren)
                 {
                     // Recursively get their children.
-                    var children = await GetChildrenRecursive(child);
+                    var children = await GetChildrenRecursive(child, tx);
                     foreach (var subchild in children)
                     {
                         // Add the results to the list.
@@ -1863,7 +1959,7 @@ namespace xivModdingFramework.Cache
         /// Returns the children that were written to the DB.
         /// </summary>
         /// <param name="internalFilePath"></param>
-        public static async Task<List<string>> UpdateChildFiles(string internalFilePath, List<string> children = null)
+        public static async Task<List<string>> UpdateChildFiles(string internalFilePath, List<string> children = null, ModTransaction tx = null)
         {
             var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Texture)
@@ -1874,7 +1970,7 @@ namespace xivModdingFramework.Cache
             // Just updating a single file.
             if (children == null)
             {
-                children = await XivDependencyGraph.GetChildFiles(internalFilePath);
+                children = await XivDependencyGraph.GetChildFiles(internalFilePath, tx);
             }
 
             var oldCacheChildren = new List<string>();
@@ -1882,6 +1978,9 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     // Clear out our old children.
@@ -1982,7 +2081,7 @@ namespace xivModdingFramework.Cache
         /// Updates the file parents in the dependencies cache.
         /// </summary>
         /// <param name="internalFilePath"></param>
-        private static async Task UpdateParentFiles(string internalFilePath, List<string> parents = null)
+        private static async Task UpdateParentFiles(string internalFilePath, List<string> parents = null, ModTransaction tx = null)
         {
             var level = XivDependencyGraph.GetDependencyLevel(internalFilePath);
             if (level == XivDependencyLevel.Invalid || level == XivDependencyLevel.Root)
@@ -1993,12 +2092,15 @@ namespace xivModdingFramework.Cache
             // Just updating a single file.
             if (parents == null)
             {
-                parents = await XivDependencyGraph.GetParentFiles(internalFilePath);
+                parents = await XivDependencyGraph.GetParentFiles(internalFilePath, tx);
             }
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
+
                 using (var transaction = db.BeginTransaction())
                 {
                     // Clear out all old parents
@@ -2053,85 +2155,133 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="files"></param>
         /// <returns></returns>
-        public static void QueueDependencyUpdate(List<string> files) {
+        public static void QueueDependencyUpdate(IEnumerable<string> files) {
 
             // We need to...
             // 1. Purge and requeue the parent calculation for all files we had listed as children previously.
             // 2. Purge our own child file references.
             // 3. Add this file to both dependency queues.
             // 4. Add our affected children to the parent queue.
+            // 5. Add this root to the items sets file if it didn't already exist.
 
-            using (var db = new SQLiteConnection(CacheConnectionString))
+            try
             {
-                db.Open();
-                using (var transaction = db.BeginTransaction())
+                // This is required because our SQL library is stupid.
+                GC.WaitForPendingFinalizers();
+                using (var db = new SQLiteConnection(CacheConnectionString))
                 {
-                    foreach (var file in files)
+                    db.BusyTimeout = 3;
+                    db.Open();
+
+                    SetPragmas(db);
+
+                    using (var transaction = db.BeginTransaction())
                     {
-
-                        var oldCacheChildren = new List<string>();
-
-                        // Clear out our old children.
-                        var query = "delete from dependencies_children where parent = $parent";
-                        using (var cmd = new SQLiteCommand(query, db))
+                        foreach (var file in files)
                         {
-                            cmd.Parameters.AddWithValue("parent", file);
-                            cmd.ExecuteScalar();
-                        }
 
-                        // Find all the files that currently point to us as a parent in the cache.
-                        query = "select child from dependencies_parents where parent = $parent";
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            cmd.Parameters.AddWithValue("parent", file);
-                            using (var reader = new CacheReader(cmd.ExecuteReader()))
+                            var oldCacheChildren = new List<string>();
+
+                            // Clear out our old children.
+                            var query = "delete from dependencies_children where parent = $parent";
+                            using (var cmd = new SQLiteCommand(query, db))
                             {
-                                while (reader.NextRow())
+                                cmd.Parameters.AddWithValue("parent", file);
+                                cmd.ExecuteScalar();
+                            }
+
+                            // Find all the files that currently point to us as a parent in the cache.
+                            query = "select child from dependencies_parents where parent = $parent";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("parent", file);
+                                using (var reader = new CacheReader(cmd.ExecuteReader()))
                                 {
-                                    oldCacheChildren.Add(reader.GetString("child"));
+                                    while (reader.NextRow())
+                                    {
+                                        oldCacheChildren.Add(reader.GetString("child"));
+                                    }
                                 }
                             }
-                        }
 
-                        // And purge all of those cached file's parents.
-                        query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
-                        using (var cmd = new SQLiteCommand(query, db))
-                        {
-                            cmd.Parameters.AddWithValue("parent", file);
-                            cmd.ExecuteScalar();
-                        }
+                            // And purge all of those cached file's parents.
+                            query = "delete from dependencies_parents where child in (select child as c_file from dependencies_parents where parent = $parent)";
+                            using (var cmd = new SQLiteCommand(query, db))
+                            {
+                                cmd.Parameters.AddWithValue("parent", file);
+                                cmd.ExecuteScalar();
+                            }
 
-                        // Now add us to both queues.
-                        query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
-                        using (var insertCmd = new SQLiteCommand(query, db))
-                        {
-                            insertCmd.Parameters.AddWithValue("file", file);
-                            insertCmd.ExecuteScalar();
-                        }
-
-                        query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
-                        using (var insertCmd = new SQLiteCommand(query, db))
-                        {
-                            insertCmd.Parameters.AddWithValue("file", file);
-                            insertCmd.ExecuteScalar();
-                        }
-
-                        // Queue up all the files that we parent-purged into the parent queue.
-                        foreach (var c in oldCacheChildren)
-                        {
-                            if (c == null) continue;
+                            // Now add us to both queues.
+                            query = "insert into dependencies_children_queue (file) values ($file) on conflict do nothing";
+                            using (var insertCmd = new SQLiteCommand(query, db))
+                            {
+                                insertCmd.Parameters.AddWithValue("file", file);
+                                insertCmd.ExecuteScalar();
+                            }
 
                             query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
                             using (var insertCmd = new SQLiteCommand(query, db))
                             {
-                                insertCmd.Parameters.AddWithValue("file", c);
+                                insertCmd.Parameters.AddWithValue("file", file);
                                 insertCmd.ExecuteScalar();
                             }
-                        }
 
+                            // Queue up all the files that we parent-purged into the parent queue.
+                            foreach (var c in oldCacheChildren)
+                            {
+                                if (c == null) continue;
+
+                                query = "insert into dependencies_parents_queue (file) values ($file) on conflict do nothing";
+                                using (var insertCmd = new SQLiteCommand(query, db))
+                                {
+                                    insertCmd.Parameters.AddWithValue("file", c);
+                                    insertCmd.ExecuteScalar();
+                                }
+                            }
+
+                        }
+                        transaction.Commit();
                     }
-                    transaction.Commit();
                 }
+
+                // Now connect to the root cache and inject our roots.
+                using (var db = new SQLiteConnection(RootsCacheConnectionString))
+                {
+                    db.Open();
+
+                    SetPragmas(db);
+
+                    using (var transaction = db.BeginTransaction())
+                    {
+                        HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
+                        var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
+                        using (var cmd = new SQLiteCommand(query, db))
+                        {
+                            foreach (var file in files)
+                            {
+                                var root = XivDependencyGraph.ExtractRootInfo(file);
+                                if (root == null || root.PrimaryId < 0)
+                                {
+                                    continue;
+                                }
+                                if (roots.Contains(root))
+                                    continue;
+
+                                var fullRoot = XivDependencyGraph.CreateDependencyRoot(root);
+                                if (fullRoot == null)
+                                    continue;
+
+                                roots.Add(root);
+                                XivCache.CacheRoot(root, db, cmd);
+                            }
+                        }
+                        transaction.Commit();
+                    }
+                }
+            } catch(Exception ex)
+            {
+                throw new CacheException(ex);
             }
         }
 
@@ -2142,6 +2292,8 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
 
                 var query = "select position, file from dependencies_children_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2168,6 +2320,8 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
+                SetPragmas(db);
+
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_children_queue where file = $file";
                 using (var deleteCmd = new SQLiteCommand(query, db))
@@ -2185,6 +2339,8 @@ namespace xivModdingFramework.Cache
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
                 db.Open();
+
+                SetPragmas(db);
 
                 var query = "select position, file from dependencies_parents_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2210,6 +2366,8 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
+                SetPragmas(db);
+
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_parents_queue where file = $file";
                 using (var deleteCmd = new SQLiteCommand(query, db))
@@ -2228,8 +2386,12 @@ namespace xivModdingFramework.Cache
         /// or is disabled, all functionally will/must continue to operate - however, calls to
         /// GetParentFiles()/GetChildFiles() may often be significantly slower, as the data may not already be cached.
         /// </summary>
-        private static void ProcessDependencyQueue(object sender, DoWorkEventArgs e)
+        private static async void ProcessDependencyQueue(object sender, DoWorkEventArgs e)
         {
+            // Note: The Cache worker only runs when Transactions are not active.
+
+            Trace.WriteLine("Starting Cache Worker on thread: " + Thread.CurrentThread.ManagedThreadId);
+
             // This will be executed on another thread.
             BackgroundWorker worker = (BackgroundWorker)sender;
             while (!worker.CancellationPending)
@@ -2252,10 +2414,10 @@ namespace xivModdingFramework.Cache
                         try
                         {
                             // The get call will automatically cache the data, if it needs updating.
-                            var task = GetChildFiles(file, false);
 
-                            // Set a safety timeout here.
-                            task.Wait(3000);
+                            // Use a temporary readonly TX for perf.
+                            var tx = ModTransaction.BeginReadonlyTransaction();
+                            await GetChildFiles(file, tx);
                         }
                         finally
                         {
@@ -2287,11 +2449,11 @@ namespace xivModdingFramework.Cache
 
                             try
                             {
-                                // The get call will automatically cache the data, if it needs updating.
-                                var task = GetParentFiles(file, false);
+                                // Use a temporary readonly TX for perf.
+                                var tx = ModTransaction.BeginReadonlyTransaction();
 
-                                // Set a safety timeout here.
-                                task.Wait(3000);
+                                // The get call will automatically cache the data, if it needs updating.
+                                await GetParentFiles(file, tx);
                             } finally
                             {
                                 RemoveFromParentQueue(file);
@@ -2307,11 +2469,35 @@ namespace xivModdingFramework.Cache
                 }
             }
 
+            Trace.WriteLine("Stopping Cache Worker on thread: " + Thread.CurrentThread.ManagedThreadId);
 
             // Ensure we're good and clean up after ourselves.
             SQLiteConnection.ClearAllPools();
+
+            // It'd be nice to be able to use this...
             GC.WaitForPendingFinalizers();
+            // But the SQlite library sometimes hangs indefinitely if you call it.
+            // So instead...
+
+            bool accessFailed = true;
+            while (accessFailed)
+            {
+
+                try
+                {
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    var fs = File.OpenWrite(_dbPath.FullName);
+                    fs.Dispose();
+                    accessFailed = false;
+                }
+                catch
+                {
+                    await Task.Delay(50);
+                }
+            }
             _cacheWorker = null;
+
         }
 
 
@@ -2327,7 +2513,7 @@ namespace xivModdingFramework.Cache
         {
             
             var wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = internalFilePath };
-            List<string> parents = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+            List<string> parents = BuildListFromTable("dependencies_children", wc, (reader) =>
             {
                 return reader.GetString("parent");
             });
@@ -2338,7 +2524,7 @@ namespace xivModdingFramework.Cache
             if (dx11Name != internalFilePath)
             {
                 wc = new WhereClause() { Column = "child", Comparer = WhereClause.ComparisonType.Equal, Value = dx11Name };
-                List<string> dxParents = await BuildListFromTable("dependencies_children", wc, async (reader) =>
+                List<string> dxParents = BuildListFromTable("dependencies_children", wc, (reader) =>
                 {
                     return reader.GetString("parent");
                 });
@@ -2353,41 +2539,46 @@ namespace xivModdingFramework.Cache
         /// Gets the current length of the dependency processing queue.
         /// </summary>
         /// <returns></returns>
-        public static int GetDependencyQueueLength()
+        public static async Task<int> GetDependencyQueueLength()
         {
             int length = 0;
-            using (var db = new SQLiteConnection(CacheConnectionString))
+            await Task.Run((Func<Task>)(async () =>
             {
-                db.Open();
-
-                var query = "select count(file) as cnt from dependencies_parents_queue";
-                using (var selectCmd = new SQLiteCommand(query, db))
+                using (var db = new SQLiteConnection((string)XivCache.CacheConnectionString))
                 {
-                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                    db.Open();
+
+                    SetPragmas(db);
+
+                    var query = "select count(file) as cnt from dependencies_parents_queue";
+                    using (var selectCmd = new SQLiteCommand(query, db))
                     {
-                        reader.NextRow();
-                        // Got the new item.
-                        length = reader.GetInt32("cnt");
+                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        {
+                            reader.NextRow();
+                            // Got the new item.
+                            length = reader.GetInt32("cnt");
+                        }
+                    }
+
+                    query = "select count(file) as cnt from dependencies_children_queue";
+                    using (var selectCmd = new SQLiteCommand(query, db))
+                    {
+                        using (var reader = new CacheReader(selectCmd.ExecuteReader()))
+                        {
+                            reader.NextRow();
+                            // Got the new item.
+                            length += reader.GetInt32("cnt");
+                        }
                     }
                 }
-
-                query = "select count(file) as cnt from dependencies_children_queue";
-                using (var selectCmd = new SQLiteCommand(query, db))
-                {
-                    using (var reader = new CacheReader(selectCmd.ExecuteReader()))
-                    {
-                        reader.NextRow();
-                        // Got the new item.
-                        length += reader.GetInt32("cnt");
-                    }
-                }
-            }
+            }));
             return length;
         }
 
-        private static async Task<List<T>> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, Task<T>> func)
+        private static List<T> BuildListFromTable<T>(string table, WhereClause where, Func<CacheReader, T> func)
         {
-            return await BuildListFromTable<T>(CacheConnectionString, table, where, func);
+            return BuildListFromTable<T>(CacheConnectionString, table, where, func);
         }
 
         /// <summary>
@@ -2398,58 +2589,72 @@ namespace xivModdingFramework.Cache
         /// <param name="where"></param>
         /// <param name="func"></param>
         /// <returns></returns>
-        public static async Task<List<T>> BuildListFromTable<T>(string connectionString, string table, WhereClause where, Func<CacheReader, Task<T>> func)
+        public static List<T> BuildListFromTable<T>(string connectionString, string table, WhereClause where, Func<CacheReader, T> func)
+        {
+
+            List<T> list;
+            using (var db = new SQLiteConnection(connectionString))
+            {
+                db.BusyTimeout = 3;
+                db.Open();
+
+                SetPragmas(db);
+
+                list = BuildListFromTable<T>(db, table, where, func);
+                db.Close();
+            }
+            return list;
+        }
+
+        public static List<T> BuildListFromTable<T>(SQLiteConnection db, string table, WhereClause where, Func<CacheReader, T> func)
         {
 
             List<T> list = new List<T>();
-            using (var db = new SQLiteConnection(connectionString))
+
+            // Check how large the result set will be so we're not constantly
+            // Reallocating the array.
+            var query = "select count(*) from " + table + " ";
+            if (where != null)
             {
-                db.Open();
-                // Check how large the result set will be so we're not constantly
-                // Reallocating the array.
-                var query = "select count(*) from " + table + " ";
+                query += where.GetSql();
+            }
+
+            using (var cmd = new SQLiteCommand(query, db))
+            {
                 if (where != null)
                 {
-                    query += where.GetSql();
+                    where.AddParameters(cmd);
                 }
 
-                using (var cmd = new SQLiteCommand(query, db))
-                {
-                    if (where != null)
-                    {
-                        where.AddParameters(cmd);
-                    }
+                int val = (int)((long) cmd.ExecuteScalar());
+                list = new List<T>(val);
+            }
 
-                    int val = (int)((long)await cmd.ExecuteScalarAsync());
-                    list = new List<T>(val);
-                }
+            // Set up the actual full query.
+            query = "select * from " + table;
+            if (where != null)
+            {
+                query += where.GetSql();
+            }
 
-                // Set up the actual full query.
-                query = "select * from " + table;
+            using (var cmd = new SQLiteCommand(query, db))
+            {
                 if (where != null)
                 {
-                    query += where.GetSql();
+                    where.AddParameters(cmd);
                 }
 
-                using (var cmd = new SQLiteCommand(query, db))
+                using (var reader = new CacheReader(cmd.ExecuteReader()))
                 {
-                    if (where != null)
+                    while (reader.NextRow())
                     {
-                        where.AddParameters(cmd);
-                    }
-
-                    using (var reader = new CacheReader(cmd.ExecuteReader()))
-                    {
-                        while (reader.NextRow())
+                        try
                         {
-                            try
-                            {
-                                list.Add(await func(reader));
-                            }
-                            catch (Exception ex)
-                            {
-                                throw;
-                            }
+                            list.Add(func(reader));
+                        }
+                        catch (Exception ex)
+                        {
+                            throw;
                         }
                     }
                 }
@@ -2665,6 +2870,14 @@ namespace xivModdingFramework.Cache
                 }
                 return _reader.GetInt32(_headers[fieldName]);
             }
+            public long GetInt64(string fieldName)
+            {
+                if (_reader[_headers[fieldName]].GetType() == NullType)
+                {
+                    return 0;
+                }
+                return _reader.GetInt64(_headers[fieldName]);
+            }
             public int? GetNullableInt32(string fieldName)
             {
                 if (_reader[_headers[fieldName]].GetType() == NullType)
@@ -2701,6 +2914,10 @@ namespace xivModdingFramework.Cache
 
             public void Dispose()
             {
+                if (_reader != null && !_reader.IsClosed)
+                {
+                    _reader.Close();
+                }
                 Dispose(true);
                 GC.SuppressFinalize(this);
             }
@@ -2719,17 +2936,9 @@ namespace xivModdingFramework.Cache
                 // Check to see if Dispose has already been called.
                 if (!this.disposed)
                 {
-                    // If disposing equals true, dispose all managed
-                    // and unmanaged resources.
-                    if (disposing)
+                    if(_reader != null && _reader.IsClosed)
                     {
-                        // Dispose managed resources.
-
-                        // Ensure the raw reader's file handle was closed.
-                        if (!_reader.IsClosed)
-                        {
-                            _reader.Close();
-                        }
+                        _reader.Close();
                     }
 
                     // Note disposing has been done.
@@ -2742,6 +2951,6 @@ namespace xivModdingFramework.Cache
                 Dispose(false);
             }
         }
-    }
 
+    }
 }

@@ -63,6 +63,8 @@ namespace xivModdingFramework.Items.DataContainers
         /// </remarks>
         public XivDataFile DataFile { get; set; } = XivDataFile._04_Chara;
 
+        public uint IconId { get; set; }
+
         /// <summary>
         /// The Primary Model Information of the Minion Item 
         /// </summary>

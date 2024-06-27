@@ -16,10 +16,18 @@
 
 namespace xivModdingFramework.Mods.Enums
 {
-    public enum XivModStatus
+    public enum EModState
     {
-        Original,
+        // The file is modded, but points to an offset that is neither the modded or original file.
+        Invalid,
+
+        // The file has not been modded at all, and exists only in its default game state.
+        UnModded,
+
+        // The file is modded, and enabled.
         Enabled,
+
+        // The file is modded, but the mod is disabled.
         Disabled
     }
 }

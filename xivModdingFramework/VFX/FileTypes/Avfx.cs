@@ -19,33 +19,25 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Mods;
 using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.VFX.FileTypes
 {
-    public class Avfx
+    public static class Avfx
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivDataFile _dataFile;
-
-        public Avfx(DirectoryInfo gameDirectory, XivDataFile dataFile)
-        {
-            _gameDirectory = gameDirectory;
-            _dataFile = dataFile;
-        }
 
         /// <summary>
         /// Gets the .atex paths that are within the .avfx file
         /// </summary>
         /// <param name="offset">The offset to the avfx file</param>
         /// <returns>A list of atex paths</returns>
-        public async Task<List<string>> GetATexPaths(long offset)
+        public static async Task<List<string>> GetATexPaths(string path, bool forceOriginal = false, ModTransaction tx = null)
         {
             var atexList = new List<string>();
 
-            var dat = new Dat(_gameDirectory);
 
-            var avfxData = await dat.GetType2Data(offset, _dataFile);
+            var avfxData = await Dat.ReadFile(path, forceOriginal, tx);
 
             await Task.Run(() =>
             {
@@ -76,16 +68,27 @@ namespace xivModdingFramework.VFX.FileTypes
 
                         try
                         {
-                            while (br.PeekChar() != 120)
+                            byte ch = 0;
+
+                            // Read until a byte of 120 or end of stream...?
+                            var read = 0;
+                            while(ch != 120)
                             {
-                                if (br.PeekChar() == -1)
+                                if(br.BaseStream.Length == br.BaseStream.Position + 1)
                                 {
+                                    // End of Stream.
                                     break;
                                 }
 
-                                br.ReadByte();
+                                if(ch != 0)
+                                {
+                                    // End of block.
+                                    break;
+                                }
+                                read++;
+                                ch = br.ReadByte();
                             }
-
+                            br.BaseStream.Seek(-1, SeekOrigin.Current);
                             data = br.ReadInt32();
                         }
                         catch

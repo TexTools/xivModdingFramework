@@ -24,16 +24,20 @@ namespace xivModdingFramework.Textures.Enums
         Diffuse,
         Specular,
         Normal,
-        Multi,
         Mask,
         Reflection,
         Skin,
         ColorSet,
+        Index,
         Map,
         Icon,
         Vfx,
         UI,
         Decal,
+
+        // Legacy Unused DX9 Textures
+        DX9,
+
         Other
     }
 }

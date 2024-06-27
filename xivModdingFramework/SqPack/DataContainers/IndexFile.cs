@@ -1,14 +1,25 @@
 ﻿using HelixToolkit.SharpDX.Core.Core2D;
+using HelixToolkit.SharpDX.Core.Helper;
+using Newtonsoft.Json.Linq;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.FileTypes;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.SqPack.DataContainers
 {
@@ -25,492 +36,505 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public class IndexFile
     {
+        public const bool _BENCHMARK_HACK = true;
         public bool ReadOnlyMode
         {
             get; private set;
         }
 
-        // Header bytes (1024 in length usually)
-        private byte[] Index1Header;
-
-        // Header bytes (1024 in length usually)
-        private byte[] Index2Header;
-
         // Total size of the segment header block (usually 1024)
-        private uint Index1TotalSegmentHeaderSize;
+        internal const uint _SqPackHeaderSize = 1024;
+        internal const uint _IndexHeaderSize = 1024;
 
-        // Total size of the segment header block (usually 1024)
-        private uint Index2TotalSegmentHeaderSize;
+        protected List<byte[]> _SqPackHeader = new List<byte[]>((int)_SqPackHeaderSize);
 
-        // The segment blocks we should copy/paste as-is into the file, which have unknown purpose.
-        private List<byte[]> Index1ExtraSegments = new List<byte[]>();
+        // Version, typically just 1.
+        protected List<uint> IndexVersion = new List<uint>();
 
-        // The segment blocks we should copy/paste as-is into the file, which have unknown purpose.
-        private List<byte[]> Index2ExtraSegments = new List<byte[]>();
+        // Index type, either 0 or 2.
+        protected List<uint> IndexType = new List<uint>();
 
-        // The unknown ints in the segment headers.
-        private List<int> Index1SegmentUnknowns = new List<int>();
+        protected List<byte[]> EmptyBlock = new List<byte[]>();
 
-        // The unknown ints in the segment headers.
-        private List<int> Index2SegmentUnknowns = new List<int>();
+        // We regenerate the directory list manually, so we don't save it.
+        //protected List<byte[]> DirBlock = new List<byte[]>();
+
+        protected bool WriteEmptyBlockOffsetIndex1 = false;
+        protected bool WriteFolderBlockOffsetIndex1 = false;
+
 
         // Index1 entries.  Keyed by [Folder Hash, File Hash] => Entry
-        private Dictionary<uint, Dictionary<uint, FileIndexEntry>> Index1Entries = new Dictionary<uint, Dictionary<uint, FileIndexEntry>>();
+        protected Dictionary<uint, Dictionary<uint, FileIndexEntry>> Index1Entries = new Dictionary<uint, Dictionary<uint, FileIndexEntry>>();
 
         // Index2 entries.  Keyed by [Full Hash] => Entry
-        private Dictionary<uint, FileIndex2Entry> Index2Entries = new Dictionary<uint, FileIndex2Entry>();
+        protected Dictionary<uint, FileIndex2Entry> Index2Entries = new Dictionary<uint, FileIndex2Entry>();
+
+        // Index 1 Synonyms.  Keyed by merged [File Hash-Folder Hash] => Entries.
+        internal Dictionary<ulong, List<SynonymTableEntry>> Index1Synonyms = new Dictionary<ulong, List<SynonymTableEntry>>();
+
+        // Index 2 Synonyms.  Keyed by [Full Hash] => Entries
+        internal Dictionary<uint, List<SynonymTableEntry>> Index2Synonyms = new Dictionary<uint, List<SynonymTableEntry>>();
 
         // The data file this Index file refers to.
         public readonly XivDataFile DataFile;
 
-        public IndexFile(XivDataFile dataFile, byte[] index1Data, byte[] index2Data) : this(dataFile, new BinaryReader(new MemoryStream(index1Data)), new BinaryReader(new MemoryStream(index2Data)), true)
+
+        private IndexFile()
         {
 
         }
 
         /// <summary>
         /// Standard constructor.
-        /// If disposeStreams is set to true, the binary streams will be disposed after use.
         /// </summary>
-        public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream, bool disposeStreams = false)
+        public IndexFile(XivDataFile dataFile, BinaryReader index1Stream, BinaryReader index2Stream, bool readOnly = true)
         {
-            DataFile = dataFile;
-
-            ReadIndex1File(index1Stream);
-
-            if (index2Stream != null)
+            try
             {
-                ReadIndex2File(index2Stream);
-                ReadOnlyMode = false;
-            } else
+                ReadOnlyMode = readOnly;
+                DataFile = dataFile;
+                ReadIndexFile(index1Stream, 0);
+                ReadIndexFile(index2Stream, 1);
+            } catch(Exception ex)
             {
-                ReadOnlyMode = true;
+                throw;
             }
+        }
 
-            if(disposeStreams)
+        public virtual void Save() {
+
+            var dir = XivCache.GameInfo.GameDirectory;
+            var index1Path = XivDataFiles.GetFullPath(DataFile, Index.IndexExtension);
+            var index2Path = XivDataFiles.GetFullPath(DataFile, Index.Index2Extension);
+            using (var index1Stream = new BinaryWriter(File.Open(index1Path, FileMode.OpenOrCreate, FileAccess.Write)))
             {
-                index1Stream.Dispose();
-                if (index2Stream != null)
+                using (var index2Stream = new BinaryWriter(File.Open(index2Path, FileMode.OpenOrCreate, FileAccess.Write)))
                 {
-                    index2Stream.Dispose();
+                    Save(index1Stream, index2Stream);
                 }
             }
         }
 
-        public void Save(BinaryWriter index1Stream, BinaryWriter index2Stream, bool disposeStreams = false)
+        public virtual void Save(BinaryWriter index1Stream, BinaryWriter index2Stream)
         {
             if (ReadOnlyMode) throw new InvalidDataException("Index Files loaded in Read Only Mode cannot be saved to file.");
 
-            WriteIndex1File(index1Stream);
-            WriteIndex2File(index2Stream);
-
-            if (disposeStreams)
+            try
             {
-                index1Stream.Dispose();
-                index2Stream.Dispose();
+                WriteIndexFile(index1Stream, 0);
+                WriteIndexFile(index2Stream, 1);
+            } catch (Exception ex)
+            {
+                throw;
             }
         }
 
-        private void ReadIndex1File(BinaryReader stream)
+
+        protected virtual void ReadIndexFile(BinaryReader br, int indexId = 0)
         {
-            stream.BaseStream.Seek(12, SeekOrigin.Begin);
-            int headerSize = stream.ReadInt32();
+            // Store the SqPack header for writing back later, though it's mostly just empty data.
+            _SqPackHeader.Add(br.ReadBytes((int)_SqPackHeaderSize));
+            br.BaseStream.Seek(_SqPackHeaderSize, SeekOrigin.Begin);
 
-            stream.BaseStream.Seek(headerSize, SeekOrigin.Begin);
-            Index1TotalSegmentHeaderSize = stream.ReadUInt32();
-
-            for (int segmentId = 0; segmentId < 4; segmentId++)
+            var headerSize = br.ReadUInt32();
+            if(headerSize != _IndexHeaderSize)
             {
-                // For some reason segment 0 has 4 bytes more padding
-                var offset = (segmentId * 72) + (headerSize + 4);
-                if (segmentId > 0)
-                {
-                    offset += 4;
-                }
-
-                stream.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                // 12 Bytes of metadata
-                Index1SegmentUnknowns.Add(stream.ReadInt32());
-                int segmentOffset = stream.ReadInt32();
-                int segmentSize = stream.ReadInt32();
-
-                // Next 20 bytes is the SHA-1 of the segment header.
-                // (Don't need to read b/c we recalculat it on writing anyways)
-
-                // Time to read the actual segment data.
-                stream.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
-
-                if (segmentId == 0)
-                {
-                    for (int x = 0; x < segmentSize; x += 16)
-                    {
-                        FileIndexEntry entry;
-                        entry = new FileIndexEntry();
-
-                        var bytes = stream.ReadBytes(16);
-                        entry.SetBytes(bytes);
-
-                        if (!Index1Entries.ContainsKey(entry.FolderPathHash))
-                        {
-                            Index1Entries.Add(entry.FolderPathHash, new Dictionary<uint, FileIndexEntry>());
-                        }
-                        if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
-                        {
-                            Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
-                        } else
-                        {
-                            var z = "z";
-                        }
-                    }
-                } else if(segmentId == 1 || segmentId == 2)
-                {
-                    // Segment 4 is regenerated when writing, so we don't need to store it.
-                    Index1ExtraSegments.Add(stream.ReadBytes(segmentSize));
-                }
+                throw new Exception("Invalid index or index file format changed.");
             }
 
-            // Copy the original header in so we have it for later.
-            stream.BaseStream.Seek(0, SeekOrigin.Begin);
-            var header = stream.ReadBytes(headerSize);
+            IndexVersion.Add(br.ReadUInt32());
 
-            Index1Header = header;
-        }
-        private void ReadIndex2File(BinaryReader stream)
-        {
-            stream.BaseStream.Seek(12, SeekOrigin.Begin);
-            int headerSize = stream.ReadInt32();
-
-            stream.BaseStream.Seek(headerSize, SeekOrigin.Begin);
-            Index2TotalSegmentHeaderSize = stream.ReadUInt32();
-
-            for (int segmentId = 0; segmentId < 4; segmentId++)
+            if (indexId == 0)
             {
-                // For some reason segment 0 has 4 bytes more padding
-                var offset = (segmentId * 72) + (headerSize + 4);
-                if (segmentId > 0)
-                {
-                    offset += 4;
-                }
-
-                stream.BaseStream.Seek(offset, SeekOrigin.Begin);
-
-                // 12 Bytes of metadata
-                Index2SegmentUnknowns.Add(stream.ReadInt32());
-                int segmentOffset = stream.ReadInt32();
-                int segmentSize = stream.ReadInt32();
-
-                // Next 20 bytes is the SHA-1 of the segment header.
-                // (Don't need to read b/c we recalculat it on writing anyways)
-
-                // Time to read the actual segment data.
-                stream.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
-
-                if (segmentId == 0)
-                {
-                    for (int x = 0; x < segmentSize; x += 8)
-                    {
-                        FileIndex2Entry entry;
-                        entry = new FileIndex2Entry();
-
-                        var bytes = stream.ReadBytes(8);
-                        entry.SetBytes(bytes);
-
-                        if (!Index2Entries.ContainsKey(entry.FullPathHash))
-                        {
-                            Index2Entries.Add(entry.FullPathHash, entry);
-                        }
-                    }
-                }
-                else if (segmentId == 1 || segmentId == 2 || segmentId == 3)
-                {
-                       Index2ExtraSegments.Add(stream.ReadBytes(segmentSize));
-                }
+                ReadIndex1Data(br);
+            } else
+            {
+                ReadIndex2Data(br);
             }
 
-            // Copy the original header in so we have it for later.
-            stream.BaseStream.Seek(0, SeekOrigin.Begin);
-            var header = stream.ReadBytes(headerSize);
+            // Don't need to store this since we regenerate it.
+            var dataFileCount = br.ReadUInt32();
 
-            Index2Header = header;
+            ReadSynTable(br, indexId);
+
+            EmptyBlock.Add(ReadSegment(br, indexId, true));
+
+            // We don't actually care about the directory data, since we regenerate it automatically.
+            var directoryData = ReadSegment(br, indexId, false);
+
+            IndexType.Add(br.ReadUInt32());
+
+            // Rest of the file is padding and self-hash.
         }
 
-        private void WriteIndex1File(BinaryWriter stream)
+
+        protected virtual void ReadIndex1Data(BinaryReader br)
         {
-            var sh = SHA1.Create();
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var storedOffset = br.BaseStream.Position;
 
-            // First, we need to create the actual sorted lists of the file entries and folder entries.
-            var fileListing = new List<FileIndexEntry>();
-            var folderListing = new Dictionary<uint, FolderIndexEntry>();
-
-            var sortedFolders = Index1Entries.Keys.OrderBy(x => x);
-            var currentFileOffset = (uint)(Index1Header.Length + Index1TotalSegmentHeaderSize);
-            foreach (var folderKey in sortedFolders)
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            for (int x = 0; x < segmentSize; x += 16)
             {
-                folderListing.Add(folderKey, new FolderIndexEntry(folderKey, 0, 0));
+                FileIndexEntry entry;
+                entry = new FileIndexEntry();
 
-                var sortedFiles = Index1Entries[folderKey].Keys.OrderBy(x => x);
-                foreach (var fileKey in sortedFiles)
+                var bytes = br.ReadBytes(16);
+                entry.SetBytes(bytes);
+
+                if (!Index1Entries.ContainsKey(entry.FolderPathHash))
                 {
-                    var entry = Index1Entries[folderKey][fileKey];
-
-                    // Don't include null files.
-                    if (entry.DataOffset == 0) continue;
-
-                    // Set the olfer start offset if we haven't yet.
-                    if (folderListing[folderKey].IndexEntriesOffset == 0)
-                    {
-                        folderListing[folderKey].IndexEntriesOffset = currentFileOffset;
-                    }
-
-                    folderListing[folderKey].FileCount++;
-                    if (entry.FileNameHash != fileKey || entry.FolderPathHash != folderKey)
-                    {
-                        throw new Exception("Attempted to save Index file with invalid structure.");
-                    }
-                    fileListing.Add(entry);
-
-                    currentFileOffset += 16;
+                    Index1Entries.Add(entry.FolderPathHash, new Dictionary<uint, FileIndexEntry>());
                 }
-
-                // Don't include empty folders.
-                if(folderListing[folderKey].FileCount == 0)
+                if (!Index1Entries[entry.FolderPathHash].ContainsKey(entry.FileNameHash))
                 {
-                    folderListing.Remove(folderKey);
+                    Index1Entries[entry.FolderPathHash].Add(entry.FileNameHash, entry);
                 }
-
             }
 
+            // Skip past the hash.
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+        }
 
-            var totalSize = Index1Header.Length;
-            totalSize += (int)Index1TotalSegmentHeaderSize;
+        protected virtual void ReadIndex2Data(BinaryReader br)
+        {
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var storedOffset = br.BaseStream.Position;
 
-            var fileSegmentSize = fileListing.Count * 16;
-            var folderSegmentSize = folderListing.Count * 16;
-            var otherSegmentSize = Index1ExtraSegments[0].Length + Index1ExtraSegments[1].Length;
-
-            // Total size is Headers + segment sizes.
-            totalSize += fileSegmentSize + folderSegmentSize + otherSegmentSize;
-
-
-
-            // Calculate individual sizes.
-            var segmentSizes = new List<int>()
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            for (int x = 0; x < segmentSize; x += 8)
             {
-                fileListing.Count * 16,
-                Index1ExtraSegments[0].Length,
-                Index1ExtraSegments[1].Length,
-                folderListing.Count * 16,
-            };
+                FileIndex2Entry entry;
+                entry = new FileIndex2Entry();
 
-            // Calculate offsets.
-            var segmentOffsets = new List<int>();
+                var bytes = br.ReadBytes(8);
+                entry.SetBytes(bytes);
+                var offset = BitConverter.ToUInt32(bytes, 4);
 
-            int offset = Index1Header.Length + (int)Index1TotalSegmentHeaderSize;
-            for (int i = 0; i < 4; i++)
-            {
-                if (segmentSizes[i] != 0)
+                if (!Index2Entries.ContainsKey(entry.FullPathHash))
                 {
-                    segmentOffsets.Add(offset);
+                    Index2Entries.Add(entry.FullPathHash, entry);
+                }
+            }
+
+            // Skip past the hash.
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+        }
+
+        /// <summary>
+        /// Retrieves just the raw indexes from an index2 file at the given file system path.
+        /// Used in validating index backups.
+        /// </summary>
+        /// <param name="index2Path"></param>
+        /// <returns></returns>
+        internal static List<long> GetOffsetsFromRawIndex2File(string index2Path)
+        {
+            var offsets = new List<long>();
+            IndexFile i = new IndexFile();
+            using(var fs = new FileStream(index2Path, FileMode.Open, FileAccess.Read))
+            {
+                using(var br = new BinaryReader(fs))
+                {
+                    i.ReadIndexFile(br, 1);
+                }
+            }
+
+            return i.Index2Entries.Select(x => x.Value.DataOffset).ToList();
+        }
+
+        protected virtual void ReadSynTable(BinaryReader br, int indexId)
+        {
+            uint segmentOffset = br.ReadUInt32();
+            uint segmentSize = br.ReadUInt32();
+            var storedOffset = br.BaseStream.Position;
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+
+            for (int i = 0; i < segmentSize / SynonymTableEntry.Size; i++)
+            {
+                var entry = SynonymTableEntry.ReadEntry(br);
+                if(indexId == 0)
+                {
+                    ulong key = entry.FilePathHash;
+                    key = key << 32;
+                    key |= entry.FolderPathHash;
+                    if (!Index1Synonyms.ContainsKey(key))
+                    {
+                        Index1Synonyms.Add(key, new List<SynonymTableEntry>());
+                    }
+                    Index1Synonyms[key].Add(entry);
                 } else
                 {
-                    segmentOffsets.Add((int)0);
-                }
-                offset += segmentSizes[i];
-            }
-
-
-            int[] SegmentShaOffsets = new int[4];
-            byte[] SegmentHeaderBlock = new byte[Index1TotalSegmentHeaderSize];
-
-            Array.Copy(BitConverter.GetBytes(Index1TotalSegmentHeaderSize), 0, SegmentHeaderBlock, 0, 4);
-
-            offset = 4;
-            for (int i = 0; i < 4; i++)
-            {
-                // Write headers
-                Array.Copy(BitConverter.GetBytes(Index1SegmentUnknowns[i]), 0, SegmentHeaderBlock, offset, 4);
-                Array.Copy(BitConverter.GetBytes(segmentOffsets[i]), 0, SegmentHeaderBlock, offset + 4, 4);
-                Array.Copy(BitConverter.GetBytes(segmentSizes[i]), 0, SegmentHeaderBlock, offset  + 8, 4);
-
-                SegmentShaOffsets[i] = offset + 12;
-
-                offset += (i == 0) ? 76 : 72;
-            }
-
-            List<byte[]> SegmentData = new List<byte[]>();
-
-
-            // Write the actual segment data.
-            for(int i = 0; i < 4; i++)
-            {
-                offset = 0;
-                var len = segmentSizes[i];
-                var data = new byte[len];
-                SegmentData.Add(data);
-
-                if(i == 0)
-                {
-                    // File listing.
-                    foreach(var file in fileListing)
+                    if (!Index2Synonyms.ContainsKey(entry.FilePathHash))
                     {
-                        Array.Copy(file.GetBytes(), 0, data, offset, 16);
-                        offset += 16;
+                        Index2Synonyms.Add(entry.FilePathHash, new List<SynonymTableEntry>());
                     }
-
-                } else if( i == 1 || i == 2)
-                {
-                    var d = Index1ExtraSegments[i - 1];
-                    Array.Copy(d, 0, data, 0, len);
-                    
-                } else if(i == 3)
-                {
-                    // Folder listing.
-                    foreach (var kv in folderListing)
-                    {
-                        Array.Copy(kv.Value.GetBytes(), 0, data, offset, 16);
-                        offset += 16;
-                    }
+                    Index2Synonyms[entry.FilePathHash].Add(entry);
                 }
-
-                // Calculate the hash of the resultant data and write it into the header.
-                var sha = sh.ComputeHash(data, 0, data.Length);
-                Array.Copy(sha, 0, SegmentHeaderBlock, SegmentShaOffsets[i], sha.Length);
             }
-
-            // Calculate SHA for the segment headers.
-            var segmentHeaderSha = sh.ComputeHash(SegmentHeaderBlock, 0, SegmentHeaderBlock.Length - 64);
-            Array.Copy(segmentHeaderSha, 0, SegmentHeaderBlock, SegmentHeaderBlock.Length - 64, segmentHeaderSha.Length);
-
-
-            // Write the final fully composed data blocks together.
-            stream.Seek(0, SeekOrigin.Begin);
-            stream.Write(Index1Header);
-            stream.Write(SegmentHeaderBlock);
-            for(int i = 0; i < 4; i++)
-            {
-                stream.Write(SegmentData[i]);
-            }
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
         }
-        private void WriteIndex2File(BinaryWriter stream)
+
+        protected virtual byte[] ReadSegment(BinaryReader br, int indexId, bool isEmptyBlock)
         {
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var storedOffset = br.BaseStream.Position;
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            var data = br.ReadBytes(segmentSize);
+
+            if(indexId == 0 && segmentOffset > 0 )
+            {
+                // Very occasionally SE is weird and stores this offset even when there is no data.
+                if (isEmptyBlock)
+                {
+                    WriteEmptyBlockOffsetIndex1 = true;
+                } else
+                {
+                    WriteFolderBlockOffsetIndex1 = true;
+                }
+            }
+
+            // Skip past the hash.
+            br.BaseStream.Seek(storedOffset + 64, SeekOrigin.Begin);
+            return data;
+        }
+
+        protected virtual void WriteIndexFile(BinaryWriter stream, int indexId)
+        {
+            var datCount = Dat.GetLargestDatNumber(DataFile) + 1;
+
             var sh = SHA1.Create();
 
             // First, we need to create the actual sorted lists of the file entries and folder entries.
-            var fileListing = new List<FileIndex2Entry>();
+            var fileListing = new List<IndexEntry>();
+            var folderListing = new Dictionary<uint, FolderIndexEntry>();
 
-            var sortedFiles = Index2Entries.Select(x => x.Value).OrderBy(x => x.FullPathHash);
-            fileListing = sortedFiles.ToList();
+            var currentFileOffset = (uint)(_SqPackHeaderSize + _IndexHeaderSize);
+
+            if (indexId == 0)
+            {
+                var sortedFolders = Index1Entries.Keys.OrderBy(x => x);
+                // Index 1 has to be sorted by folder.
+                foreach (var folderKey in sortedFolders)
+                {
+                    folderListing.Add(folderKey, new FolderIndexEntry(folderKey, 0, 0));
+
+                    var sortedFiles = Index1Entries[folderKey].Keys.OrderBy(x => x);
+                    foreach (var fileKey in sortedFiles)
+                    {
+                        var entry = Index1Entries[folderKey][fileKey];
+
+                        // Don't include null files.
+                        if (entry.DataOffset == 0) continue;
+
+                        // Set the folder start offset if we haven't yet.
+                        if (folderListing[folderKey].IndexEntriesOffset == 0)
+                        {
+                            folderListing[folderKey].IndexEntriesOffset = currentFileOffset;
+                        }
+
+                        folderListing[folderKey].FileCount++;
+                        if (entry.FileNameHash != fileKey || entry.FolderPathHash != folderKey)
+                        {
+                            throw new Exception("Attempted to save Index file with invalid structure.");
+                        }
+                        fileListing.Add(entry);
+
+                        currentFileOffset += 16;
+                    }
+
+                    // Don't include empty folders.
+                    if (folderListing[folderKey].FileCount == 0)
+                    {
+                        folderListing.Remove(folderKey);
+                    }
+
+                }
+            } else
+            {
+                // Index 2 is just sorted by hash
+                fileListing.AddRange(Index2Entries.Select(x => x.Value).OrderBy(x => x.FullPathHash));
+            }
 
 
-            var totalSize = Index2Header.Length;
-            totalSize += (int)Index2TotalSegmentHeaderSize;
+            // File listing.
+            var fileSegmentSize = fileListing.Count * (indexId == 0 ? 16 : 8);
+            var fileSegment = new byte[fileSegmentSize];
+            var offset = 0;
+            foreach (var file in fileListing)
+            {
+                var bytes = file.GetBytes(this);
+                Array.Copy(bytes, 0, fileSegment, offset, bytes.Length);
+                offset += bytes.Length;
+            }
 
-            var fileSegmentSize = fileListing.Count * 8;
-            var otherSegmentSize = Index2ExtraSegments[0].Length + Index2ExtraSegments[1].Length + Index2ExtraSegments[2].Length;
+            // Synonym table
+            var synTableSize = 0;
+            var synonymTableSegment = new byte[0];
+            offset = 0;
+            if (indexId == 0)
+            {
+                synTableSize = Index1Synonyms.Sum(x => x.Value.Count) * SynonymTableEntry.Size;
+                synonymTableSegment = new byte[synTableSize];
+                foreach (var kv in Index1Synonyms)
+                {
+                    foreach (var entry in kv.Value)
+                    {
+                        Array.Copy(entry.GetBytes(), 0, synonymTableSegment, offset, SynonymTableEntry.Size);
+                        offset += SynonymTableEntry.Size;
+                    }
+                }
+            } else
+            {
+                synTableSize = Index2Synonyms.Sum(x => x.Value.Count) * SynonymTableEntry.Size;
+                synonymTableSegment = new byte[synTableSize];
+                foreach (var kv in Index2Synonyms)
+                {
+                    foreach (var entry in kv.Value)
+                    {
+                        Array.Copy(entry.GetBytes(), 0, synonymTableSegment, offset, SynonymTableEntry.Size);
+                        offset += SynonymTableEntry.Size;
+                    }
+                }
+            }
+
+
+            // Folder listing
+            var folderSegmentSize = folderListing.Count * 16;
+            var folderSegment = new byte[folderSegmentSize];
+            offset = 0;
+            foreach (var kv in folderListing)
+            {
+                Array.Copy(kv.Value.GetBytes(this), 0, folderSegment, offset, 16);
+                offset += 16;
+            }
+
+
+            var emptyBlockSize = EmptyBlock[indexId].Length;
 
             // Total size is Headers + segment sizes.
-            totalSize += fileSegmentSize + otherSegmentSize;
-
-
-
-            // Calculate individual sizes.
-            var segmentSizes = new List<int>()
-            {
-                fileListing.Count * 8,
-                Index2ExtraSegments[0].Length,
-                Index2ExtraSegments[1].Length,
-                Index2ExtraSegments[2].Length,
-            };
+            var totalSize = (int)(_SqPackHeaderSize + _IndexHeaderSize) + fileSegmentSize + folderSegmentSize + emptyBlockSize + synTableSize;
 
             // Calculate offsets.
             var segmentOffsets = new List<int>();
 
-            int offset = Index2Header.Length + (int)Index2TotalSegmentHeaderSize;
-            for (int i = 0; i < 4; i++)
+            var fileSegmentOffset = (int)(_SqPackHeaderSize + _IndexHeaderSize);
+            var synTableOffset = fileSegmentOffset + fileSegmentSize;
+            var emptyBlockOffset = synTableOffset + synTableSize;
+            var folderSegmentOffset = emptyBlockOffset + emptyBlockSize;
+
+
+            var indexHeaderBlock = new byte[_IndexHeaderSize];
+            using(var ms = new MemoryStream(indexHeaderBlock))
             {
-                if (segmentSizes[i] != 0)
+                using (var bw = new BinaryWriter(ms))
                 {
-                    segmentOffsets.Add(offset);
+                    bw.Write(BitConverter.GetBytes(_IndexHeaderSize));
+                    bw.Write(BitConverter.GetBytes(IndexVersion[indexId]));
+
+                    // Index Data Segment
+                    bw.Write(BitConverter.GetBytes(fileSegmentOffset));
+                    bw.Write(BitConverter.GetBytes(fileSegmentSize));
+                    Write64ByteHash(bw, sh.ComputeHash(fileSegment));
+
+                    // Dat Count - Why is it here in the middle of the other data? Who knows.
+                    bw.Write(BitConverter.GetBytes(datCount));
+
+                    // Synonym Table Data Segment
+                    bw.Write(BitConverter.GetBytes(synTableOffset));
+                    bw.Write(BitConverter.GetBytes(synTableSize));
+                    Write64ByteHash(bw, sh.ComputeHash(synonymTableSegment));
+
+                    // Empty Block Data Segment
+                    var forceWrite = (WriteEmptyBlockOffsetIndex1 && indexId == 0);
+                    bw.Write(BitConverter.GetBytes(emptyBlockSize == 0 && !forceWrite ? 0 : emptyBlockOffset));
+                    bw.Write(BitConverter.GetBytes(emptyBlockSize));
+                    Write64ByteHash(bw, sh.ComputeHash(EmptyBlock[indexId]));
+
+                    // Folder Data Segment
+                    forceWrite = (WriteFolderBlockOffsetIndex1 && indexId == 0);
+                    bw.Write(BitConverter.GetBytes(folderSegmentSize == 0 && !forceWrite ? 0 : folderSegmentOffset));
+                    bw.Write(BitConverter.GetBytes(folderSegmentSize));
+                    Write64ByteHash(bw, sh.ComputeHash(folderSegment));
+
+                    // Index Type
+                    bw.Write(BitConverter.GetBytes(indexId == 0 ? 0 : 2));
+
+                    // Pad until end, minus the self-hash.
+                    var diff = _IndexHeaderSize - bw.BaseStream.Position - 64;
+                    bw.Write(new byte[diff]);
                 }
-                else
-                {
-                    segmentOffsets.Add((int)0);
-                }
-                offset += segmentSizes[i];
             }
 
-
-            int[] SegmentShaOffsets = new int[4];
-            byte[] SegmentHeaderBlock = new byte[Index2TotalSegmentHeaderSize];
-
-            Array.Copy(BitConverter.GetBytes(Index2TotalSegmentHeaderSize), 0, SegmentHeaderBlock, 0, 4);
-
-            offset = 4;
-            for (int i = 0; i < 4; i++)
-            {
-                // Write headers
-                Array.Copy(BitConverter.GetBytes(Index2SegmentUnknowns[i]), 0, SegmentHeaderBlock, offset, 4);
-                Array.Copy(BitConverter.GetBytes(segmentOffsets[i]), 0, SegmentHeaderBlock, offset + 4, 4);
-                Array.Copy(BitConverter.GetBytes(segmentSizes[i]), 0, SegmentHeaderBlock, offset + 8, 4);
-
-                SegmentShaOffsets[i] = offset + 12;
-
-                offset += (i == 0) ? 76 : 72;
-            }
-
-            // Index 2 files have a random 2 here in the middle of the padding.
-            // Omitting it doesn't seem to actually do anything, but might as well replicate.
-            SegmentHeaderBlock[300] = 2;
-
-            List<byte[]> SegmentData = new List<byte[]>();
-
-
-            // Write the actual segment data.
-            for (int i = 0; i < 4; i++)
-            {
-                offset = 0;
-                var len = segmentSizes[i];
-                var data = new byte[len];
-                SegmentData.Add(data);
-
-                if (i == 0)
-                {
-                    // File listing.
-                    foreach (var file in fileListing)
-                    {
-                        Array.Copy(file.GetBytes(), 0, data, offset, 8);
-                        offset += 8;
-                    }
-
-                }
-                else if (i == 1 || i == 2 || i == 3)
-                {
-                    var d = Index2ExtraSegments[i - 1];
-                    Array.Copy(d, 0, data, 0, len);
-
-                }
-
-                // Calculate the hash of the resultant data and write it into the header.
-                var sha = sh.ComputeHash(data, 0, data.Length);
-                Array.Copy(sha, 0, SegmentHeaderBlock, SegmentShaOffsets[i], sha.Length);
-            }
-
-            // Calculate SHA for the segment headers.
-            var segmentHeaderSha = sh.ComputeHash(SegmentHeaderBlock, 0, SegmentHeaderBlock.Length - 64);
-            Array.Copy(segmentHeaderSha, 0, SegmentHeaderBlock, SegmentHeaderBlock.Length - 64, segmentHeaderSha.Length);
-
+            var headerHash = sh.ComputeHash(indexHeaderBlock, 0, indexHeaderBlock.Length - 64);
+            Array.Copy(headerHash, 0, indexHeaderBlock, indexHeaderBlock.Length - 64, headerHash.Length);
 
             // Write the final fully composed data blocks together.
             stream.Seek(0, SeekOrigin.Begin);
-            stream.Write(Index2Header);
-            stream.Write(SegmentHeaderBlock);
-            for (int i = 0; i < 4; i++)
+
+            var expandedHeader = new byte[_SqPackHeaderSize];
+            _SqPackHeader[indexId].CopyTo(expandedHeader, 0);
+
+            stream.Write(expandedHeader);
+            stream.Write(indexHeaderBlock);
+            stream.Write(fileSegment);
+            stream.Write(synonymTableSegment);
+            stream.Write(EmptyBlock[indexId]);
+            stream.Write(folderSegment);
+
+            // Truncate any extra data in the file.
+            stream.BaseStream.SetLength(stream.BaseStream.Position);
+        }
+
+        /// <summary>
+        /// Writes a given hash into a 64 byte block, padding as needed.
+        /// </summary>
+        /// <param name="bw"></param>
+        /// <param name="hash"></param>
+        protected virtual void Write64ByteHash(BinaryWriter bw, byte[] hash)
+        {
+            var pos = bw.BaseStream.Position;
+            bw.Write(hash);
+            var goal = pos + 64;
+            var diff = goal - bw.BaseStream.Position;
+            if(diff > 0)
             {
-                stream.Write(SegmentData[i]);
+                bw.Write(new byte[diff]);
             }
         }
 
+
+        /// <summary>
+        /// Gets the raw uint data offset from the index files, with DatNumber embeded.
+        /// Or 0 if the file does not exist.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public virtual uint GetRawDataOffset(string filePath)
+        {
+            // Check Index1
+            var offset = GetRawDataOffsetIndex1(filePath);
+            if(offset == 0)
+            {
+                // Check Index2.
+                offset = GetRawDataOffsetIndex2(filePath);
+            }
+            return offset;
+        }
+
+        /// <summary>
+        /// Gets the 8x multiplied data offset from the index files, with DatNumber embeded.
+        /// Or 0 if the file does not exist.  
+        /// This is primarily useful for legacy functionality.
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public virtual long Get8xDataOffset(string filePath)
+        {
+            return ((long)GetRawDataOffset(filePath)) * 8L;
+        }
 
         /// <summary>
         /// Gets the raw uint data offset from the index file, with DatNumber embeded.
@@ -518,7 +542,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public uint GetRawDataOffset(string filePath)
+        public virtual uint GetRawDataOffsetIndex1(string filePath)
         {
 
             var fileName = Path.GetFileName(filePath);
@@ -526,13 +550,28 @@ namespace xivModdingFramework.SqPack.DataContainers
             var fileHash = (uint) HashGenerator.GetHash(fileName);
             var folderHash = (uint) HashGenerator.GetHash(folderName);
 
+            uint offset = 0;
+            // Do we have a base table entry?
             if (Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].ContainsKey(fileHash))
             {
                 var entry = Index1Entries[folderHash][fileHash];
-                return entry.RawOffset;
+                offset = entry.RawOffset;
             }
 
-            return 0;
+            // Do we have a synonym table entry?
+            ulong key = fileHash;
+            key = key << 32;
+            key |= folderHash;
+            if (Index1Synonyms.ContainsKey(key))
+            {
+                var entry = Index1Synonyms[key].FirstOrDefault(x => x.FilePath == filePath);
+                if (entry != null)
+                {
+                    offset = entry.Offset;
+                }
+            }
+
+            return offset;
         }
 
         /// <summary>
@@ -542,9 +581,9 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public long Get8xDataOffset(string filePath)
+        public virtual long Get8xDataOffsetIndex1(string filePath)
         {
-            return ((long) GetRawDataOffset(filePath)) * 8L;
+            return ((long) GetRawDataOffsetIndex1(filePath)) * 8L;
         }
 
         /// <summary>
@@ -553,18 +592,31 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public uint GetRawDataOffsetIndex2(string filePath)
+        public virtual uint GetRawDataOffsetIndex2(string filePath)
         {
 
             var fullHash = (uint)HashGenerator.GetHash(filePath);
 
+            uint offset = 0;
+
+            // Do we have a base entry?
             if (Index2Entries.ContainsKey(fullHash))
             {
                 var entry = Index2Entries[fullHash];
-                return entry.RawFileOffset;
+                offset = entry.RawOffset;
             }
 
-            return 0;
+            // Do we have a synonym table entry?
+            if (Index2Synonyms.ContainsKey(fullHash))
+            {
+                var entry = Index2Synonyms[fullHash].FirstOrDefault(x => x.FilePath == filePath);
+                if(entry != null)
+                {
+                    offset = entry.Offset;
+                }
+            }
+
+            return offset;
         }
 
         /// <summary>
@@ -574,96 +626,233 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public long Get8xDataOffsetIndex2(string filePath)
+        public virtual long Get8xDataOffsetIndex2(string filePath)
         {
             return ((long)GetRawDataOffsetIndex2(filePath)) * 8L;
         }
-        public (uint DatNumber, long DataOffset) GetDataOffsetComplete(string filePath)
-        {
-            var raw = GetRawDataOffset(filePath);
-            var datNum = (uint)((raw & 0x0F) / 2);
-
-            // Multiply by 8 to get us in the right frame.
-            long longOffset = ((long)raw) * 8;
-                
-            // And lop off the last 7 bits.
-            var longWithout = (longOffset / 128) * 128;
-
-            return (datNum, longWithout);
-        }
-
 
         /// <summary>
         /// Update the data offset for a given file, adding the file if needed.
-        /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
+        /// Returns the previous 8x Data Offset (with dat Number Embedded), or 0 if the file did not exist.
         /// 
         /// Setting a value of 0 or negative for the offset will remove the file pointer.
         /// </summary>
-        public uint SetDataOffset(string filePath, long new8xOffset, uint datNumber)
-        {
-
-            if (new8xOffset <= 0)
-            {
-                return SetDataOffset(filePath, 0);
-            }
-            else
-            {
-                uint val = (uint)(new8xOffset / 8);
-                return SetDataOffset(filePath, val, datNumber);
-            }
-        }
-
-        /// <summary>
-        /// Update the data offset for a given file, adding the file if needed.
-        /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
-        /// 
-        /// Setting a value of 0 for the offset will remove the file pointer.
-        /// </summary>
-        public uint SetDataOffset(string filePath, uint newRawOffset, uint datNumber)
-        {
-            if(newRawOffset % 8 != 0)
-            {
-                throw new InvalidDataException("Provided offset is not a valid dat-less offset.");
-            }
-
-            if (newRawOffset == 0)
-            {
-                return SetDataOffset(filePath, 0);
-            }
-            else
-            {
-                byte bits = (byte)(datNumber * 2);
-                var modulatedOffset = newRawOffset | bits;
-                return SetDataOffset(filePath, modulatedOffset);
-            }
-        }
-
-        /// <summary>
-        /// Update the data offset for a given file, adding the file if needed.
-        /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
-        /// 
-        /// Setting a value of 0 or negative for the offset will remove the file pointer.
-        /// </summary>
-        public uint SetDataOffset(string filePath, long new8xOffsetWithDatNumEmbed)
+        public virtual long Set8xDataOffset(string filePath, long new8xOffsetWithDatNumEmbed)
         {
             if (new8xOffsetWithDatNumEmbed <= 0)
             {
-                return SetDataOffset(filePath, 0);
+                return SetRawDataOffset(filePath, 0);
             }
             else
             {
                 uint val = (uint)(new8xOffsetWithDatNumEmbed / 8);
-                return SetDataOffset(filePath, val);
+                return SetRawDataOffset(filePath, val) * 8L;
             }
         }
 
+
+        public virtual uint SetRawDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        {
+            return INTERNAL_SetDataOffset(filePath, newRawOffsetWithDatNumEmbed, false);
+        }
         /// <summary>
         /// Update the data offset for a given file, adding the file if needed.
         /// Returns the previous Raw Data Offset (with dat Number Embedded), or 0 if the file did not exist.
         /// 
         /// Setting a value of 0 for the offset will remove the file pointer.
         /// </summary>
-        public uint SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed)
+        protected virtual uint INTERNAL_SetDataOffset(string filePath, uint newRawOffsetWithDatNumEmbed, bool allowRepair = false)
+        {
+            if (ReadOnlyMode)
+            {
+                throw new Exception("Cannot write index updates to ReadOnly Index File.");
+            }
+
+            var fileName = Path.GetFileName(filePath);
+            var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
+            var fileHash = (uint)HashGenerator.GetHash(fileName);
+            var folderHash = (uint)HashGenerator.GetHash(folderName);
+            var fullHash = (uint)HashGenerator.GetHash(filePath);
+
+            ulong key = (ulong)fileHash;
+            key = key << 32;
+            key |= folderHash;
+
+            uint originalOffsetIndex1 = GetRawDataOffsetIndex1(filePath);
+            uint originalOffsetIndex2 = GetRawDataOffsetIndex2(filePath);
+            bool existsInIndex1 = originalOffsetIndex1 > 0;
+            bool existsInIndex2 = originalOffsetIndex2 > 0;
+            bool index1Syn = Index1Synonyms.ContainsKey(key);
+            bool index2Syn = Index2Synonyms.ContainsKey(fullHash);
+
+            // Create folder hash if needed.
+            if (newRawOffsetWithDatNumEmbed > 0 && !Index1Entries.ContainsKey(folderHash))
+            {
+                Index1Entries.Add(folderHash, new Dictionary<uint, FileIndexEntry>());
+            }
+
+            if (!existsInIndex1 && Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].ContainsKey(fileHash))
+            {
+                // 0 Offset value in the index table.  Remove it.
+                Index1Entries[folderHash].Remove(fileHash);
+            }
+            if(!existsInIndex2 && Index2Entries.ContainsKey(fullHash))
+            {
+                // 0 Offset value in the index table.  Remove it.
+                Index2Entries.Remove(fullHash);
+            }
+
+
+            if (originalOffsetIndex1 == originalOffsetIndex2 && (!index1Syn && !index2Syn))
+            {
+                // This is the typical case for updating, adding, or removing a file.
+                // It exists in the same state in both indexes, with no colisions.
+
+                if(originalOffsetIndex1 == newRawOffsetWithDatNumEmbed)
+                {
+                    // Updating to the same value that already exists, just return.
+                    return originalOffsetIndex1;
+                }
+
+                // Deleting existing file.
+                if (newRawOffsetWithDatNumEmbed == 0)
+                {
+                    Index1Entries[folderHash].Remove(fileHash);
+                    Index2Entries.Remove(fullHash);
+
+                    // Remove folder if empty now.
+                    if(Index1Entries[folderHash].Count == 0)
+                    {
+                        Index1Entries.Remove(folderHash);
+                    }
+                    return originalOffsetIndex1;
+                }
+                else
+                {
+                    // Creating or Updating.
+                    if (originalOffsetIndex1 > 0)
+                    {
+                        // Update existing
+                        Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        return originalOffsetIndex1;
+                    }
+                    else
+                    {
+                        // Add new, non-colliding file.
+                        var entry1 = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
+                        var entry2 = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
+
+                        Index1Entries[folderHash].Add(fileHash, entry1);
+                        Index2Entries.Add(fullHash, entry2);
+                        return originalOffsetIndex1;
+                    }
+                }
+            } else if (!index1Syn && !index2Syn)
+            {
+                // Cases where the values between indexes did not match, while not being synonyms.
+                // These are essentially all error states.
+                if(originalOffsetIndex1 == 0)
+                {
+                    if (allowRepair)
+                    {
+                        // Create/Update as needed.
+                        var entry1 = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
+                        Index1Entries[folderHash].Add(fileHash, entry1);
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                        // Values out of repair path are unused/invalid.
+                        return uint.MaxValue;
+                    }
+
+                    if (_BENCHMARK_HACK)
+                    {
+                        // Doesn't exist in Index 1.
+                        // Set value from Index 2 to Index 1 and re-call.
+                        var entry1 = new FileIndexEntry(originalOffsetIndex2, fileHash, folderHash);
+                        Index1Entries[folderHash].Add(fileHash, entry1);
+                        return SetRawDataOffset(filePath, newRawOffsetWithDatNumEmbed);
+                    }
+
+                    // Doesn't exist in Index 1.
+                    // This means we hit a -NEW- Synonym in Index 2.
+                    throw new InvalidDataException("Cannot write new Synonym to Index 2 File: " + filePath + " : " + fullHash);
+                } else if(originalOffsetIndex2 == 0)
+                {
+                    if (allowRepair)
+                    {
+                        // Create/Update as needed.
+                        Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        var entry2 = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
+                        Index2Entries.Add(fullHash, entry2);
+
+                        // Values out of repair path are unused/invalid.
+                        return uint.MaxValue;
+                    }
+
+                    // Doesn't exist in Index 2.
+                    // This means we hit a -NEW- Synonym in Index 1.
+                    throw new InvalidDataException("Cannot write new Synonym to Index 1 File: "  + filePath + " : " + fileHash + " : " + folderHash);
+                } else
+                {
+                    if (allowRepair)
+                    {
+                        // Update existing
+                        Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+                        Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                        // Values out of repair path are unused/invalid.
+                        return uint.MaxValue;
+                    }
+
+                    // This is a case, where the hash exists in both indexes, but with mismatching values...
+                    // While /NOT/ being a synonym in either...
+                    // This means either the index is partially corrupt...
+                    // ... or we are in a benchmark partial-index situation, where we also have a hash-collision.
+                    throw new InvalidDataException("Cannot Update non-Synonym index with mismatched Index1/Index2 Values: " + filePath);
+                }
+            } else
+            {
+                // Exists as a Synonym in one or both tables.
+                
+                if (index1Syn)
+                {
+                    // Update Index2
+                    Index2Entries[fullHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                    // Update the Index1 synonym entry.
+                    var synEntry = Index1Synonyms[key].FirstOrDefault(x => x.FilePath == filePath);
+                    if(synEntry == null)
+                    {
+                        throw new InvalidDataException("Cannot add third Synonym Definition for Index1 Entry: " + filePath);
+                    }
+                    synEntry.Offset = newRawOffsetWithDatNumEmbed;
+                }
+                
+                if(index2Syn)
+                {
+                    // Update Index1
+                    Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
+
+                    // Update the Index2 synonym entry.
+                    var synEntry = Index2Synonyms[fullHash].FirstOrDefault(x => x.FilePath == filePath);
+                    if (synEntry == null)
+                    {
+                        throw new InvalidDataException("Cannot add third Synonym Definition for Index2 Entry: " + filePath);
+                    }
+                    synEntry.Offset = newRawOffsetWithDatNumEmbed;
+                }
+
+                return originalOffsetIndex1;
+            }
+        }
+
+
+        /// <summary>
+        /// Attempts to repair a broken index value.
+        /// </summary>
+        /// <param name="filePath"></param>
+        public virtual void RepairIndexValue(string filePath)
         {
             var fileName = Path.GetFileName(filePath);
             var folderName = filePath.Substring(0, filePath.LastIndexOf('/'));
@@ -671,54 +860,38 @@ namespace xivModdingFramework.SqPack.DataContainers
             var folderHash = (uint)HashGenerator.GetHash(folderName);
             var fullHash = (uint)HashGenerator.GetHash(filePath);
 
+            ulong key = (ulong)fileHash;
+            key = key << 32;
+            key |= folderHash;
 
-            if (!Index1Entries.ContainsKey(folderHash))
+            uint originalOffsetIndex1 = GetRawDataOffsetIndex1(filePath);
+            uint originalOffsetIndex2 = GetRawDataOffsetIndex2(filePath);
+            bool existsInIndex1 = originalOffsetIndex1 > 0;
+            bool existsInIndex2 = originalOffsetIndex2 > 0;
+            bool index1Syn = Index1Synonyms.ContainsKey(key);
+            bool index2Syn = Index2Synonyms.ContainsKey(fullHash);
+
+            if(originalOffsetIndex1 == originalOffsetIndex2)
             {
-                Index1Entries.Add(folderHash, new Dictionary<uint, FileIndexEntry>());
+                // Doesn't need repair.
+                return;
             }
 
-            uint originalOffset = 0;
-            if (!Index1Entries[folderHash].ContainsKey(fileHash)) {
-
-                if (newRawOffsetWithDatNumEmbed != 0)
-                {
-                    var entry = new FileIndexEntry(newRawOffsetWithDatNumEmbed, fileHash, folderHash);
-                    Index1Entries[folderHash].Add(fileHash, entry);
-                }
-            } else
+            if (!existsInIndex1)
             {
-                if (newRawOffsetWithDatNumEmbed == 0)
-                {
-                    Index1Entries[folderHash].Remove(fileHash);
-                }
-                else
-                {
-                    originalOffset = Index1Entries[folderHash][fileHash].RawOffset;
-                    Index1Entries[folderHash][fileHash].RawOffset = newRawOffsetWithDatNumEmbed;
-                }
+                INTERNAL_SetDataOffset(filePath, originalOffsetIndex2, true);
+            } else if(!existsInIndex2)
+            {
+                INTERNAL_SetDataOffset(filePath, originalOffsetIndex1, true);
+            }
+            else
+            {
+                // Exists in both indices with mismatching values.
+                // Treat Index1 as the gold truth value.
+                INTERNAL_SetDataOffset(filePath, originalOffsetIndex1, true);
             }
 
-            if(!Index2Entries.ContainsKey(fullHash))
-            {
-
-                if (newRawOffsetWithDatNumEmbed != 0)
-                {
-                    var entry = new FileIndex2Entry(fullHash, newRawOffsetWithDatNumEmbed);
-                    Index2Entries.Add(fullHash, entry);
-                }
-            } else
-            {
-                if (newRawOffsetWithDatNumEmbed == 0)
-                {
-                    Index2Entries.Remove(fullHash);
-                } else { 
-                    Index2Entries[fullHash].RawFileOffset = newRawOffsetWithDatNumEmbed;
-                }
-            }
-
-            return originalOffset;
         }
-
 
         /// <summary>
         /// Returns the raw index entries contained in a specific folder.
@@ -727,7 +900,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// </summary>
         /// <param name="folderHash"></param>
         /// <returns></returns>
-        public List<FileIndexEntry> GetEntriesInFolder(uint folderHash)
+        public virtual List<FileIndexEntry> GetEntriesInFolder(uint folderHash)
         {
             if (!Index1Entries.ContainsKey(folderHash)) return new List<FileIndexEntry>();
             return Index1Entries[folderHash].Values.ToList();
@@ -735,10 +908,10 @@ namespace xivModdingFramework.SqPack.DataContainers
 
 
         /// <summary>
-        /// Retrieves the entire universe of folder => file hashes in the index.
+        /// Retrieves the entire universe of folder => file hashes in the index1.
         /// </summary>
         /// <returns></returns>
-        public Dictionary<uint, HashSet<uint>> GetAllHashes()
+        public virtual Dictionary<uint, HashSet<uint>> GetAllHashes()
         {
             var result = new Dictionary<uint, HashSet<uint>>();
             foreach(var folderKv in Index1Entries)
@@ -752,23 +925,63 @@ namespace xivModdingFramework.SqPack.DataContainers
             return result;
         }
 
-
-        public bool FileExists(string fullPath)
+        /// <summary>
+        /// Clones the entire list of hashes in the index1 file.
+        /// Returns a safe cloned copy of the entries by default.
+        /// </summary>
+        /// <returns></returns>
+        public virtual List<FileIndexEntry> GetAllEntriesIndex1(bool safe = true)
         {
-            var fileName = Path.GetFileName(fullPath);
-            var folderName = fullPath.Substring(0, fullPath.LastIndexOf('/'));
-            var fileHash = (uint)HashGenerator.GetHash(fileName);
-            var folderHash = (uint)HashGenerator.GetHash(folderName);
-
-            if(Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].ContainsKey(fileHash))
+            var result = new List<FileIndexEntry>();
+            foreach (var folderKv in Index1Entries)
             {
-                var entry = Index1Entries[folderHash][fileHash];
-                return entry.RawOffset != 0;
+                foreach (var fileKv in folderKv.Value)
+                {
+                    if (!safe)
+                    {
+
+                        result.Add((FileIndexEntry)fileKv.Value);
+                    }
+                    else
+                    {
+                        result.Add((FileIndexEntry)fileKv.Value.Clone());
+                    }
+                }
             }
-            return false;
+            return result;
         }
 
-        public bool FolderExists(uint folderHash)
+        /// <summary>
+        /// Clones the entire list of hashes in the index1 file.
+        /// Returns a safe cloned copy of the entries by default.
+        /// </summary>
+        /// <returns></returns>
+        public virtual List<FileIndex2Entry> GetAllEntriesIndex2(bool safe = true)
+        {
+            var result = new List<FileIndex2Entry>();
+            foreach (var kv in Index2Entries)
+            {
+                if (!safe)
+                {
+
+                    result.Add(kv.Value);
+                }
+                else
+                {
+                    result.Add((FileIndex2Entry)kv.Value.Clone());
+                }
+            }
+            return result;
+        }
+
+
+        public virtual bool FileExists(string fullPath)
+        {
+            var offset = GetRawDataOffset(fullPath);
+            return offset > 0;
+        }
+
+        public virtual bool FolderExists(uint folderHash)
         {
             if (Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].Count != 0)
             {
@@ -776,7 +989,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
             return false;
         }
-        public bool FolderExists(string folderPath)
+        public virtual bool FolderExists(string folderPath)
         {
             var folderHash = (uint)HashGenerator.GetHash(folderPath);
             if (Index1Entries.ContainsKey(folderHash) && Index1Entries[folderHash].Count != 0)
@@ -785,16 +998,28 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
             return false;
         }
+
+
+
+        internal IEnumerable<long> GetAllIndex2Offsets()
+        {
+            return Index2Entries.Values.Select(x => x.DataOffset);
+        }
     }
 
     /// <summary>
     /// Class to represent a single entry in an index segment.
     /// </summary>
-    public abstract class IndexEntry : IComparable
+    public abstract class IndexEntry : IComparable, ICloneable
     {
-        public abstract byte[] GetBytes();
+        public abstract byte[] GetBytes(IndexFile indexFile);
         public abstract void SetBytes(byte[] b);
         public abstract int CompareTo(object obj);
+        public abstract object Clone();
+        public abstract uint DatNum { get; }
+        public abstract long DataOffset { get; }
+        public abstract long ModifiedOffset { get; }
+        public abstract uint RawOffset { get; set; }
     }
 
     public class FileIndex2Entry : IndexEntry
@@ -807,18 +1032,6 @@ namespace xivModdingFramework.SqPack.DataContainers
             get
             {
                 return _fullPathHash;
-            }
-        }
-
-        public uint RawFileOffset
-        {
-            get
-            {
-                return _fileOffset;
-            }
-            set
-            {
-                _fileOffset = value;
             }
         }
 
@@ -836,7 +1049,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Base data offset * 8.  Includes DAT number reference information still.
         /// </summary>
-        public long ModifiedOffset
+        public override long ModifiedOffset
         {
             get { return ((long)_fileOffset) * 8; }
         }
@@ -844,30 +1057,52 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Dat Number this file's data resides in.
         /// </summary>
-        public int DatNum
+        public override uint DatNum
         {
             get
             {
-                return ((int)(_fileOffset & 0x0F) / 2);
+                return ((uint)(_fileOffset & 0x0F) / 2);
             }
         }
 
         /// <summary>
         /// Data offset within the containing Data File.
         /// </summary>
-        public long DataOffset
+        public override long DataOffset
         {
             get
             {
                 return (ModifiedOffset / 128) * 128;
             }
         }
-
-        public override byte[] GetBytes()
+        public override uint RawOffset
         {
-            byte[] b = new byte[8];
-            IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fullPathHash), 0);
-            IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fileOffset), 4);
+            get
+            {
+                return _fileOffset;
+            }
+            set
+            {
+                _fileOffset = value;
+            }
+        }
+
+
+        public override byte[] GetBytes(IndexFile indexFile)
+        {
+            var b = new byte[8];
+
+            if (indexFile.Index2Synonyms.ContainsKey(_fileOffset))
+            {
+                // Synonyms just write a [1] in place of offset since they use the Synonym table.
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fullPathHash), 0);
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes((uint)1), 4);
+            }
+            else
+            {
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fullPathHash), 0);
+                IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fileOffset), 4);
+            }
 
             return b;
         }
@@ -891,6 +1126,10 @@ namespace xivModdingFramework.SqPack.DataContainers
             if (mine == theirs) return 0;
             if (mine < theirs) return -1;
             return 1;
+        }
+        public override object Clone()
+        {
+            return MemberwiseClone();
         }
     }
 
@@ -932,7 +1171,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Base data offset * 8.  Includes DAT number reference information still.
         /// </summary>
-        public long ModifiedOffset
+        public override long ModifiedOffset
         {
             get { return ((long)_fileOffset) * 8; }
         }
@@ -940,7 +1179,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Dat Number this file's data resides in.
         /// </summary>
-        public uint DatNum
+        public override uint DatNum
         {
             get
             {
@@ -951,7 +1190,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         /// <summary>
         /// Data offset within the containing Data File.
         /// </summary>
-        public long DataOffset
+        public override long DataOffset
         {
             get
             {
@@ -959,7 +1198,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             }
         }
 
-        public uint RawOffset
+        public override uint RawOffset
         {
             get
             {
@@ -972,7 +1211,7 @@ namespace xivModdingFramework.SqPack.DataContainers
         }
 
 
-        public override byte[] GetBytes()
+        public override byte[] GetBytes(IndexFile indexFile)
         {
             byte[] b = new byte[16];
             IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_fileNameHash), 0);
@@ -1013,6 +1252,11 @@ namespace xivModdingFramework.SqPack.DataContainers
                 if (mine < theirs) return -1;
                 return 1;
             }
+        }
+
+        public override object Clone()
+        {
+            return MemberwiseClone();
         }
     }
 
@@ -1061,7 +1305,7 @@ namespace xivModdingFramework.SqPack.DataContainers
             _totalFolderSize = totalSize;
         }
 
-        public override byte[] GetBytes()
+        public override byte[] GetBytes(IndexFile indexFile)
         {
             byte[] b = new byte[16];
             IOUtil.ReplaceBytesAt(b, BitConverter.GetBytes(_folderPathHash), 0);
@@ -1093,34 +1337,93 @@ namespace xivModdingFramework.SqPack.DataContainers
             if (mine < theirs) return -1;
             return 1;
         }
+
+
+        // Inhereted/Interface members.
+        // DAT number might actually be resolveable? Not sure.
+        public override uint DatNum { get { return 0; } }
+        public override long DataOffset { get { return 0; } }
+        public override long ModifiedOffset { get { return 0; } }
+        public override uint RawOffset { get { return 0; } set { } }
+        public override object Clone()
+        {
+            return MemberwiseClone();
+        }
     }
 
 
-    /// <summary>
-    /// Raw unsortable type index entry.
-    /// </summary>
-    public class RawIndexEntry : IndexEntry
+    public class SynonymTableEntry
     {
-        private byte[] bytes;
-        public override byte[] GetBytes()
+        public const int Size = 256;
+        public uint FilePathHash;
+        public uint FolderPathHash; // Always Seems to be 0.
+        public uint Offset;
+        public uint SynonymNumber; // 0 or 1
+        public string FilePath;
+
+        /// <summary>
+        /// The default table-ending synonym entry.
+        /// Seems to always be included?
+        /// </summary>
+        /// <returns></returns>
+        public static SynonymTableEntry GetSynTableEndingEntry()
         {
-            return bytes;
+            var entry = new SynonymTableEntry();
+            entry.FilePathHash = uint.MaxValue;
+            entry.FolderPathHash = uint.MaxValue;
+            entry.Offset = 0;
+            entry.SynonymNumber = uint.MaxValue;
+            entry.FilePath = "";
+            return entry;
         }
 
-        public override void SetBytes(byte[] b)
+        public static SynonymTableEntry ReadEntry(BinaryReader br)
         {
-            bytes = b;
+            var entry = new SynonymTableEntry();
+            var offset = br.BaseStream.Position;
+            var end = br.BaseStream.Position + Size;
+            entry.FilePathHash = br.ReadUInt32();
+            entry.FolderPathHash = br.ReadUInt32();
+
+            entry.Offset = br.ReadUInt32();
+            entry.SynonymNumber = br.ReadUInt32();
+            entry.FilePath = IOUtil.ReadNullTerminatedString(br);
+
+            // Remainder is padding bytes of value 254 or 0 depending on if it is a valid or ending entry.
+            br.BaseStream.Seek(end, SeekOrigin.Begin);
+
+            return entry;
         }
 
-
-        public override int CompareTo(object obj)
+        public byte[] GetBytes()
         {
-            if (obj == null) return 1;
-            if (obj.GetType() != typeof(RawIndexEntry)) throw new Exception("Invalid Index Data Comparison");
+            try
+            {
+                var bytes = new byte[Size];
+                Array.Copy(BitConverter.GetBytes(FilePathHash), 0, bytes, 0, sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(FolderPathHash), 0, bytes, 4, sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(Offset), 0, bytes, 8, sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(SynonymNumber), 0, bytes, 12, sizeof(uint));
 
-            return 0;
+                var strBytes = Encoding.UTF8.GetBytes(FilePath);
+                Array.Copy(strBytes, 0, bytes, 16, strBytes.Length);
+
+                if (FilePathHash != uint.MaxValue)
+                {
+                    var offset = strBytes.Length + 16 + 1;
+                    for (int i = offset; i < Size; i++)
+                    {
+                        bytes[i] = 254;
+                    }
+                }
+                return bytes;
+            }
+            catch(Exception ex)
+            {
+                throw;
+            }
         }
+
     }
-
 
 }

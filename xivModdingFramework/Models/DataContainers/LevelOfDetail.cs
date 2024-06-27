@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using xivModdingFramework.Materials.DataContainers;
 
 namespace xivModdingFramework.Models.DataContainers
 {
@@ -23,65 +26,69 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class LevelOfDetail
     {
-        /// <summary>
-        /// The offset to the mesh data block
-        /// </summary>
-        public ushort MeshOffset { get; set; }
+        public int TotalMeshCount 
+        {
+            get
+            {
+                return MeshTypes.Sum(x => x.Value.Count);
+            }
+        }
 
-        /// <summary>
-        /// The number of meshes to use
-        /// </summary>
-        public short MeshCount { get; set; }
+        public bool HasExtraMeshes
+        {
+            get {
+                var extraStart = (int)EMeshType.LightShaft;
+                var extraMeshCount = 10;
 
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public int Unknown0 { get; set; }
+                for(int i = extraStart; i < extraStart + extraMeshCount; i++)
+                {
+                    var e = (EMeshType)i;
+                    if (MeshTypes.ContainsKey(e))
+                    {
+                        if (MeshTypes[e].Count > 0)
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+        }
 
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public int Unknown1 { get; set; }
+        public EMeshType GetMeshType(int offset)
+        {
+            foreach (var kv in MeshTypes)
+            {
+                if (offset >= kv.Value.Offset && offset < kv.Value.Offset + kv.Value.Count)
+                {
+                    return kv.Key;
+                }
+            }
+            throw new Exception("Unknown Mesh Type.");
 
-        /// <summary>
-        /// Mesh End
-        /// </summary>
-        public short MeshEnd { get; set; }
+        }
 
-        /// <summary>
-        /// Extra Mesh Count
-        /// </summary>
-        public short ExtraMeshCount { get; set; }
-
-        /// <summary>
-        /// Mesh Sum
-        /// </summary>
-        public short MeshSum{ get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown2 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public int Unknown3 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public int Unknown4 { get; set; }
+        public Dictionary<EMeshType, (ushort Offset, ushort Count)> MeshTypes = new Dictionary<EMeshType, (ushort Offset, ushort Count)>();
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown5 { get; set; }
+        public float ModelLoDRange { get; set; }
+
+        /// <summary>
+        /// Unknown Usage
+        /// </summary>
+        public float TextureLoDRange { get; set; }
+
+        /// <summary>
+        /// Unknown Usage
+        /// </summary>
+        public int EdgeGeometrySize { get; set; }
 
         /// <summary>
         /// The offset at which the index data begins
         /// </summary>
-        public int IndexDataStart { get; set; }
+        public int EdgeGeometryOffset { get; set; }
 
         /// <summary>
         /// Unknown Usage

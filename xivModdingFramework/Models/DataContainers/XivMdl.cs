@@ -14,12 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SharpDX;
 using System.Collections.Generic;
 
 namespace xivModdingFramework.Models.DataContainers
 {
     /// <summary>
-    /// This class contains the properties for the entire mdl file
+    /// This class is an internal representation of the entire sum of an uncompressed .mdl file.
+    /// It is not used in any high-level APIs, but is often used as a storage of the many bits of data that
+    /// either we don't know what they do, or that users have no interaction with, but are still parts of the
+    /// final .mdl file.
     /// </summary>
     public class XivMdl
     {
@@ -29,29 +33,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public string MdlPath { get; set; }
 
-        /// <summary>
-        /// Special indicator that says the mesh does not use parts at all.
-        /// This is the case for some furniture/background models.
-        /// </summary>
-        public bool Partless
-        {
-            get
-            {
-                var anyParts = false;
-                var anyIndices = false;
-                foreach(var m in LoDList[0].MeshDataList)
-                {
-                    anyParts = anyParts || m.MeshPartList.Count > 0;
-                    if(m.MeshInfo.IndexCount > 0)
-                    {
-                        anyIndices = true;
-                    }
-                }
-                var noParts = !anyParts;
-                return noParts && (!HasShapeData) && anyIndices;
-            }
-        }
-
+        public ushort MdlVersion { get; set;  }
 
         /// <summary>
         /// The path data contained in the mdl file
@@ -124,14 +106,19 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] PaddedBytes { get; set; }
 
         /// <summary>
-        /// The bounding box information for the model
+        // Bounding Boxes for the model
         /// </summary>
-        public BoundingBox BoundBox { get; set; }
+        public List<List<Vector4>> BoundingBoxes { get; set; }
 
         /// <summary>
-        /// The list containing the transform data for each bone
+        /// Bone Bounding Boxes
         /// </summary>
-        public List<BoneTransformData> BoneTransformDataList { get; set; }
+        public List<List<Vector4>> BoneBoundingBoxes { get; set; }
+
+        /// <summary>
+        /// Bone Bounding Boxes
+        /// </summary>
+        public List<List<Vector4>> BonelessPartBoundingBoxes { get; set; }
 
         /// <summary>
         /// Flag set when the model has shape data
