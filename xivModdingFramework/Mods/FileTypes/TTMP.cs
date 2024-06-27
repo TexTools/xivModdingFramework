@@ -841,7 +841,7 @@ namespace xivModdingFramework.Mods.FileTypes
                     if (settings.UpdateEndwalkerFiles)
                     {
                         var modPack = filteredModsJson[0].ModPackEntry;
-                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, originalStates, settings.UpdatePartialEndwalkerFiles, progress, tx);
+                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, progress, tx);
                     }
 
                     count = 0;
@@ -1133,7 +1133,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (settings.UpdateEndwalkerFiles)
                 {
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, originalStates, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(paths);
@@ -1401,6 +1401,18 @@ namespace xivModdingFramework.Mods.FileTypes
             // 3. The block sizes are incorrect.  This can only be fixed by unzipping and rewriting the blocks.
 
             var data = await TransactionDataHandler.GetUncompressedFile(info);
+
+            using(var ms = new MemoryStream(data)) {
+                using (var br = new BinaryReader(ms))
+                {
+                    var header = Tex.TexHeader.ReadTexHeader(br);
+                    if (!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height))
+                    {
+                        throw new InvalidDataException("Texture dimensions must be a power of two. (Ex. 256, 512, 1024, ...)");
+                    }
+                }
+            }
+
             var recomp = await Tex.CompressTexFile(data);
 
             var originalSize = info.FileSize;

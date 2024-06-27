@@ -64,9 +64,9 @@ namespace xivModdingFramework.Helpers
         /// <param name="progress"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> filePaths, string source, Dictionary<string, TxFileState> states, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> paths, string source, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-
+            var filePaths = paths.ToList();
             var ret = new Dictionary<string, UpgradeInfo>();
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
@@ -91,7 +91,7 @@ namespace xivModdingFramework.Helpers
             if (includePartials)
             {
                 progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths.ToList(), source, tx, _ConvertedTextures);
+                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths, source, tx, _ConvertedTextures);
 
                 progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
                 foreach (var path in filePaths)
@@ -436,15 +436,23 @@ namespace xivModdingFramework.Helpers
             foreach (var mtrl in materials)
             {
                 progress?.Report((i, total, "Updating Endwalker Materials..."));
-                var missingFiles = await UpdateEndwalkerMaterial(mtrl, source, true, tx, _ConvertedTextures, files);
-
-                // Merge missing files in.
-                foreach(var kv in missingFiles)
+                try
                 {
-                    if (!ret.ContainsKey(kv.Key))
+                    var missingFiles = await UpdateEndwalkerMaterial(mtrl, source, true, tx, _ConvertedTextures, files);
+
+                    // Merge missing files in.
+                    foreach (var kv in missingFiles)
                     {
-                        ret.Add(kv.Key, kv.Value);
+                        if (!ret.ContainsKey(kv.Key))
+                        {
+                            ret.Add(kv.Key, kv.Value);
+                        }
                     }
+                }
+                catch(Exception ex)
+                {
+                    // No-Op
+                    Trace.WriteLine(ex);
                 }
 
                 i++;
@@ -559,7 +567,16 @@ namespace xivModdingFramework.Helpers
 
                 if (!_ConvertedTextures.Contains(texInfo.normalToCreateFrom))
                 {
-                    var data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx, files);
+                    (string indexFilePath, byte[] data) data = (null, null);
+                    try
+                    {
+                        data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx, files);
+                    }
+                    catch
+                    {
+                        // No-Op, Typically a texture sizing error.
+                    }
+
                     if (files == null)
                     {
                         if (data.data != null)
@@ -568,7 +585,6 @@ namespace xivModdingFramework.Helpers
                         }
                         else
                         {
-
                             // Resave the material with texture validation to create dummy textures if none exist.
                             await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
                         }

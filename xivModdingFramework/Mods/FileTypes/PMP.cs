@@ -235,7 +235,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 else
                 {
                     // Order groups by Priority, Lowest => Highest, tiebreaker default order
-                    var orderedGroups = pmp.Groups.OrderBy(x => x.Priority);
+                    var orderedGroups = pmp.Groups.OrderBy(x => x.Priority).ToList();
                     var groupIdx = 0;
                     foreach (var group in orderedGroups)
                     {
@@ -268,7 +268,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         }
                         else if(group.Type == "Multi")
                         {
-                            var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority);
+                            var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority).ToList();
 
                             // Bitmask options.  Install in priority order.
                             foreach(var op in ordered)
@@ -363,7 +363,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 if (settings.UpdateEndwalkerFiles)
                 {
                     progress?.Report((0, 0, "Updating Pre-Dawntrail Files..."));
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(imported.Keys, _Source, imported, settings.UpdatePartialEndwalkerFiles, progress, tx);
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(imported.Keys, _Source, settings.UpdatePartialEndwalkerFiles, progress, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(imported.Keys);
