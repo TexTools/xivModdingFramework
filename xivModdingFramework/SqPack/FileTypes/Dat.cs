@@ -182,7 +182,10 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns>The largest dat number for the given data file.</returns>
         internal static int GetLargestDatNumber(XivDataFile dataFile)
         {
-
+            if (!Directory.Exists(dataFile.GetContainingFolder()))
+            {
+                return 0;
+            }
             string[] allFiles = Directory.GetFiles(dataFile.GetContainingFolder());
 
             var dataFiles = from file in allFiles where file.Contains(dataFile.GetFileName()) && file.Contains(".dat") select file;
