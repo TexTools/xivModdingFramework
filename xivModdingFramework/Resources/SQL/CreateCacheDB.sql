@@ -12,7 +12,9 @@ CREATE TABLE "characters" (
 	"primary_id"	INTEGER NOT NULL,
 	"slot"		TEXT,
 	"slot_full"	TEXT NOT NULL,
-	"root"		TEXT
+	"root"		TEXT,
+	"race"		TEXT,
+	"secondary_id" INTEGER
 );
 
 -- All Equipment, Accessory, and Human type entries.
@@ -35,6 +37,7 @@ CREATE TABLE "ui" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,
+	"mapzonecategory" TEXT,
 	"path" TEXT,
 	"icon_id" INTEGER NOT NULL,
 	"root"		TEXT,
@@ -48,6 +51,7 @@ CREATE TABLE "furniture" (
 	"category" TEXT NOT NULL,
 	"subcategory" TEXT,
 	"primary_id"	INTEGER NOT NULL,
+	"secondary_id"	INTEGER,
 	"icon_id"	INTEGER NOT NULL,
 	"root"		TEXT,
 	

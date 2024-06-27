@@ -1,5 +1,7 @@
-﻿using System;
+﻿using HelixToolkit.SharpDX.Core.Model;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.NetworkInformation;
@@ -15,6 +17,8 @@ using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.Enums;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
@@ -120,13 +124,36 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
         /// <summary>
+        /// Alter this metdata to properly point to a new root.
+        /// </summary>
+        /// <param name="newRoot"></param>
+        /// <exception cref="InvalidDataException"></exception>
+        public void AlterRoot(XivDependencyRoot newRoot)
+        {
+            if (newRoot.Info.PrimaryType != Root.Info.PrimaryType 
+                || newRoot.Info.SecondaryType != Root.Info.SecondaryType 
+                || newRoot.Info.Slot != Root.Info.Slot)
+            {
+                throw new InvalidDataException("Cannot alter metadata to different item type.");
+            }
+
+            Root = newRoot;
+
+            // Swap EST pointers.
+            foreach (var entry in EstEntries)
+            {
+                entry.Value.SetId = (ushort)newRoot.Info.PrimaryId;
+            }
+        }
+
+        /// <summary>
         /// Gets the metadata file for an IItem entry
         /// </summary>
         /// <param name="item"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(IItem item, bool forceDefault = false)
+        public static async Task<ItemMetadata> GetMetadata(IItem item, bool forceDefault = false, ModTransaction tx = null)
         {
-            return await GetMetadata(item.GetRoot(), forceDefault);
+            return await GetMetadata(item.GetRoot(), forceDefault, tx);
         }
 
         /// <summary>
@@ -135,10 +162,10 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="internalFilePath"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(string internalFilePath, bool forceDefault = false )
+        public static async Task<ItemMetadata> GetMetadata(string internalFilePath, bool forceDefault = false, ModTransaction tx = null)
         {
             var root = await XivCache.GetFirstRoot(internalFilePath);
-            return await GetMetadata(root, forceDefault);
+            return await GetMetadata(root, forceDefault, tx);
         }
 
         /// <summary>
@@ -146,97 +173,80 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="root"></param>
         /// <returns></returns>
-        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceDefault = false)
+        public static async Task<ItemMetadata> GetMetadata(XivDependencyRoot root, bool forceOriginal = false, ModTransaction tx = null)
         {
             if(root == null)
             {
                 return null;
             }
 
-            Mod mod = null;
-            var filePath = root.Info.GetRootFile();
-            if (!forceDefault)
-            {
-                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-                mod = await _modding.TryGetModEntry(filePath);
+            if (tx == null) {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
-            if(mod != null && mod.enabled)
+            var path = root.Info.GetRootFile();
+
+            if(await tx.FileExists(path, forceOriginal))
             {
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                // We have modded metadata stored in the .meta file in the DAT we can use.
-                var data = await _dat.GetType2Data(filePath, false);
-
-                // Run it through the binary deserializer and we're good.
-                //return await Deserialize(data);
-                return await CreateFromRaw(root, forceDefault);
-            } else
-            {
-                // This is the fun part where we get to pull the Metadata from all the disparate files around the FFXIV File System.
-                return await CreateFromRaw(root, forceDefault);
-            }
-        }
-
-        /// <summary>
-        /// Retrieves the item metadata from a cached index setup (or raw)
-        /// </summary>
-        /// <param name="root"></param>
-        /// <param name="index"></param>
-        /// <returns></returns>
-        public static async Task<ItemMetadata> GetFromCachedIndex(XivDependencyRoot root, IndexFile index)
-        {
-
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var df = IOUtil.GetDataFileFromPath(root.Info.GetRootFile());
-
-            long offset = 0;
-            if (index != null)
-            {
-                offset = index.Get8xDataOffset(root.Info.GetRootFile());
-            }
-
-            ItemMetadata mData = null;
-            if (offset == 0)
-            {
-                mData = await ItemMetadata.GetMetadata(root);
+                // If we have a valid meta file, read that.
+                var data = await tx.ReadFile(path, forceOriginal);
+                var meta = await Deserialize(data);
+                meta.Validate(path);
+                return meta;
             }
             else
             {
-                var data = await _dat.GetType2Data(offset, df);
-                mData = await ItemMetadata.Deserialize(data);
+                // Meta file doesn't exist, create from live state.
+                return await CreateFromRaw(root, forceOriginal, tx);
             }
-            return mData;
+
         }
+
 
         /// <summary>
         /// Creates a new ItemMetaData entry from the constituent files around the FFXIV file system.
         /// </summary>
         /// <param name="root"></param>
         /// <returns></returns>
-        private static async Task<ItemMetadata> CreateFromRaw(XivDependencyRoot root, bool forceDefault = false)
+        private static async Task<ItemMetadata> CreateFromRaw(XivDependencyRoot root, bool forceDefault = false, ModTransaction tx = null)
         {
 
+            if (tx == null) {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
 
             // These functions generate the path::offset to each of our
             // contiguous metadata entries.
-            var imcPaths = await root.GetImcEntryPaths();
 
             var ret = new ItemMetadata(root);
-
-            if (imcPaths.Count > 0)
+            if (Imc.UsesImc(root))
             {
-                ret.ImcEntries = await _imc.GetEntries(imcPaths, forceDefault);
+                var baseImc = root.GetRawImcFilePath();
+                if (await tx.FileExists(baseImc, forceDefault))
+                {
+                    var imcPaths = await root.GetImcEntryPaths(tx);
+                    if (imcPaths.Count > 0)
+                    {
+                        ret.ImcEntries = await Imc.GetEntries(imcPaths, forceDefault, tx);
+                    }
+                } else
+                {
+                    // IMC file did not exist, so no entries.
+                }
             }
 
-            ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault);
+            ret.EqpEntry = await _eqp.GetEqpEntry(root.Info, forceDefault, tx);
 
-            ret.EqdpEntries = await _eqp.GetEquipmentDeformationParameters(root.Info, forceDefault);
+            ret.EqdpEntries = await _eqp.GetEquipmentDeformationParameters(root.Info, forceDefault, false, tx);
 
-            ret.EstEntries = await Est.GetExtraSkeletonEntries(root, forceDefault);
+            ret.EstEntries = await Est.GetExtraSkeletonEntries(root, forceDefault, tx);
 
-            ret.GmpEntry = await _eqp.GetGimmickParameter(root, forceDefault);
+            ret.GmpEntry = await _eqp.GetGimmickParameter(root, forceDefault, tx);
 
             return ret;
         }
@@ -246,121 +256,107 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="meta"></param>
         /// <returns></returns>
-        public static async Task SaveMetadata(ItemMetadata meta, string source, IndexFile index = null, ModList modlist = null)
+        public static async Task SaveMetadata(ItemMetadata meta, string source, ModTransaction tx = null, bool fillMissing = false)
         {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
 
             var path = meta.Root.Info.GetRootFile();
             var item = meta.Root.GetFirstItem();
 
-            await _dat.ImportType2Data(await Serialize(meta), path, source, item, index, modlist);
+            var boiler = await TxBoiler.BeginWrite(tx, true);
+            tx = boiler.Transaction;
+            try
+            {
+
+                await Dat.ImportType2Data(await Serialize(meta), path, source, item, tx);
+
+                if (fillMissing)
+                {
+                    await meta.FillMissingFiles(source, tx);
+                }
+
+                await boiler.Commit();
+            }
+            catch
+            {
+                await boiler.Catch();
+            }
         }
 
         /// <summary>
-        /// Applies multiple metadata mods simultaneously for performance gains.
+        /// Fills any files that are missing for this metadata.
+        /// In specific, this adds additional materials for missing sets,
+        /// and adds additional models for missing models.
         /// </summary>
-        /// <param name="data"></param>
-        /// <param name="index"></param>
-        /// <param name="modlist"></param>
+        /// <param name="source"></param>
+        /// <param name="tx"></param>
         /// <returns></returns>
-        internal static async Task ApplyMetadataBatched(List<ItemMetadata> data, IndexFile index, ModList modlist, bool save = true)
+        public async Task FillMissingFiles(string source, ModTransaction tx)
         {
-            if (data == null || data.Count == 0) return;
 
-            var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-
-            var dummyItem = new XivGenericItemModel();
-            dummyItem.Name = Constants.InternalModSourceName;
-            dummyItem.SecondaryCategory = Constants.InternalModSourceName;
-
-            Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>> eqdpEntries = new Dictionary<XivRace, List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>>();
-            Dictionary<Est.EstType, List<ExtraSkeletonEntry>> estEntries = new Dictionary<Est.EstType, List<ExtraSkeletonEntry>>();
-            List<(uint PrimaryId, EquipmentParameter EqpData)> eqpEntries = new List<(uint PrimaryId, EquipmentParameter EqpData)>();
-            List<(uint PrimaryId, GimmickParameter GmpData)> gmpEntries = new List<(uint PrimaryId, GimmickParameter GmpData)>();
-
-            foreach (var meta in data)
+            foreach (var kv in EqdpEntries)
             {
-                // Construct the parameter collections for each function call.
-                foreach(var kv in meta.EqdpEntries)
+                if (kv.Value.HasModel == false) continue;
+                // Here we have a new race, we need to create a model for it.
+                await Mdl.AddRacialModel(Root.Info.PrimaryId, Root.Info.Slot, kv.Key, source, tx);
+            }
+
+            if (ImcEntries.Count > 0)
+            {
+                // We need to validate the material paths.
+
+                // First find the base files to copy. (Just always copy from set 1 for simplicity)
+                var copySource = await Root.GetMaterialFiles(1, tx);
+                var item = Root.GetFirstItem();
+
+                var newMaterialSetMax = ImcEntries.Select(x => x.MaterialSet).Max();
+
+                for (int i = 1; i <= newMaterialSetMax; i++)
                 {
-                    if (!eqdpEntries.ContainsKey(kv.Key))
+                    foreach (var material in copySource)
                     {
-                        eqdpEntries.Add(kv.Key, new List<(uint PrimaryId, string Slot, EquipmentDeformationParameter Entry)>());
+                        var dest = material.Replace("v0001", "v" + i.ToString().PadLeft(4, '0'));
+                        if (await tx.FileExists(dest))
+                        {
+                            // File exists.  No need to modify.
+                            return;
+                        }
+
+                        var mod = await tx.GetMod(dest);
+                        if (mod != null)
+                        {
+                            // Mod exists.  Just re-enable it.
+                            await Modding.SetModState(EModState.Enabled, mod.Value, tx);
+                            return;
+                        }
+
+                        // Material doesn't exist at all, have to copy in a new one.
+                        await Dat.CopyFile(material, dest, source, false, item, tx);
                     }
-
-                    eqdpEntries[kv.Key].Add(((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, kv.Value));
-                }
-
-                var estType = Est.GetEstType(meta.Root);
-                foreach (var kv in meta.EstEntries)
-                {
-                    if (!estEntries.ContainsKey(estType))
-                    {
-                        estEntries.Add(estType, new List<ExtraSkeletonEntry>());
-                    }
-
-                    estEntries[estType].Add(kv.Value);
-                }
-
-                if (meta.EqpEntry != null)
-                {
-                    eqpEntries.Add(((uint)meta.Root.Info.PrimaryId, meta.EqpEntry));
-                }
-
-                if (meta.GmpEntry != null)
-                {
-                    gmpEntries.Add(((uint)meta.Root.Info.PrimaryId, meta.GmpEntry));
                 }
             }
-
-
-            if (index.DataFile == XivDataFile._04_Chara)
+        }
+        internal static async Task ApplyMetadata(string internalPath, bool forceOriginal = false, ModTransaction tx = null)
+        {
+            var exists = await tx.FileExists(internalPath, forceOriginal);
+            if(!exists)
             {
-                // Batch install functions for these three.
-                await _eqp.SaveEqpEntries(eqpEntries, dummyItem, index, modlist);
-                await _eqp.SaveEqdpEntries(eqdpEntries, dummyItem, index, modlist);
-                await _eqp.SaveGmpEntries(gmpEntries, dummyItem, index, modlist);
-
-                // The EST function already does batch applications by nature of how it works,
-                // so just call it once for each of the four EST types represented.
-                foreach (var kv in estEntries)
-                {
-                    await Est.SaveExtraSkeletonEntries(kv.Key, kv.Value, dummyItem, index, modlist);
-                }
+                // If the metadata file does not exist, we're always restoring to default state.
+                forceOriginal = true;
             }
-
-
-            // IMC Files don't really overlap that often, so it's
-            // not a significant loss generally to just write them individually.
-            foreach (var meta in data)
-            {
-                if (meta.ImcEntries.Count > 0)
-                {
-                    var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                    var imcPath = meta.Root.GetRawImcFilePath();
-                    await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, null, index, modlist);
-                }
-            }
-
-            if (save)
-            {
-                await _index.SaveIndexFile(index);
-                await _modding.SaveModListAsync(modlist);
-            }
+            
+            var meta = await GetMetadata(internalPath, forceOriginal, tx);
+            meta.Validate(internalPath);
+            await ApplyMetadata(meta, tx);
         }
 
         /// <summary>
         /// Applies this Metadata object to the FFXIV file system.
         /// This should only called by Dat.WriteToDat() / RestoreDefaultMetadata()
+        /// and sufficiently advanced/complex functions that are doing raw data writes (Ex. Modpack imports)
         /// </summary>
-        internal static async Task ApplyMetadata(ItemMetadata meta, IndexFile index = null, ModList modlist = null)
+        internal static async Task ApplyMetadata(ItemMetadata meta, ModTransaction tx)
         {
             var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
-            var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
             var df = IOUtil.GetDataFileFromPath(meta.Root.Info.GetRootFile());
 
             var dummyItem = new XivGenericItemModel();
@@ -368,62 +364,76 @@ namespace xivModdingFramework.Mods.FileTypes
             dummyItem.SecondaryCategory = Constants.InternalModSourceName;
 
 
-            // Beep boop
-            bool doSave = false;
-            if (index == null)
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
+            try
             {
-                doSave = true;
-                index = await _index.GetIndexFile(df);
-                modlist = await _modding.GetModListAsync();
+                var index = await tx.GetIndexFile(df);
+                var modlist = await tx.GetModList();
+
+
+                if (meta.ImcEntries.Count > 0)
+                {
+                    var imcPath = meta.Root.GetRawImcFilePath();
+                    await Imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, tx);
+                }
+                else
+                {
+                    var imcPath = meta.Root.GetRawImcFilePath();
+                    if (Imc.UsesImc(meta.Root) && await tx.FileExists(imcPath))
+                    {
+                        var mod = await tx.GetMod(imcPath);
+                        if (mod != null)
+                        {
+                            // Remove IMC file if we have 0 entries and it's a file we created.
+                            await tx.Set8xDataOffset(imcPath, 0);
+                        }
+                    }
+                }
+
+                var preOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
+                // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
+                if (meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
+                {
+                    await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, tx);
+                }
+
+                //var postOffset = (await tx.GetIndexFile(df)).Get8xDataOffset(Eqp.EquipmentParameterFile);
+                if (meta.EqdpEntries.Count > 0)
+                {
+                    await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, tx);
+                }
+
+                if (meta.EstEntries.Count > 0)
+                {
+                    var type = Est.GetEstType(meta.Root);
+                    var entries = meta.EstEntries.Values.ToList();
+                    await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, tx);
+                }
+
+                if (meta.GmpEntry != null)
+                {
+                    await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, tx);
+                }
+
+                await boiler.Commit();
             }
-
-
-            if (meta.ImcEntries.Count > 0)
+            catch
             {
-                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var imcPath = meta.Root.GetRawImcFilePath();
-                await _imc.SaveEntries(imcPath, meta.Root.Info.Slot, meta.ImcEntries, dummyItem, index, modlist);
-            }
-
-            // Applying EQP data via set 0 is not allowed, as it is a special set hard-coded to use Set 1's data.
-            if(meta.EqpEntry != null && !(meta.Root.Info.PrimaryType == Items.Enums.XivItemType.equipment && meta.Root.Info.PrimaryId == 0))
-            {
-                await _eqp.SaveEqpEntry(meta.Root.Info.PrimaryId, meta.EqpEntry, dummyItem, index, modlist);
-            }
-
-            if(meta.EqdpEntries.Count > 0)
-            {
-                await _eqp.SaveEqdpEntries((uint)meta.Root.Info.PrimaryId, meta.Root.Info.Slot, meta.EqdpEntries, dummyItem, index, modlist);
-            }
-
-            if (meta.EstEntries.Count > 0)
-            {
-                var type = Est.GetEstType(meta.Root);
-                var entries = meta.EstEntries.Values.ToList();
-                await Est.SaveExtraSkeletonEntries(type, entries, dummyItem, index, modlist);
-            }
-
-            if(meta.GmpEntry != null)
-            {
-                await _eqp.SaveGimmickParameter(meta.Root.Info.PrimaryId, meta.GmpEntry, dummyItem, index, modlist);
-            }
-
-            if (doSave && !XivCache.GameInfo.UseLumina)
-            {
-                await _index.SaveIndexFile(index);
-                await _modding.SaveModListAsync(modlist);
+                await boiler.Cancel();
+                throw;
             }
         }
 
 
         /// <summary>
         /// Restores the original SE metadata for this root.
-        /// This should only be called by Index.DeleteFileDescriptor().
+        /// This should be called when setting the offset to 0 for a file.
         /// </summary>
-        public static async Task RestoreDefaultMetadata(XivDependencyRoot root, IndexFile index = null, ModList modlist = null)
+        public static async Task RestoreDefaultMetadata(XivDependencyRoot root, ModTransaction tx = null)
         {
-            var original = await ItemMetadata.CreateFromRaw(root, true);
-            await ApplyMetadata(original, index, modlist);
+            var original = await GetMetadata(root, true, tx);
+            await ApplyMetadata(original, tx);
         }
 
 
@@ -731,6 +741,48 @@ namespace xivModdingFramework.Mods.FileTypes
             return bytes.ToArray();
         }
 
+        /// <summary>
+        /// Deserializes the binary EQDP data into a dictionary of EQDP entries.
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private static Dictionary<XivRace, EquipmentDeformationParameter> DeserializeEqdpData(byte[] data, XivDependencyRoot root, uint dataVersion)
+        {
+            const int eqdpEntrySize = 5;
+            var entries = data.Length / eqdpEntrySize;
+
+            var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
+
+            var read = 0;
+            using (var reader = new BinaryReader(new MemoryStream(data)))
+            {
+                while (read < entries)
+                {
+                    var raceCode = reader.ReadInt32();
+                    var race = XivRaces.GetXivRace(raceCode.ToString().PadLeft(4, '0'));
+
+                    var eqpByte = reader.ReadByte();
+                    var entry = EquipmentDeformationParameter.FromByte(eqpByte);
+
+                    ret.Add(race, entry);
+
+                    read++;
+                }
+            }
+
+            // Catch for cases where for some reason the EQP doesn't have all races,
+            // for example, SE adding more races in the future, and we're
+            // reading old metadata entries.
+            foreach (var race in Eqp.PlayableRaces)
+            {
+                if (!ret.ContainsKey(race))
+                {
+                    ret.Add(race, new EquipmentDeformationParameter());
+                }
+            }
+
+            return ret;
+        }
 
         /// <summary>
         /// Deserializes the binary EQP data into a EQP entry.
@@ -758,47 +810,6 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
 
-        /// <summary>
-        /// Deserializes the binary EQDP data into a dictionary of EQDP entries.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        private static Dictionary<XivRace, EquipmentDeformationParameter> DeserializeEqdpData(byte[] data, XivDependencyRoot root, uint dataVersion)
-        {
-            const int eqdpEntrySize = 5;
-            var entries = data.Length / eqdpEntrySize;
-
-            var ret = new Dictionary<XivRace, EquipmentDeformationParameter>();
-
-            var read = 0;
-            using (var reader = new BinaryReader(new MemoryStream(data)))
-            {
-                while(read < entries)
-                {
-                    var raceCode = reader.ReadInt32();
-                    var race = XivRaces.GetXivRace(raceCode.ToString().PadLeft(4, '0'));
-
-                    var eqpByte = reader.ReadByte();
-                    var entry = EquipmentDeformationParameter.FromByte(eqpByte);
-
-                    ret.Add(race, entry);
-
-                    read++;
-                }
-            }
-
-            // Catch for cases where for some reason the EQP doesn't have all races,
-            // for example, SE adding more races in the future, and we're
-            // reading old metadata entries.
-            foreach (var race in Eqp.PlayableRaces) {
-                if(!ret.ContainsKey(race))
-                {
-                    ret.Add(race, new EquipmentDeformationParameter());
-                }
-            }
-
-            return ret;
-        }
 
         private static async Task<Dictionary<XivRace, ExtraSkeletonEntry>> DeserializeEstData(byte[] data, XivDependencyRoot root, uint dataVersion)
         {

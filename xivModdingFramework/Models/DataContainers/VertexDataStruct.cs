@@ -48,5 +48,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// What the data will be used for
         /// </summary>
         public VertexUsageType DataUsage { get; set; }
+
+        public byte Count { get; set; }
     }
 }

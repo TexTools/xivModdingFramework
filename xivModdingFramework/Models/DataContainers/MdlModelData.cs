@@ -14,8 +14,53 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+using System.IO;
+using xivModdingFramework.Mods.DataContainers;
+
 namespace xivModdingFramework.Models.DataContainers
 {
+
+    [Flags]
+    public enum EMeshFlags1 : byte
+    {
+        ShadowDisabled = 0x01,
+        LightShadowDisabled = 0x02,
+        WavingAnimationDisabled = 0x04,
+        LightingReflectionEnabled = 0x08,
+        Unknown10 = 0x10,
+        RainOcclusionEnabled = 0x20,
+        SnowOcclusionEnabled = 0x40,
+        DustOcclusionEnabled = 0x80,
+    };
+
+    [Flags]
+    public enum EMeshFlags2 : byte
+    {
+        HasBonelessParts = 0x01,
+        EdgeGeometryEnabled = 0x02,
+        ForceLodRangeEnabled = 0x04,
+        ShadowMaskEnabled = 0x08,
+        HasExtraMeshes = 0x10,
+        EnableForceNonResident = 0x20,
+        BgUvScrollEnabled = 0x40,
+        Unknown80 = 0x80,
+    };
+
+    [Flags]
+    public enum EMeshFlags3 : byte
+    {
+        Unknown01 = 0x01,
+        UseMaterialChange = 0x02,
+        UseCrestChange = 0x04,
+        Unknown08 = 0x08,
+        Unknown10 = 0x10,
+        Unknown20 = 0x20,
+        Unknown40 = 0x40,
+        Unknown80 = 0x80,
+    };
+
+
     /// <summary>
     /// This class cotains the properties for the MDL model data
     /// </summary>
@@ -27,7 +72,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public int Unknown0 { get; set; }
+        public float Radius { get; set; }
 
         /// <summary>
         /// The total number of meshes that the model contains
@@ -63,7 +108,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// There is usually one per LoD
         /// </remarks>
-        public short BoneListCount { get; set; }
+        public short BoneSetCount { get; set; }
 
         /// <summary>
         /// The number of Mesh Shapes
@@ -85,70 +130,54 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public byte LoDCount { get; set; }
 
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public byte Unknown1 { get; set; }
+        public EMeshFlags1 Flags1 { get; set; }
+
+        public ushort ElementIdCount { get; set; }
+
+        public byte TerrainShadowMeshCount { get; set; }
+
+
+        public EMeshFlags2 Flags2 { get; set; }
+
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown2 { get; set; }
+        public float ModelClipOutDistance { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown3 { get; set; }
+        public float ShadowClipOutDistance { get; set; }
+
+        /// <summary>
+        /// Bounding boxes for LoD0 Mesh0 parts for furniture/Non-Boned items with multiple parts.
+        /// </summary>
+        public ushort FurniturePartBoundingBoxCount { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown4 { get; set; }
+        public short TerrainShadowPartCount { get; set; }
+
+        public EMeshFlags3 Flags3 { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown5 { get; set; }
+        public byte BgChangeMaterialIndex { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown6 { get; set; }
+        public byte BgCrestChangeMaterialIndex { get; set; }
+
+        public byte Unknown12 { get; set; }
 
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown7 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown8 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown9 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public byte Unknown10a { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public byte Unknown10b { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown11 { get; set; }
-
-        /// <summary>
-        /// Unknown Usage
-        /// </summary>
-        public short Unknown12 { get; set; }
+        public short BoneSetSize { get; set; }
 
         /// <summary>
         /// Unknown Usage
@@ -161,18 +190,101 @@ namespace xivModdingFramework.Models.DataContainers
         public short Unknown14 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Padding?
         /// </summary>
         public short Unknown15 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Padding?
         /// </summary>
         public short Unknown16 { get; set; }
 
         /// <summary>
-        /// Unknown Usage
+        /// Padding?
         /// </summary>
         public short Unknown17 { get; set; }
+
+        public static MdlModelData Read(BinaryReader br)
+        {
+            var modelData = new MdlModelData
+            {
+                Radius = br.ReadSingle(),
+
+                MeshCount = br.ReadInt16(),
+                AttributeCount = br.ReadInt16(),
+                MeshPartCount = br.ReadInt16(),
+                MaterialCount = br.ReadInt16(),
+
+                BoneCount = br.ReadInt16(),
+                BoneSetCount = br.ReadInt16(),
+
+                ShapeCount = br.ReadInt16(),
+                ShapePartCount = br.ReadInt16(),
+                ShapeDataCount = br.ReadUInt16(),
+
+                LoDCount = br.ReadByte(),
+
+                Flags1 = (EMeshFlags1)br.ReadByte(),
+
+                ElementIdCount = br.ReadUInt16(),
+                TerrainShadowMeshCount = br.ReadByte(),
+
+                Flags2 = (EMeshFlags2)br.ReadByte(),
+
+                ModelClipOutDistance = br.ReadSingle(),
+                ShadowClipOutDistance = br.ReadSingle(),
+
+                FurniturePartBoundingBoxCount = br.ReadUInt16(),
+                TerrainShadowPartCount = br.ReadInt16(),
+                Flags3 = (EMeshFlags3)br.ReadByte(),
+
+                BgChangeMaterialIndex = br.ReadByte(),
+                BgCrestChangeMaterialIndex = br.ReadByte(),
+
+                Unknown12 = br.ReadByte(),
+                BoneSetSize = br.ReadInt16(),
+
+                Unknown13 = br.ReadInt16(),
+                Unknown14 = br.ReadInt16(),
+                Unknown15 = br.ReadInt16(),
+                Unknown16 = br.ReadInt16(),
+                Unknown17 = br.ReadInt16()
+            };
+
+            return modelData;
+        }
+
+        public void Write(BinaryWriter br)
+        {
+            br.Write(Radius);
+            br.Write(MeshCount);
+            br.Write(AttributeCount);
+            br.Write(MeshPartCount);
+            br.Write(MaterialCount);
+            br.Write(BoneCount);
+            br.Write(BoneSetCount);
+            br.Write(ShapeCount);
+            br.Write(ShapePartCount);
+            br.Write(ShapeDataCount);
+            br.Write(LoDCount);
+            br.Write((byte) Flags1);
+            br.Write(ElementIdCount);
+            br.Write(TerrainShadowMeshCount);
+            br.Write((byte)Flags2);
+            br.Write(ModelClipOutDistance);
+            br.Write(ShadowClipOutDistance);
+            br.Write(FurniturePartBoundingBoxCount);
+            br.Write(TerrainShadowPartCount);
+            br.Write((byte)Flags3);
+            br.Write(BgChangeMaterialIndex);
+            br.Write(BgCrestChangeMaterialIndex);
+            br.Write(Unknown12);
+            br.Write(BoneSetSize);
+            br.Write(Unknown13);
+            br.Write(Unknown14);
+            br.Write(Unknown15);
+            br.Write(Unknown16);
+            br.Write(Unknown17);
+        }
     }
 }

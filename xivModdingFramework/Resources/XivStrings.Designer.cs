@@ -19,7 +19,7 @@ namespace xivModdingFramework.Resources {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class XivStrings {
@@ -367,7 +367,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to buddyaction_0_{0}.exd.
+        ///   Looks up a localized string similar to Buddy Action.
         /// </summary>
         internal static string BuddyAction {
             get {
@@ -421,7 +421,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to companyaction_0_{0}.exd.
+        ///   Looks up a localized string similar to Company Action.
         /// </summary>
         internal static string CompanyAction {
             get {
@@ -439,7 +439,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to craftaction_100000_{0}.exd.
+        ///   Looks up a localized string similar to Crafting Action.
         /// </summary>
         internal static string CraftAction {
             get {
@@ -898,7 +898,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to eventaction_0_{0}.exd.
+        ///   Looks up a localized string similar to Event Action.
         /// </summary>
         internal static string EventAction {
             get {
@@ -1029,6 +1029,15 @@ namespace xivModdingFramework.Resources {
         internal static string FieldMarkerEXD {
             get {
                 return ResourceManager.GetString("FieldMarkerEXD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Fish.
+        /// </summary>
+        internal static string Fish {
+            get {
+                return ResourceManager.GetString("Fish", resourceCulture);
             }
         }
         
@@ -1204,11 +1213,11 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Hrothgar - Hellion.
+        ///   Looks up a localized string similar to Hrothgar - Helion.
         /// </summary>
-        internal static string Hrothgar_Hellion {
+        internal static string Hrothgar_Helion {
             get {
-                return ResourceManager.GetString("Hrothgar_Hellion", resourceCulture);
+                return ResourceManager.GetString("Hrothgar_Helion", resourceCulture);
             }
         }
         
@@ -1645,6 +1654,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Map.
+        /// </summary>
+        internal static string Map {
+            get {
+                return ResourceManager.GetString("Map", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to map_0.exd.
         /// </summary>
         internal static string MapExd {
@@ -1731,6 +1749,15 @@ namespace xivModdingFramework.Resources {
         internal static string Mask {
             get {
                 return ResourceManager.GetString("Mask", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Minimap.
+        /// </summary>
+        internal static string Minimap {
+            get {
+                return ResourceManager.GetString("Minimap", resourceCulture);
             }
         }
         
@@ -2055,6 +2082,24 @@ namespace xivModdingFramework.Resources {
         internal static string OuterEar {
             get {
                 return ResourceManager.GetString("OuterEar", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Painting.
+        /// </summary>
+        internal static string Painting {
+            get {
+                return ResourceManager.GetString("Painting", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Painting Icons.
+        /// </summary>
+        internal static string Painting_Icons {
+            get {
+                return ResourceManager.GetString("Painting Icons", resourceCulture);
             }
         }
         

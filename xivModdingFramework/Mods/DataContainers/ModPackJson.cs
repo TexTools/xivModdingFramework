@@ -87,6 +87,34 @@ namespace xivModdingFramework.Mods.DataContainers
         /// The list of mods for simple modpacks
         /// </summary>
         public List<ModsJson> SimpleModsList { get; set; }
+
+
+        public string GetHeaderImagePath()
+        {
+            if (ModPackPages == null || ModPackPages.Count == 0)
+            {
+                return null;
+            }
+
+            foreach (var p in ModPackPages)
+            {
+                if (p.ModGroups == null || p.ModGroups.Count == 0) continue;
+
+                foreach (var g in p.ModGroups)
+                {
+                    if (g.OptionList == null || g.OptionList.Count == 0) continue;
+
+                    foreach (var o in g.OptionList)
+                    {
+                        if (!string.IsNullOrEmpty(o.ImagePath))
+                        {
+                            return o.ImagePath;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
     }
 
     public class ModPackPageJson
@@ -231,6 +259,6 @@ namespace xivModdingFramework.Mods.DataContainers
         /// <summary>
         /// The Mod Pack Entry
         /// </summary>
-        public ModPack ModPackEntry { get; set; }
+        public ModPack? ModPackEntry { get; set; }
     }
 }

@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 using SharpDX;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.IO;
@@ -35,6 +36,7 @@ using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -45,18 +47,16 @@ namespace xivModdingFramework.Models.FileTypes
     /// <summary>
     /// This class deals with .sklb Skeleton files
     /// </summary>
-    public class Sklb
+    public static class Sklb
     {
-        private readonly DirectoryInfo _gameDirectory;
         private const string SkeletonsFolder = "Skeletons";
-        public Sklb(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-        }
 
         /// <summary>
         /// Retrieves the base racial or body skeleton for a given model file, parsing it from the base
         /// game files to generate it, if necessary.
+        /// 
+        /// NOTE: Not Transaction safe... If the base skeleton files were altered during Transaction.
+        /// Which seems niche enough to not worry about for now.
         /// </summary>
         /// <param name="fullMdlPath"></param>
         /// <returns></returns>
@@ -72,7 +72,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             return await GetBaseSkeletonFile(root.Info, race);
         }
-        public static async Task<string> GetBaseSkeletonFile(XivDependencyRootInfo root, XivRace race) 
+        public static async Task<string> GetBaseSkeletonFile(XivDependencyRootInfo root, XivRace race, ModTransaction tx = null) 
         {
             var file = await GetBaseSkelbPath(root, race);
 
@@ -85,14 +85,46 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 return parsedFile;
             }
-            await ExtractAndParseSkel(file);
+            await ExtractAndParseSkel(file, tx);
             return parsedFile;
 
+        }
+
+
+        public static async Task<List<SkeletonData>> GetBones(XivDependencyRootInfo root, XivRace race, ModTransaction tx = null)
+        {
+            var baseSkeletonPath = await Sklb.GetBaseSkeletonFile(root, race, tx);
+            var skeletonData = File.ReadAllLines(baseSkeletonPath);
+
+            var list = new List<SkeletonData>();
+            foreach (var b in skeletonData)
+            {
+                if (b == "") continue;
+                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                list.Add(j);
+            }
+            return list;
+        }
+
+        public static List<SkeletonData> GetParents(SkeletonData bone, List<SkeletonData> fullSkel)
+        {
+            var list = new List<SkeletonData>();
+            var parent = fullSkel.FirstOrDefault(x => x.BoneNumber == bone.BoneParent);
+            while(parent != null)
+            {
+                list.Add(parent);
+                bone = parent;
+                parent = fullSkel.FirstOrDefault(x => x.BoneNumber == bone.BoneParent);
+            }
+            return list;
         }
 
         /// <summary>
         /// Retrieves the Ex skeleton file for a given model file, parsing it from the base
         /// game files to generate it, if necessary.
+        /// 
+        /// NOTE: NOT Transaction safe... If the base EST skeletons were modified during transaction?
+        /// This is niche enough to leave for the moment and come back to if it proves an issue.
         /// </summary>
         /// <param name="fullMdlPath"></param>
         /// <returns></returns>
@@ -111,7 +143,7 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
-        public static async Task<string> GetExtraSkeletonFile(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
+        public static async Task<string> GetExtraSkeletonFile(XivDependencyRootInfo root, XivRace race = XivRace.All_Races, ModTransaction tx = null)
         {
             if(root.SecondaryType == XivItemType.ear)
             {
@@ -146,7 +178,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // In some cases, the extra skeleton doesn't actually exist, despite the 
                 // game files saying it should.  In these cases, SE actually intends to 
                 // default to the base skel.
-                await ExtractAndParseSkel(file);
+                await ExtractAndParseSkel(file, tx);
             }
             catch
             {
@@ -162,17 +194,16 @@ namespace xivModdingFramework.Models.FileTypes
             return input.Any(c => c > MaxAnsiCode);
         }
 
-        private static async Task ExtractAndParseSkel(string file)
+        private static async Task ExtractAndParseSkel(string file, ModTransaction tx = null)
         {
-
-            var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
-            var parsedFile = Path.Combine(cwd, SkeletonsFolder, skelName + ".skel");
+            //var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
+            //var parsedFile = Path.Combine(cwd, SkeletonsFolder, skelName + ".skel");
 
             // Create skel folder if needed.
             Directory.CreateDirectory(Path.Combine(cwd, SkeletonsFolder));
 
-            var rawFile = await ExtractSkelb(file);
+            var rawFile = await ExtractSkelb(file, tx);
 
             var xmlFile = await ConvertSkelToXml(rawFile);
 
@@ -217,8 +248,8 @@ namespace xivModdingFramework.Models.FileTypes
 
                     // Unicode path and we don't have AssetCC2.
                     // Check if a temp path has unicode in it.
-                    var tempFileXml = Path.GetTempFileName();
-                    var tempFileRaw = Path.GetTempFileName();
+                    var tempFileXml = IOUtil.GetFrameworkTempFile();
+                    var tempFileRaw = IOUtil.GetFrameworkTempFile();
 
                     if (!ContainsUnicodeCharacter(tempFileXml) && !ContainsUnicodeCharacter(tempFileRaw))
                     {
@@ -374,20 +405,20 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="fullMdlPath">Full path to the MDL.</param>
         /// <param name="internalSkelName">Internal skeleton name (for hair).  This can be resolved if missing, though it is slightly expensive to do so.</param>
-        private static async Task<string> ExtractSkelb(string skelBPath)
+        private static async Task<string> ExtractSkelb(string skelBPath, ModTransaction tx = null)
         {
-            var index = new Index(XivCache.GameInfo.GameDirectory);
-            var dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var dataFile = IOUtil.GetDataFileFromPath(skelBPath);
-
-            var offset = await index.GetDataOffset(skelBPath);
-
-            if (offset == 0)
+            if (tx == null)
             {
-                throw new Exception($"Could not find offset for {skelBPath}");
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
-            var sklbData = await dat.GetType2Data(offset, dataFile);
+            if (!await tx.FileExists(skelBPath))
+            {
+                throw new FileNotFoundException($"Could not find offset for {skelBPath}");
+            }
+
+            var sklbData = await tx.ReadFile(skelBPath);
 
             using (var br = new BinaryReader(new MemoryStream(sklbData)))
             {
@@ -439,8 +470,21 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="xmlFile">The location of the skeleton file</param>
         private static void ParseSkeleton(string xmlFile)
         {
-            var skelData = new SkeletonData();
+
             var jsonBones = new List<string>();
+            var bones = ParseBones(xmlFile);
+
+            foreach(var bone in bones)
+            {
+                jsonBones.Add(JsonConvert.SerializeObject(bone));
+            }
+
+            File.WriteAllLines(Path.ChangeExtension(xmlFile, ".skel"), jsonBones.ToArray());
+        }
+
+        private static List<SkeletonData> ParseBones(string xmlFile)
+        {
+            var bones = new List<SkeletonData>();
 
             var parentIndices = new List<int>();
             var boneNames = new List<string>();
@@ -465,7 +509,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                     if (!name.Equals("bones")) continue;
 
-                
+
                     boneCount = int.Parse(reader["numelements"]);
 
                     while (reader.Read())
@@ -527,6 +571,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             for (var i = 0; i < boneCount; i++)
             {
+                var skelData = new SkeletonData();
                 skelData.BoneNumber = i;
                 skelData.BoneName = boneNames[i];
                 skelData.BoneParent = parentIndices[i];
@@ -584,15 +629,12 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 skelData.InversePoseMatrix = iposeMatrix.ToArray();
-
-                jsonBones.Add(JsonConvert.SerializeObject(skelData));
+                bones.Add(skelData);
             }
 
+            return bones;
 
-
-            File.WriteAllLines(Path.ChangeExtension(xmlFile, ".skel"), jsonBones.ToArray());
         }
-
         private static bool IsWeapon(string fullMdlPath)
         {
             return fullMdlPath.Contains("chara/weapon/");

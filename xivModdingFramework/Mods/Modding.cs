@@ -15,12 +15,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using Newtonsoft.Json;
+using SharpDX.Direct3D11;
+using SharpDX.IO;
 using SharpDX.Text;
 using SharpDX.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -38,7 +41,7 @@ using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
-
+using static xivModdingFramework.Cache.FrameworkExceptions;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Mods
@@ -46,827 +49,744 @@ namespace xivModdingFramework.Mods
     /// <summary>
     /// This class contains the methods that deal with the .modlist file
     /// </summary>
-    public class Modding
+    public static class Modding
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly Version _modlistVersion = new Version(1, 0);
+        #region Constants and Private Vars
+
+        private static readonly Version _modlistVersion = new Version(2, 0);
         private static SemaphoreSlim _modlistSemaphore = new SemaphoreSlim(1);
 
-        public DirectoryInfo ModListDirectory { get; }
+        internal static string ModListDirectory
+        {
+            get
+            {
+                return Path.Combine(XivCache.GameInfo.GameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath);
+            }
+        }
+
+        private static ModList _CachedModList;
+        private static DateTime _ModListLastModifiedTime;
+
+        #endregion
+
+        #region Modlist Accessors
+
+        static Modding()
+        {
+            // Create modlist if we don't already have one.
+            CreateModlist();
+        }
 
         /// <summary>
-        /// Sets the modlist with a provided name
+        /// Creates a blank ModList file if one does not already exist.
         /// </summary>
-        /// <param name="modlistDirectory">The directory in which to place the Modlist</param>
-        /// <param name="modListName">The name to give the modlist file</param>
-        public Modding(DirectoryInfo gameDirectory)
+        internal static void CreateModlist()
         {
-            _gameDirectory = gameDirectory;
-            ModListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-
-        }
-
-        public ModList GetModList()
-        {
-            ModList val = null;
-            _modlistSemaphore.Wait();
-            try
+            if (File.Exists(ModListDirectory))
             {
-                var modlistText = File.ReadAllText(ModListDirectory.FullName);
-                val = JsonConvert.DeserializeObject<ModList>(modlistText);
-            }
-            finally
-            {
-                _modlistSemaphore.Release();
-            }
-
-            if(val == null)
-            {
-                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
+                // Try to parse it.
+                try
+                {
+                    var modlistText = File.ReadAllText(ModListDirectory);
+                    var res = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    if (res != null)
+                    {
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Broken.  Regenerate modlist.
+                }
             }
 
-            return val;
-        }
-        public async Task<ModList> GetModListAsync()
-        {
-            ModList val = null;
-            await _modlistSemaphore.WaitAsync();
-            try
+            var modList = new ModList(true)
             {
-                var modlistText = File.ReadAllText(ModListDirectory.FullName);
-                val = JsonConvert.DeserializeObject<ModList>(modlistText);
-            }
-            finally
-            {
-                _modlistSemaphore.Release();
-            }
-
-            if (val == null)
-            {
-                throw new InvalidOperationException("GetModlist returned NULL Mod List.");
-            }
-
-            return val;
-        }
-
-        public void SaveModList(ModList ml)
-        {
-            _modlistSemaphore.Wait();
-            try
-            {
-                File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
-            }
-            finally
-            {
-                _modlistSemaphore.Release();
-            }
-        }
-        public async Task SaveModListAsync(ModList ml)
-        {
-            await _modlistSemaphore.WaitAsync();
-            try
-            {
-                File.WriteAllText(ModListDirectory.FullName, JsonConvert.SerializeObject(ml, Formatting.Indented));
-            }
-            finally
-            {
-                _modlistSemaphore.Release();
-            }
-        }
-
-        public async Task DeleteAllFilesAddedByTexTools()
-        {
-            var modList = GetModList();
-            var modsToRemove = modList.Mods.Where(x => x.data.modOffset == x.data.originalOffset);
-
-            // Delete user files first.
-            foreach(var mod in modsToRemove)
-            {
-                if (mod.IsInternal()) continue;
-                await DeleteMod(mod.fullPath);
-            }
-
-            // Then delete system files.
-            foreach (var mod in modsToRemove)
-            {
-                if (mod.IsInternal()) continue;
-                await DeleteMod(mod.fullPath, true);
-            }
-        }
-        /// <summary>
-        /// Creates the Mod List that is used to keep track of mods.
-        /// </summary>
-        public void CreateModlist()
-        {
-            if (File.Exists(ModListDirectory.FullName))
-            {
-                return;
-            }
-
-            var modList = new ModList
-            {
-                version = _modlistVersion.ToString(),
-                ModPacks = new List<ModPack>(),
-                Mods = new List<Mod>()
+                Version = _modlistVersion.ToString(),
             };
 
-            SaveModList(modList);
+            File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(modList, Formatting.Indented));
         }
 
         /// <summary>
-        /// Tries to get the mod entry for the given internal file path, return null otherwise
+        /// Retrieve the base modlist file.
+        /// Should not be called directly unless you really know what you're doing.
+        /// 
         /// </summary>
-        /// <param name="internalFilePath">The internal file path to find</param>
-        /// <returns>The mod entry if found, null otherwise</returns>
-        public Task<Mod> TryGetModEntry(string internalFilePath)
+        /// <param name="writeEnabled"></param>
+        /// <returns></returns>
+        /// <exception cref="FileNotFoundException"></exception>
+
+        internal static async Task<ModList> INTERNAL_GetModList(bool writeEnabled)
         {
+            await _modlistSemaphore.WaitAsync();
             try
             {
-                if (String.IsNullOrWhiteSpace(internalFilePath))
+                if (writeEnabled)
                 {
-                    return null;
+                    // Always get a clean file when doing write actions so it doesn't pollute our cached copy.
+                    var modlistText = File.ReadAllText(ModListDirectory);
+                    var modList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
+                    modList.RebuildModPackList();
+                    return modList;
                 }
-
-                return Task.Run(() =>
+                else
                 {
-                    internalFilePath = internalFilePath.Replace("\\", "/");
-
-                    var modList = GetModList();
-
-                    if (modList == null) return null;
-
-                    foreach (var modEntry in modList.Mods)
+                    var lastUpdatedTime = new FileInfo(ModListDirectory).LastWriteTimeUtc;
+                    if (_CachedModList == null || lastUpdatedTime > _ModListLastModifiedTime)
                     {
-                        if (modEntry.fullPath.Equals(internalFilePath))
-                        {
-                            return modEntry;
-                        }
+                        // First access or cache is stale.
+                        var modlistText = File.ReadAllText(ModListDirectory);
+                        _CachedModList = JsonConvert.DeserializeObject<TransactionModList>(modlistText);
+                        _ModListLastModifiedTime = lastUpdatedTime;
                     }
-
-                    return null;
-                });
-            } catch(Exception ex)
-            {
-                return null;
+                    _CachedModList.RebuildModPackList();
+                }
             }
+            catch(Exception ex)
+            {
+                throw new FileNotFoundException("Failedto find or parse modlist file.\n\n" + ex.Message);
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
+
+            return _CachedModList;
         }
 
         /// <summary>
-        /// Checks to see whether the mod is currently enabled
+        /// Save the base modlist file.  Should not be called unless you really know what you're doing.
+        /// </summary>
+        /// <param name="ml"></param>
+        internal static async Task INTERNAL_SaveModlist(ModList ml)
+        {
+            await _modlistSemaphore.WaitAsync();
+
+            try
+            {
+                File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            }
+            finally
+            {
+                _modlistSemaphore.Release();
+            }
+        }
+
+
+        #endregion
+
+        #region Mod State Getters 
+
+        /// <summary>
+        /// Retrieves the current mod state of a file.
+        /// Mostly a useful wrapper for when you don't know if the mod exists or not.
         /// </summary>
         /// <param name="internalPath">The internal path of the file</param>
-        /// <param name="dataFile">The data file to check in</param>
-        /// <param name="indexCheck">Flag to determine whether to check the index file or just the modlist</param>
         /// <returns></returns>
-        public async Task<XivModStatus> IsModEnabled(string internalPath, bool indexCheck)
+        public static async Task<EModState> GetModState(string internalPath, ModTransaction tx = null)
         {
-            if (!File.Exists(ModListDirectory.FullName))
+            if(tx == null)
             {
-                return XivModStatus.Original;
+                // Read only TX so we can be lazy about manually disposing it.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+            var modList = await tx.GetModList();
+
+            var nmod = modList.GetMod(internalPath);
+            if (nmod == null)
+            {
+                return EModState.UnModded;
+            }
+            var mod = nmod.Value;
+
+            var originalOffset = mod.OriginalOffset8x;
+            var moddedOffset = mod.ModOffset8x;
+            var offset = await tx.Get8xDataOffset(internalPath);
+
+            if (offset.Equals(originalOffset))
+            {
+                return EModState.Disabled;
             }
 
-            if (indexCheck)
+            if (offset.Equals(moddedOffset))
             {
-                var index = new Index(_gameDirectory);
-
-                var modEntry = await TryGetModEntry(internalPath);
-
-                if (modEntry == null)
-                {
-                    return XivModStatus.Original;
-                }
-
-                var originalOffset = modEntry.data.originalOffset;
-                var moddedOffset = modEntry.data.modOffset;
-
-                var offset = await index.GetDataOffset(
-                    HashGenerator.GetHash(Path.GetDirectoryName(internalPath).Replace("\\", "/")),
-                    HashGenerator.GetHash(Path.GetFileName(internalPath)),
-                    XivDataFiles.GetXivDataFile(modEntry.datFile));
-
-                if (offset.Equals(originalOffset))
-                {
-                    return XivModStatus.Disabled;
-                }
-
-                if (offset.Equals(moddedOffset))
-                {
-                    return XivModStatus.Enabled;
-                }
-
-                throw new Exception("Offset in Index does not match either original or modded offset in modlist.");
+                return EModState.Enabled;
             }
-            else
-            {
-                var modEntry = await TryGetModEntry(internalPath);
 
-                if (modEntry == null)
-                {
-                    return XivModStatus.Original;
-                }
-
-                return modEntry.enabled ? XivModStatus.Enabled : XivModStatus.Disabled;
-            }
+            return EModState.Invalid;
         }
 
-        /// <summary>
-        /// Toggles the mod on or off
-        /// </summary>
-        /// <param name="internalFilePath">The internal file path of the mod</param>
-        /// <param name="enable">The status of the mod</param>
-        public async Task<bool> ToggleModStatus(string internalFilePath, bool enable)
-        {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
+        #endregion
 
-            var index = new Index(_gameDirectory);
-
-            if (string.IsNullOrEmpty(internalFilePath))
-            {
-                throw new Exception("File Path missing, unable to toggle mod.");
-            }
-            var modList = GetModList();
-
-            var modEntry = modList.Mods.FirstOrDefault(x => x.fullPath == internalFilePath);
-
-            var result = await ToggleModUnsafe(enable, modEntry, false, true);
-            if(!result)
-            {
-                return result;
-            }
-
-            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-
-
-            SaveModList(modList);
-
-            return result;
-        }
+        #region Mod State Setters
 
         /// <summary>
-        /// Toggles the mod on or off
-        /// </summary>
-        /// <param name="internalFilePath">The internal file path of the mod</param>
-        /// <param name="enable">The status of the mod</param>
-        public async Task ToggleModPackStatus(string modPackName, bool enable)
-        {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
-            var index = new Index(_gameDirectory);
-
-            var modList = GetModList();
-            var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
-            List<Mod> mods = null;
-
-            if (modPackName.Equals("Standalone (Non-ModPack)"))
-            {
-                mods = (from mod in modList.Mods
-                        where mod.modPack == null
-                        select mod).ToList();
-            }
-            else
-            {
-                mods = (from mod in modList.Mods
-                        where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                        select mod).ToList();
-            }
-
-
-            if (mods == null)
-            {
-                throw new Exception("Unable to find mods with given Mod Pack Name in modlist.");
-            }
-
-            await ToggleMods(enable, mods.Select(x => x.fullPath));
-        }
-
-        /// <summary>
-        /// Performs the most low-level mod enable/disable functions, without saving the modlist,
-        /// ergo this should only be called by functions which will handle saving the modlist after
-        /// they're done performing all modlist operations.
-        /// 
-        /// If the Index and modlist are provided, the actions are only applied to those cached entries, rather
-        /// than to the live files.
+        /// Performs a standard state change for the mod at a given path.
+        /// Returns true if the value was actually changed.
         /// </summary>
         /// <param name="enable"></param>
         /// <param name="mod"></param>
         /// <returns></returns>
-        public async Task<bool> ToggleModUnsafe(bool enable, Mod mod, bool includeInternal, bool updateCache, IndexFile cachedIndex = null, ModList cachedModlist = null)
+        public static async Task<bool> SetModState(EModState state, Mod mod, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
+            return await SetModState(state, mod.FilePath, tx);
+        }
+
+        /// <summary>
+        /// Performs a standard state change for the mod at a given path.
+        /// Returns true if the value was actually changed.
+        /// </summary>
+        /// <param name="enable"></param>
+        /// <param name="mod"></param>
+        /// <returns></returns>
+        public static async Task<bool> SetModState(EModState state, string path, ModTransaction tx = null)
+        {
+            return await INTERNAL_SetModState(state, path, false, tx);
+        }
+
+        /// <summary>
+        /// Performs a standard state change for the mod at a given path.
+        /// Returns true if the value was actually changed.
+        /// </summary>
+        /// <param name="enable"></param>
+        /// <param name="mod"></param>
+        /// <returns></returns>
+        private static async Task<bool> INTERNAL_SetModState(EModState state, string path, bool allowInternal = false, ModTransaction tx = null)
+        {
+            if(state == EModState.Invalid)
             {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+                throw new Exception("Cannot intentionally set Mod State to Invalid.");
             }
 
-            if (mod == null) return false;
-            if (string.IsNullOrEmpty(mod.name)) return false;
-            if (string.IsNullOrEmpty(mod.fullPath)) return false;
-
-            if (mod.data.originalOffset <= 0 && !enable)
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
+            try
             {
-                throw new Exception("Cannot disable mod with invalid original offset.");
-            }
+                var nMod = await tx.GetMod(path);
+                if (nMod == null)
+                {
+                    if(state != EModState.UnModded)
+                    {
+                        throw new Exception("Cannot change state for non-existent mod.");
+                    }
 
-            if (enable && mod.data.modOffset <= 0)
-            {
-                throw new Exception("Cannot enable mod with invalid mod offset.");
-            }
+                    // No change.
+                    return false;
+                }
+                var mod = nMod.Value;
+                var curState = await mod.GetState(tx);
+
+                if (state == curState)
+                {
+                    await boiler.Cancel(true);
+                    return false;
+                }
+
+                if (mod.OriginalOffset8x < 0 && state == EModState.Disabled)
+                {
+                    throw new Exception("Cannot disable mod with invalid original offset.");
+                }
+
+                if (state == EModState.Enabled && mod.ModOffset8x < 0)
+                {
+                    throw new Exception("Cannot enable mod with invalid mod offset.");
+                }
             
-            if(mod.IsInternal() && !includeInternal)
-            {
-                // Don't allow toggling internal mods unless we were specifically told to.
-                return false;
-            }
-
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
-
-            // Added file.
-            if (enable)
-            {
-                if (cachedIndex != null)
+                if(mod.IsInternal() && !allowInternal)
                 {
-                    cachedIndex.SetDataOffset(mod.fullPath, mod.data.modOffset);
+                    // Don't allow toggling internal mods unless we were specifically told to.
+                    await boiler.Cancel(true);
+                    return false;
                 }
-                else
-                {
-                    await index.UpdateDataOffset(mod.data.modOffset, mod.fullPath, false);
-                }
-                mod.enabled = true;
 
-                if (cachedIndex == null)
+                var df = IOUtil.GetDataFileFromPath(mod.FilePath);
+
+
+                var modList = await tx.GetModList();
+                var index = await tx.GetIndexFile(df);
+
+                tx.ModPack = mod.GetModPack(modList);
+
+                if (state == EModState.Enabled)
                 {
-                    // Check if we're re-enabling a metadata mod.
-                    var ext = Path.GetExtension(mod.fullPath);
+                    // Enabling Mod
+                    index.Set8xDataOffset(mod.FilePath, mod.ModOffset8x);
+                    var ext = Path.GetExtension(mod.FilePath);
                     if (ext == ".meta")
                     {
-                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
-                        // Retreive the uncompressed meta entry we just enabled.
-                        var data = await dat.GetType2Data(mod.data.modOffset, df);
-                        var meta = await ItemMetadata.Deserialize(data);
-
-                        meta.Validate(mod.fullPath);
-
-                        // And write that metadata to the actual constituent files.
-                        await ItemMetadata.ApplyMetadata(meta, cachedIndex, cachedModlist);
-                    } else if(ext == ".rgsp")
+                        await ItemMetadata.ApplyMetadata(mod.FilePath, false, tx);
+                    }
+                    else if (ext == ".rgsp")
                     {
-                        await CMP.ApplyRgspFile(mod.fullPath, cachedIndex, cachedModlist);
+                        await CMP.ApplyRgspFile(mod.FilePath, false, tx);
                     }
                 }
-            }
-            else if (!enable)
-            {
-                if (mod.IsCustomFile())
+                else if (state == EModState.Disabled)
                 {
-                    // Delete file descriptor handles removing metadata as needed on its own.
-                    if (cachedIndex != null)
+                    // Disabling mod.
+                    index.Set8xDataOffset(mod.FilePath, mod.OriginalOffset8x);
+
+                    // Restore original metadata.
+                    if (mod.FilePath.EndsWith(".meta"))
                     {
-                        cachedIndex.SetDataOffset(mod.fullPath, 0);
+                        var root = await XivCache.GetFirstRoot(mod.FilePath);
+                        await ItemMetadata.RestoreDefaultMetadata(root, tx);
                     }
-                    else
+
+                    if (mod.FilePath.EndsWith(".rgsp"))
                     {
-                        await index.DeleteFileDescriptor(mod.fullPath, IOUtil.GetDataFileFromPath(mod.fullPath), false);
+                        await CMP.RestoreDefaultScaling(mod.FilePath, tx);
                     }
-                } else
+                } else if(state == EModState.UnModded)
                 {
-                    if (cachedIndex != null)
-                    {
-                        cachedIndex.SetDataOffset(mod.fullPath, mod.data.originalOffset);
-                    }
-                    else
-                    {
-                        await index.UpdateDataOffset(mod.data.originalOffset, mod.fullPath, false);
-                    }
+                    await INTERNAL_DeleteMod(path, allowInternal, tx);
                 }
-                mod.enabled = false;
+
+                XivCache.QueueDependencyUpdate(path);
+                await boiler.Commit();
+            }
+            catch(Exception ex)
+            {
+                await boiler.Catch();
+                throw;
             }
 
-            if (updateCache)
-            {
-                XivCache.QueueDependencyUpdate(mod.fullPath);
-            }
 
             return true;
         }
 
         /// <summary>
-        /// Toggles all mods on or off
+        /// Deletes a mod from the modlist, if it exists.
         /// </summary>
-        /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
-        public async Task ToggleAllMods(bool enable, IProgress<(int current, int total, string message)> progress = null)
+        public static async Task DeleteMod(Mod mod, ModTransaction tx = null)
         {
-            if(XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
-            }
-            var modList = await GetModListAsync();
-            await ToggleMods(enable, modList.Mods.Select(x => x.fullPath), progress);
+            await INTERNAL_DeleteMod(mod.FilePath, false, tx);
         }
 
-        public async Task ToggleMods(bool enable, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null)
+        /// <summary>
+        /// Deletes a mod from the modlist, if it exists.
+        /// </summary>
+        public static async Task DeleteMod(string path, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
+            await INTERNAL_DeleteMod(path, false, tx);
+        }
+
+        /// <summary>
+        /// Deletes a mod from the modlist, if it exists.
+        /// </summary>
+        private static async Task INTERNAL_DeleteMod(string path, bool allowInternal = false, ModTransaction tx = null)
+        {
+            if (string.IsNullOrWhiteSpace(path))
             {
-                throw new Exception("TexTools mods cannot be toggled in Lumina mode.");
+                throw new ArgumentException("Deleted Mod Path cannot be blank.");
             }
 
-            var _index = new Index(_gameDirectory);
-
-            var modList = await GetModListAsync();
-
-            if (modList == null || modList.Mods.Count == 0) return;
-
-            // Convert to hash set for speed when matching so we're not doing an O(n^2) check.
-            var files = new HashSet<string>();
-            foreach(var f in filePaths)
-            {
-                files.Add(f);
-            }
-
-            Dictionary<XivDataFile, IndexFile> indexFiles = new Dictionary<XivDataFile, IndexFile>();
-
-            var modNum = 0;
-            var mods = modList.Mods.Where(x => files.Contains(x.fullPath) && !String.IsNullOrWhiteSpace(x.fullPath)).ToList();
-
-            if (mods.Count == 0) return;
-
-            // If we're disabling all of our standard files, then this is a full toggle.
-            var fullToggle = mods.Count >= modList.Mods.Count(x => !String.IsNullOrWhiteSpace(x.fullPath) && !x.IsInternal());
-
-            // Pause cache worker
-            var workerState = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
-
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
-                foreach (var modEntry in mods)
+                var modList = await tx.GetModList();
+
+                var nmod = modList.GetMod(path);
+
+                // Mod doesn't exist in the modlist.
+                if (nmod == null) return;
+
+                var modToRemove = nmod.Value;
+
+                if (modToRemove.IsInternal() && !allowInternal)
                 {
-                    // Save disabling these for last.
-                    if (modEntry.IsInternal()) continue;
-
-                    var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
-                    if (!indexFiles.ContainsKey(df))
-                    {
-                        indexFiles.Add(df, await _index.GetIndexFile(df));
-                    }
-
-
-                    await ToggleModUnsafe(enable, modEntry, false, false, indexFiles[df], modList);
-                    progress?.Report((++modNum, modList.Mods.Count, string.Empty));
+                    throw new Exception("Cannot delete internal data without explicit toggle.");
                 }
 
-                if (fullToggle && !enable)
+                if(!Dat.IsOffsetSane(nmod.Value.DataFile, nmod.Value.OriginalOffset8x, true))
                 {
-                    // If we're doing a full mod toggle, we should purge our internal files as well.
-                    var internalEntries = modList.Mods.Where(x => x.IsInternal()).ToList();
-                    foreach (var modEntry in internalEntries)
-                    {
-                        var df = IOUtil.GetDataFileFromPath(modEntry.fullPath);
-                        await ToggleModUnsafe(enable, modEntry, true, false, indexFiles[df], modList);
-                        modList.Mods.Remove(modEntry);
-                    }
-                }
-                else if(enable)
-                {
-                    progress?.Report((0, 0, "Expanding Metadata Entries..."));
-
-                    // Batch and group apply the metadata entries.
-                    var metadataEntries = mods.Where(x => x.fullPath.EndsWith(".meta")).ToList();
-                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-                    Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
-                    foreach (var mod in metadataEntries)
-                    {
-                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
-                        var data = await _dat.GetType2Data(mod.data.modOffset, df);
-                        var meta = await ItemMetadata.Deserialize(data);
-
-                        meta.Validate(mod.fullPath);
-
-                        if (!metadata.ContainsKey(df))
-                        {
-                            metadata.Add(df, new List<ItemMetadata>());
-                        }
-                        metadata[df].Add(meta);
-                    }
-
-                    foreach (var dkv in metadata)
-                    {
-                        var df = dkv.Key;
-                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
-                    }
-
-                    var rgspEntries = mods.Where(x => x.fullPath.EndsWith(".rgsp")).ToList();
-                    foreach (var mod in rgspEntries)
-                    {
-                        await CMP.ApplyRgspFile(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
-                    }
-                } else
-                {
-                    progress?.Report((0, 0, "Restoring Metadata Entries..."));
-                    var metadataEntries = mods.Where(x => x.fullPath.EndsWith(".meta")).ToList();
-                    var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-
-                    Dictionary<XivDataFile, List<ItemMetadata>> metadata = new Dictionary<XivDataFile, List<ItemMetadata>>();
-                    foreach (var mod in metadataEntries)
-                    {
-                        var root = await XivCache.GetFirstRoot(mod.fullPath);
-                        var df = IOUtil.GetDataFileFromPath(mod.fullPath);
-                        var meta = await ItemMetadata.GetMetadata(root, true);
-                        if (!metadata.ContainsKey(df))
-                        {
-                            metadata.Add(df, new List<ItemMetadata>());
-                        }
-                        metadata[df].Add(meta);
-                    }
-
-                    foreach (var dkv in metadata)
-                    {
-                        var df = dkv.Key;
-                        await ItemMetadata.ApplyMetadataBatched(dkv.Value, indexFiles[df], modList);
-                    }
-
-                    var rgspEntries = mods.Where(x => x.fullPath.EndsWith(".rgsp")).ToList();
-                    foreach (var mod in rgspEntries)
-                    {
-                        await CMP.RestoreDefaultScaling(mod.fullPath, indexFiles[XivDataFile._04_Chara], modList);
-                    }
-
+                    throw new OffsetException("Mod does not have a valid original offset, cannot safely delete mod.");
                 }
 
-                foreach (var kv in indexFiles)
-                {
-                    await _index.SaveIndexFile(kv.Value);
-                }
+                await INTERNAL_SetModState(EModState.Disabled, path, allowInternal, tx);
+                modList.RemoveMod(modToRemove);
 
-                SaveModList(modList);
-
-                // Do these as a batch query at the end.
-                progress?.Report((++modNum, modList.Mods.Count, "Adding modified files to Cache Queue..."));
-                var allPaths = mods.Select(x => x.fullPath).ToList();
-                XivCache.QueueDependencyUpdate(allPaths);
-            } finally
-            {
-                XivCache.CacheWorkerEnabled = workerState;
+                await boiler.Commit();
             }
-
-
+            catch
+            {
+                await boiler.Catch();
+                throw;
+            }
         }
 
         /// <summary>
-        /// Purges any invalid empty mod blocks from the modlist.
+        /// Sets a given Modpack's state.
         /// </summary>
+        /// <param name="state"></param>
+        /// <param name="modPack"></param>
+        /// <param name="tx"></param>
         /// <returns></returns>
-        public async Task<int> PurgeInvalidEmptyBlocks()
+        public static async Task SetModpackState(EModState state, ModPack modPack, ModTransaction tx = null)
         {
-            int removed = 0;
-            var modList = await GetModListAsync();
-            var emptyBlocks = modList.Mods.Where(x => x.name == string.Empty);
-            var toRemove = emptyBlocks.Where(x => x.data.modOffset <= 0).ToList();
-
-            foreach(var block in toRemove)
-            {
-                modList.Mods.Remove(block);
-                removed++;
-            }
-
-            if (removed > 0)
-            {
-                SaveModList(modList);
-            }
-            return removed;
-        } 
+            await SetModpackState(state, modPack.Name, tx);
+        }
 
         /// <summary>
-        /// Deletes a mod from the modlist
+        /// Sets a given Modpack's state, if it exists.
         /// </summary>
-        /// <param name="modItemPath">The mod item path of the mod to delete</param>
-        public async Task DeleteMod(string modItemPath, bool allowInternal = false, IndexFile index = null, ModList modList = null)
+        /// <param name="state"></param>
+        /// <param name="modPack"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task SetModpackState(EModState state, string modPackName, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
+
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
+            try
             {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+                var ml = await tx.GetModList();
+                var mp = ml.GetModPack(modPackName);
+                if(mp == null)
+                {
+                    return;
+                }
+
+                var pack = mp.Value;
+                var mods = pack.Mods;
+
+                foreach(var mod in mods)
+                {
+                    await SetModState(state, mod, tx);
+                }
+
+                if(state == EModState.UnModded)
+                {
+                    ml.RemoveModpack(pack);
+                }
+
+                await boiler.Commit();
+            }
+            catch
+            {
+                await boiler.Catch();
+                throw;
             }
 
-            var doSave = false;
-            var _index = new Index(_gameDirectory);
-            if (modList == null)
-            {
-                doSave = true;
-                modList = GetModList();
-                index = await _index.GetIndexFile(IOUtil.GetDataFileFromPath(modItemPath));
-            }
-
-            var modToRemove = (from mod in modList.Mods
-                where mod.fullPath.Equals(modItemPath)
-                select mod).FirstOrDefault();
-
-            // Mod doesn't exist in the modlist.
-            if (modToRemove == null) return;
-
-            if(modToRemove.IsInternal() && !allowInternal)
-            {
-                throw new Exception("Cannot delete internal data without explicit toggle.");
-            }
-
-            await ToggleModUnsafe(false, modToRemove, allowInternal, true, index, modList);
-
-
-            // This is a metadata entry being deleted, we'll need to restore the metadata entries back to default.
-            if (modToRemove.fullPath.EndsWith(".meta"))
-            {
-                var root = await XivCache.GetFirstRoot(modToRemove.fullPath);
-                await ItemMetadata.RestoreDefaultMetadata(root, index, modList);
-            }
-
-            if (modToRemove.fullPath.EndsWith(".rgsp"))
-            {
-                await CMP.RestoreDefaultScaling(modToRemove.fullPath, index, modList);
-            }
-
-            modList.Mods.Remove(modToRemove);
-
-            if (doSave)
-            {
-                await _index.SaveIndexFile(index);
-                await SaveModListAsync(modList);
-            }
         }
 
         /// <summary>
         /// Deletes a Mod Pack and all its mods from the modlist
         /// </summary>
         /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
-        public async Task DeleteModPack(string modPackName)
+        public static async Task DeleteModPack(ModPack modPack, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
+            await DeleteModPack(modPack.Name, tx);
+        }
 
-            var modList = GetModList();
-
-            var modPackItem = (from modPack in modList.ModPacks
-                where modPack.name.Equals(modPackName)
-                select modPack).FirstOrDefault();
-
-            // Modpack doesn't exist in the modlist.
-            if (modPackItem == null) return;
-
-            modList.ModPacks.Remove(modPackItem);
-
-            var modsToRemove = (from mod in modList.Mods
-                                where mod.modPack != null && mod.modPack.name.Equals(modPackName)
-                                select mod).ToList();
-
-            var modRemoveCount = modsToRemove.Count;
-
-            // Disable all the mods.
-            await ToggleMods(false, modsToRemove.Select(x => x.fullPath));
-
-            // Then remove them from the modlist.
-            foreach(var mod in modsToRemove)
-            {
-                modList.Mods.Remove(mod);
-            }
-
-            SaveModList(modList);
+        /// <summary>
+        /// Deletes a Mod Pack and all its mods from the modlist
+        /// </summary>
+        /// <param name="modPackName">The name of the Mod Pack to be deleted</param>
+        public static async Task DeleteModPack(string modPackName, ModTransaction tx = null)
+        {
+            await SetModpackState(EModState.UnModded, modPackName, tx);
         }
 
 
         /// <summary>
-        /// Cleans up the Modlist file, performing the following operations.
-        /// 
-        /// 1.  Fix up the Item Names and Categories of all mods to be consistent.
-        /// 2.  Remove all empty mod slots.
-        /// 
+        /// Set the state of all mods.
+        /// </summary>
+        /// <param name="enable">The status to switch the mods to True if enable False if disable</param>
+        public static async Task SetAllModStates(EModState state, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        {
+            if(state == EModState.Invalid)
+            {
+                // This would error down chain anyways, but we can catch it early for some perf.
+                throw new Exception("Cannot intentionally set Invalid Mod State.");
+            }
+
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
+            try
+            {
+                var modList = await tx.GetModList();
+                var toRemove = modList.Mods.Where(x => !x.Value.IsInternal()).Select(x => x.Value.FilePath);
+                await SetModStates(state, toRemove, progress, tx);
+
+                toRemove = modList.Mods.Where(x => x.Value.IsInternal()).Select(x => x.Value.FilePath);
+
+                // If we're clearing or disabling everything, delete all our internal files.
+                // This both helps reduce IMC bloat and helps ensure clean states are actually /clean/
+                if(state == EModState.UnModded || state == EModState.Disabled)
+                {
+                    foreach (var mod in toRemove) {
+                        await INTERNAL_DeleteMod(mod, true, tx);
+                    }
+
+                }
+
+
+                await boiler.Commit();
+
+                if (boiler.OwnTx && (state == EModState.UnModded || state == EModState.Disabled))
+                {
+                    // This is a little cheatyface here, but if we just disabled everything, we can do a
+                    // soft 'start over' and adjust the index counts back so our final indexes are bytewise identical to originals.
+                    Index.UNSAFE_ResetAllIndexDatCounts();
+                }
+            }
+            catch
+            {
+                await boiler.Catch();
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Set the states of a given subset of mods.
+        /// </summary>
+        /// <param name="state"></param>
+        /// <param name="filePaths"></param>
+        /// <param name="progress"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task SetModStates(EModState state, IEnumerable<string> filePaths, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        {
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
+            try
+            {
+                var total = 0;
+                if (progress != null)
+                {
+                    // Only enumerate here if it actually matters.
+                    total = filePaths.Count();
+                }
+
+                var verb = "Enabling";
+                switch (state)
+                {
+                    case EModState.Enabled:
+                        verb = "Enabling ";
+                        break;
+                    case EModState.Disabled:
+                        verb = "Disabling ";
+                        break;
+                    case EModState.UnModded:
+                        verb = "Deleting ";
+                        break;
+                }
+
+                var count = 0;
+                foreach (var file in filePaths)
+                {
+                    await SetModState(state, file, tx);
+
+                    progress?.Report((count, total, verb + " Mods..."));
+                    count++;
+                }
+
+                await boiler.Commit();
+            }
+            catch
+            {
+                await boiler.Catch();
+            }
+
+        }
+
+
+        /// <summary>
+        /// Determines if any mods, at all, are enabled currently.
+        /// </summary>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task<bool> AnyModsEnabled(ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+            var ml = await tx.GetModList();
+
+            var mods = ml.GetMods().ToList();
+            if (mods.Count == 0) return false;
+
+            foreach (var mod in mods)
+            {
+                var state = await mod.GetState(tx);
+                if (state == EModState.Enabled || state == EModState.Invalid)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
+        /// <summary>
+        /// Retrieves the list of enabled or invalid state mods.
+        /// </summary>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task<List<Mod>> GetActiveMods(ModTransaction tx = null)
+        {
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+            var ml = await tx.GetModList();
+            var mods = ml.GetMods().ToList();
+
+            var active = new List<Mod>();
+            foreach (var x in mods)
+            {
+                var state = await x.GetState(tx);
+                if (state == EModState.Enabled || state == EModState.Invalid)
+                {
+                    active.Add(x);
+                }
+            }
+            return active;
+        }
+
+        #endregion
+
+        #region One-Off Functions 
+
+        /// <summary>
+        /// Fixes the Item Names and Item Categories of all mods to be consistent.
         /// </summary>
         /// <returns></returns>
-        public async Task CleanUpModlist(IProgress<(int Current, int Total, string Message)> progressReporter = null)
+        public static async Task CleanUpModlistItems(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
         {
-            if (XivCache.GameInfo.UseLumina)
+            if (XivCache.GameWriteEnabled)
             {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
+                throw new Exception("Cannot alter game files while FFXIV file writing is disabled.");
             }
 
             progressReporter?.Report((0, 0, "Loading Modlist file..."));
-            var modlist = await GetModListAsync();
 
-            var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-
-            // IMC entries cache so we're not having to constantly re-load the IMC data.
-            Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
-
-            var totalMods = modlist.Mods.Count;
-
-
-            var count = 0;
-            List<Mod> toRemove = new List<Mod>();
-            foreach(var mod in modlist.Mods)
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
+            try
             {
-                progressReporter?.Report((count, totalMods, "Fixing up item names..."));
-                count++;
+                var modlist = await tx.GetModList();
 
-                if (String.IsNullOrWhiteSpace(mod.fullPath)) {
-                    toRemove.Add(mod);
-                    continue;
-                }
+                // IMC entries cache so we're not having to constantly re-load the IMC data.
+                Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache = new Dictionary<XivDependencyRoot, List<XivImc>>();
 
-                if (mod.IsInternal()) continue;
+                var totalMods = modlist.Mods.Count;
 
-                XivDependencyRoot root = null;
-                try
+
+                var count = 0;
+                var mods = modlist.GetMods();
+                var newMods = new List<Mod>();
+                foreach (var baseMod in mods)
                 {
-                    root = await XivCache.GetFirstRoot(mod.fullPath);
-                    if(root == null)
-                    {
-                        var cmpName = CMP.GetModFileNameFromRgspPath(mod.fullPath);
-                        if (cmpName != null)
-                        {
-                            mod.name = cmpName;
-                            mod.category = "Racial Scaling";
-                        }
-                        else if (mod.fullPath.StartsWith("ui/"))
-                        {
-                            mod.name = Path.GetFileName(mod.fullPath);
-                            mod.category = "UI";
-                        }
-                        else
-                        {
-                            mod.name = Path.GetFileName(mod.fullPath);
-                            mod.category = "Raw Files";
-                        }
-                        continue;
-                    }
+                    progressReporter?.Report((count, totalMods, "Fixing up item names..."));
+                    count++;
+                    var mod = baseMod;
 
-                    var ext = Path.GetExtension(mod.fullPath);
-                    IItem item = null;
-                    if (Imc.UsesImc(root) && ext == ".mtrl")
-                    {
-                        var data = await ResolveMtrlModInfo(_imc, mod.fullPath, root, ImcEntriesCache);
-                        mod.name = data.Name;
-                        mod.category = data.Category;
+                    if (mod.IsInternal()) continue;
 
-                    } else if(Imc.UsesImc(root) && ext == ".tex")
+                    XivDependencyRoot root = null;
+                    try
                     {
-                        // For textures, get the first material using them, and list them under that material's item.
-                        var parents = await XivCache.GetParentFiles(mod.fullPath);
-                        if(parents.Count == 0)
+                        root = await XivCache.GetFirstRoot(mod.FilePath);
+                        if (root == null)
                         {
-                            item = root.GetFirstItem();
-                            mod.name = item.GetModlistItemName();
-                            mod.category = item.GetModlistItemCategory();
+                            var cmpName = CMP.GetModFileNameFromRgspPath(mod.FilePath);
+                            if (cmpName != null)
+                            {
+                                mod.ItemName = cmpName;
+                                mod.ItemCategory = "Racial Scaling";
+                            }
+                            else if (mod.FilePath.StartsWith("ui/"))
+                            {
+                                mod.ItemName = Path.GetFileName(mod.FilePath);
+                                mod.ItemCategory = "UI";
+                            }
+                            else
+                            {
+                                mod.ItemName = Path.GetFileName(mod.FilePath);
+                                mod.ItemCategory = "Raw Files";
+                            }
+                            newMods.Add(mod);
                             continue;
                         }
 
-                        var parent = parents[0];
+                        var ext = Path.GetExtension(mod.FilePath);
+                        IItem item = null;
+                        if (Imc.UsesImc(root) && ext == ".mtrl")
+                        {
+                            var data = await ResolveMtrlModInfo(mod.FilePath, root, ImcEntriesCache, tx);
+                            mod.ItemName = data.Name;
+                            mod.ItemCategory = data.Category;
 
-                        var data = await ResolveMtrlModInfo(_imc, parent, root, ImcEntriesCache);
-                        mod.name = data.Name;
-                        mod.category = data.Category;
+                        }
+                        else if (Imc.UsesImc(root) && ext == ".tex")
+                        {
+                            // For textures, get the first material using them, and list them under that material's item.
+                            var parents = await XivCache.GetParentFiles(mod.FilePath, tx);
+                            if (parents.Count == 0)
+                            {
+                                item = root.GetFirstItem();
+                                mod.ItemName = item.GetModlistItemName();
+                                mod.ItemCategory = item.GetModlistItemCategory();
+                                continue;
+                            }
+
+                            var parent = parents[0];
+
+                            var data = await ResolveMtrlModInfo(parent, root, ImcEntriesCache, tx);
+                            mod.ItemName = data.Name;
+                            mod.ItemCategory = data.Category;
+                        }
+                        else
+                        {
+                            item = root.GetFirstItem();
+                            mod.ItemName = item.GetModlistItemName();
+                            mod.ItemCategory = item.GetModlistItemCategory();
+                            newMods.Add(mod);
+                            continue;
+                        }
                     }
-                    else
+                    catch
                     {
-                        item = root.GetFirstItem();
-                        mod.name = item.GetModlistItemName();
-                        mod.category = item.GetModlistItemCategory();
+                        mod.ItemName = Path.GetFileName(mod.FilePath);
+                        mod.ItemCategory = "Raw Files";
+                        newMods.Add(mod);
                         continue;
                     }
-                } catch
-                {
-                    mod.name = Path.GetFileName(mod.fullPath);
-                    mod.category = "Raw Files";
-                    continue;
                 }
+
+                modlist.AddOrUpdateMods(newMods);
+
+
+                if (boiler.OwnTx)
+                {
+                    progressReporter?.Report((0, 0, "Saving Modlist file..."));
+                }
+
+                await boiler.Commit();
             }
-
-
-            progressReporter?.Report((0,0, "Removing empty mod slots..."));
-
-            // Remove all empty mod frames.
-            foreach (var mod in toRemove)
+            catch
             {
-                modlist.Mods.Remove(mod);
+                await boiler.Cancel();
             }
-
-            progressReporter?.Report((0, 0, "Removing empty modpacks..."));
-
-            modlist.ModPacks.RemoveAll(modpack => {
-                var anyMods = modlist.Mods.Any(mod => mod.modPack != null && mod.modPack.name == modpack.name);
-                return !anyMods;
-            });
-
-            progressReporter?.Report((0, 0, "Saving Modlist file..."));
-
-            await SaveModListAsync(modlist);
         }
-        private async Task<(string Name, string Category)> ResolveMtrlModInfo(Imc _imc, string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache)
+
+        /// <summary>
+        /// Fluff function for resolving item name/category for MTRLs based on their material set folder.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <param name="root"></param>
+        /// <param name="ImcEntriesCache"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        private static async Task<(string Name, string Category)> ResolveMtrlModInfo(string path, XivDependencyRoot root, Dictionary<XivDependencyRoot, List<XivImc>> ImcEntriesCache, ModTransaction tx = null)
         {
             IItem item;
             var mSetRegex = new Regex("/v([0-9]{4})/");
@@ -881,13 +801,19 @@ namespace xivModdingFramework.Mods
                 }
                 else
                 {
-                    imcEntries = await _imc.GetEntries(await root.GetImcEntryPaths());
+                    if (tx == null)
+                    {
+                        // Read only TX if none supplied.
+                        tx = ModTransaction.BeginReadonlyTransaction();
+                    }
+
+                    imcEntries = await Imc.GetEntries(await root.GetImcEntryPaths(tx), false, tx);
                     ImcEntriesCache.Add(root, imcEntries);
                 }
                 var mSetId = Int32.Parse(match.Groups[1].Value);
 
                 // The list from this function is already sorted.
-                var allItems = await root.GetAllItems();
+                var allItems = await root.GetAllItems(-1, tx);
 
 
                 var variantItem = allItems.FirstOrDefault(x =>
@@ -910,195 +836,8 @@ namespace xivModdingFramework.Mods
             }
         }
 
+        #endregion
 
-        /// <summary>
-        /// Gets the sum total size in bytes of all modded dats.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<long> GetTotalModDataSize()
-        {
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var dataFiles = Enum.GetValues(typeof(XivDataFile)).Cast<XivDataFile>();
-
-            long size = 0;
-            foreach(var df in dataFiles)
-            {
-                var moddedDats = await _dat.GetModdedDatList(df);
-                foreach(var dat in moddedDats)
-                {
-                    var finfo = new FileInfo(dat);
-                    size += finfo.Length;
-                }
-            }
-
-            return size;
-        }
-
-        /// <summary>
-        /// This function will rewrite all the mod files to new DAT entries, replacing the existing modded DAT files with new, defragmented ones.
-        /// Returns the total amount of bytes recovered.
-        /// </summary>
-        /// <returns></returns>
-        public async Task<long> DefragmentModdedDats(IProgress<(int Current, int Total, string Message)> progressReporter = null)
-        {
-            if (XivCache.GameInfo.UseLumina)
-            {
-                throw new Exception("TexTools mods cannot be altered in Lumina mode.");
-            }
-
-            var modlist = await GetModListAsync();
-            var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-            var _index = new Index(XivCache.GameInfo.GameDirectory);
-
-            var offsets = new Dictionary<string, (long oldOffset, long newOffset, uint size)>();
-
-            modlist.Mods.RemoveAll(x => String.IsNullOrWhiteSpace(x.fullPath));
-
-            var modsByDf = modlist.Mods.GroupBy(x => XivDataFiles.GetXivDataFile(x.datFile));
-            var indexFiles = new Dictionary<XivDataFile, IndexFile>();
-
-            var count = 0;
-            var total = modlist.Mods.Count();
-
-            var originalSize = await GetTotalModDataSize();
-
-            var workerStatus = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
-            try
-            {
-                // Copy files over into contiguous data blocks in the new dat files.
-                foreach (var dKv in modsByDf)
-                {
-                    var df = dKv.Key;
-                    indexFiles.Add(df, await _index.GetIndexFile(df));
-
-                    foreach (var mod in dKv)
-                    {
-                        progressReporter?.Report((count, total, "Writing mod data to temporary DAT files..."));
-
-                        try
-                        {
-                            var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
-
-                            if (size % 256 != 0) throw new Exception("Dicks");
-
-                            var data = _dat.GetRawData(mod.data.modOffset, df, size);
-                            var newOffset = await WriteToTempDat(_dat, data, df);
-
-                            if (mod.IsCustomFile())
-                            {
-                                mod.data.originalOffset = newOffset;
-                            }
-                            mod.data.modOffset = newOffset;
-                            indexFiles[df].SetDataOffset(mod.fullPath, newOffset);
-                        }
-                        catch (Exception except)
-                        {
-                            throw;
-                        }
-
-                        count++;
-                    }
-                }
-
-                progressReporter?.Report((0, 0, "Removing old modded DAT files..."));
-                foreach (var dKv in modsByDf)
-                {
-                    // Now we need to delete the current modded dat files.
-                    var moddedDats = await _dat.GetModdedDatList(dKv.Key);
-                    foreach (var file in moddedDats)
-                    {
-                        File.Delete(file);
-                    }
-                }
-
-                // Now we need to rename our temp files.
-                progressReporter?.Report((0, 0, "Renaming temporary DAT files..."));
-                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
-                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
-                foreach (var temp in temps)
-                {
-                    var oldName = temp.FullName;
-                    var newName = temp.FullName.Substring(0, oldName.Length - 4);
-                    System.IO.File.Move(oldName, newName);
-                }
-
-                progressReporter?.Report((0, 0, "Saving updated Index Files..."));
-
-                foreach (var dKv in modsByDf)
-                {
-                    await _index.SaveIndexFile(indexFiles[dKv.Key]);
-                }
-
-                progressReporter?.Report((0, 0, "Saving updated Modlist..."));
-
-                // Save modList
-                await SaveModListAsync(modlist);
-
-
-                var finalSize = await GetTotalModDataSize();
-                var saved = originalSize - finalSize;
-                saved = saved > 0 ? saved : 0;
-                return saved;
-            } finally
-            {
-                var finfos = XivCache.GameInfo.GameDirectory.GetFiles();
-                var temps = finfos.Where(x => x.Name.EndsWith(".temp"));
-                foreach(var temp in temps)
-                {
-                    temp.Delete();
-                }
-
-                XivCache.CacheWorkerEnabled = workerStatus;
-            }
-
-        }
-
-        private async Task<long> WriteToTempDat(Dat _dat, byte[] data, XivDataFile df)
-        {
-            var moddedDats = await _dat.GetModdedDatList(df);
-            var tempDats = moddedDats.Select(x => x + ".temp");
-            var maxSize = Dat.GetMaximumDatSize();
-
-            string targetDatFile = null;
-            foreach(var file in tempDats)
-            {
-                if(!File.Exists(file))
-                {
-                    using (var stream = new BinaryWriter(File.Create(file)))
-                    {
-                        stream.Write(Dat.MakeSqPackHeader());
-                        stream.Write(Dat.MakeDatHeader());
-                    }
-                    targetDatFile = file;
-                    break;
-                }
-
-                var finfo = new FileInfo(file);
-                if(finfo.Length + data.Length < maxSize)
-                {
-                    targetDatFile = file;
-                }
-            }
-
-            if (targetDatFile == null) throw new Exception("Unable to find open temp dat to write to.");
-
-            var rex = new Regex("([0-9])\\.temp$");
-            var match = rex.Match(targetDatFile);
-            uint datNum = UInt32.Parse(match.Groups[1].Value);
-
-
-            long baseOffset = 0;
-            using(var stream = new BinaryWriter(File.Open(targetDatFile, FileMode.Append)))
-            {   
-                baseOffset = stream.BaseStream.Position;
-                stream.Write(data);
-            }
-
-            long offset = ((baseOffset / 8) | (datNum * 2)) * 8;
-
-            return offset;
-        }
     }
 
 }

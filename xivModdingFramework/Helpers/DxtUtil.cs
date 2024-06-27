@@ -4,50 +4,53 @@
  * Released under the Microsoft Public License.
  * See LICENSE for details.
  */
+
+using System;
+using System.Collections.Concurrent;
 using System.IO;
+using System.Runtime.CompilerServices;
+using System.Threading.Tasks;
+using JeremyAnsel.BcnSharp;
 
 namespace xivModdingFramework.Helpers
 {
     internal static class DxtUtil
     {
-        internal static byte[] DecompressDxt1(byte[] imageData, int width, int height)
+        internal static byte[] DecompressDxt1(byte[] compData, int width, int height)
         {
-            using (MemoryStream imageStream = new MemoryStream(imageData))
-                return DecompressDxt1(imageStream, width, height);
-        }
+            byte[] resultData = new byte[width * height * 4];
 
-        internal static byte[] DecompressDxt1(Stream imageStream, int width, int height)
-        {
-            byte[] imageData = new byte[width * height * 4];
+            int blockCountX = (width + 3) / 4;
+            int blockCountY = (height + 3) / 4;
+            const int blockSize = 8;
 
-            using (BinaryReader imageReader = new BinaryReader(imageStream))
+            Parallel.ForEach(Partitioner.Create(0, blockCountY), range =>
             {
-                int blockCountX = (width + 3) / 4;
-                int blockCountY = (height + 3) / 4;
-
-                for (int y = 0; y < blockCountY; y++)
+                for (int y = range.Item1; y < range.Item2; y++)
                 {
                     for (int x = 0; x < blockCountX; x++)
                     {
-                        DecompressDxt1Block(imageReader, x, y, blockCountX, width, height, imageData);
+                        int offset = (y * blockCountX + x) * blockSize;
+                        DecompressDxt1Block(compData, offset, x, y, width, height, resultData);
                     }
                 }
-            }
+            });
 
-            return imageData;
+            return resultData;
         }
 
-        private static void DecompressDxt1Block(BinaryReader imageReader, int x, int y, int blockCountX, int width, int height, byte[] imageData)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void DecompressDxt1Block(byte[] source, int sourceOffset, int x, int y, int width, int height, byte[] imageData)
         {
-            ushort c0 = imageReader.ReadUInt16();
-            ushort c1 = imageReader.ReadUInt16();
+            ushort c0 = BitConverter.ToUInt16(source, sourceOffset);
+            ushort c1 = BitConverter.ToUInt16(source, sourceOffset + 2);
 
             byte r0, g0, b0;
             byte r1, g1, b1;
             ConvertRgb565ToRgb888(c0, out r0, out g0, out b0);
             ConvertRgb565ToRgb888(c1, out r1, out g1, out b1);
 
-            uint lookupTable = imageReader.ReadUInt32();
+            uint lookupTable = BitConverter.ToUInt32(source, sourceOffset + 4);
 
             for (int blockY = 0; blockY < 4; blockY++)
             {
@@ -124,53 +127,51 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        internal static byte[] DecompressDxt3(byte[] imageData, int width, int height)
+        internal static byte[] DecompressDxt3(byte[] compData, int width, int height)
         {
-            using (MemoryStream imageStream = new MemoryStream(imageData))
-                return DecompressDxt3(imageStream, width, height);
-        }
+            byte[] resultData = new byte[width * height * 4];
 
-        internal static byte[] DecompressDxt3(Stream imageStream, int width, int height)
-        {
-            byte[] imageData = new byte[width * height * 4];
+            int blockCountX = (width + 3) / 4;
+            int blockCountY = (height + 3) / 4;
+            const int blockSize = 16;
 
-            using (BinaryReader imageReader = new BinaryReader(imageStream))
+            Parallel.ForEach(Partitioner.Create(0, blockCountY), range =>
             {
-                int blockCountX = (width + 3) / 4;
-                int blockCountY = (height + 3) / 4;
-
-                for (int y = 0; y < blockCountY; y++)
+                for (int y = range.Item1; y < range.Item2; y++)
                 {
                     for (int x = 0; x < blockCountX; x++)
                     {
-                        DecompressDxt3Block(imageReader, x, y, blockCountX, width, height, imageData);
+                        int offset = (y * blockCountX + x) * blockSize;
+                        DecompressDxt3Block(compData, offset, x, y, width, height, resultData);
                     }
                 }
-            }
+            });
 
-            return imageData;
+            return resultData;
         }
 
-        private static void DecompressDxt3Block(BinaryReader imageReader, int x, int y, int blockCountX, int width, int height, byte[] imageData)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void DecompressDxt3Block(byte[] source, int sourceOffset, int x, int y, int width, int height, byte[] imageData)
         {
-            byte a0 = imageReader.ReadByte();
-            byte a1 = imageReader.ReadByte();
-            byte a2 = imageReader.ReadByte();
-            byte a3 = imageReader.ReadByte();
-            byte a4 = imageReader.ReadByte();
-            byte a5 = imageReader.ReadByte();
-            byte a6 = imageReader.ReadByte();
-            byte a7 = imageReader.ReadByte();
+            using var blockReader = new BinaryReader(new MemoryStream(source, sourceOffset, 16));
+            byte a0 = source[sourceOffset];
+            byte a1 = source[sourceOffset + 1];
+            byte a2 = source[sourceOffset + 2];
+            byte a3 = source[sourceOffset + 3];
+            byte a4 = source[sourceOffset + 4];
+            byte a5 = source[sourceOffset + 5];
+            byte a6 = source[sourceOffset + 6];
+            byte a7 = source[sourceOffset + 7];
 
-            ushort c0 = imageReader.ReadUInt16();
-            ushort c1 = imageReader.ReadUInt16();
+            ushort c0 = BitConverter.ToUInt16(source, sourceOffset + 8);
+            ushort c1 = BitConverter.ToUInt16(source, sourceOffset + 10);
 
             byte r0, g0, b0;
             byte r1, g1, b1;
             ConvertRgb565ToRgb888(c0, out r0, out g0, out b0);
             ConvertRgb565ToRgb888(c1, out r1, out g1, out b1);
 
-            uint lookupTable = imageReader.ReadUInt32();
+            uint lookupTable = BitConverter.ToUInt32(source, sourceOffset + 12);
 
             int alphaIndex = 0;
             for (int blockY = 0; blockY < 4; blockY++)
@@ -272,54 +273,51 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        internal static byte[] DecompressDxt5(byte[] imageData, int width, int height)
+        internal static byte[] DecompressDxt5(byte[] compData, int width, int height)
         {
-            using (MemoryStream imageStream = new MemoryStream(imageData))
-                return DecompressDxt5(imageStream, width, height);
-        }
+            byte[] resultData = new byte[width * height * 4];
 
-        internal static byte[] DecompressDxt5(Stream imageStream, int width, int height)
-        {
-            byte[] imageData = new byte[width * height * 4];
+            int blockCountX = (width + 3) / 4;
+            int blockCountY = (height + 3) / 4;
+            const int blockSize = 16;
 
-            using (BinaryReader imageReader = new BinaryReader(imageStream))
+            Parallel.ForEach(Partitioner.Create(0, blockCountY), range =>
             {
-                int blockCountX = (width + 3) / 4;
-                int blockCountY = (height + 3) / 4;
-
-                for (int y = 0; y < blockCountY; y++)
+                for (int y = range.Item1; y < range.Item2; y++)
                 {
                     for (int x = 0; x < blockCountX; x++)
                     {
-                        DecompressDxt5Block(imageReader, x, y, blockCountX, width, height, imageData);
+                        int offset = (y * blockCountX + x) * blockSize;
+                        DecompressDxt5Block(compData, offset, x, y, width, height, resultData);
                     }
                 }
-            }
+            });
 
-            return imageData;
+            return resultData;
         }
 
-        private static void DecompressDxt5Block(BinaryReader imageReader, int x, int y, int blockCountX, int width, int height, byte[] imageData)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void DecompressDxt5Block(byte[] source, int sourceOffset, int x, int y, int width, int height, byte[] imageData)
         {
-            byte alpha0 = imageReader.ReadByte();
-            byte alpha1 = imageReader.ReadByte();
+            byte alpha0 = source[sourceOffset];
+            byte alpha1 = source[sourceOffset + 1];
 
-            ulong alphaMask = (ulong)imageReader.ReadByte();
-            alphaMask += (ulong)imageReader.ReadByte() << 8;
-            alphaMask += (ulong)imageReader.ReadByte() << 16;
-            alphaMask += (ulong)imageReader.ReadByte() << 24;
-            alphaMask += (ulong)imageReader.ReadByte() << 32;
-            alphaMask += (ulong)imageReader.ReadByte() << 40;
+            ulong alphaMask = (ulong)source[sourceOffset + 2]
+                            | (ulong)source[sourceOffset + 3] << 8
+                            | (ulong)source[sourceOffset + 4] << 16
+                            | (ulong)source[sourceOffset + 5] << 24
+                            | (ulong)source[sourceOffset + 6] << 32
+                            | (ulong)source[sourceOffset + 7] << 40;
 
-            ushort c0 = imageReader.ReadUInt16();
-            ushort c1 = imageReader.ReadUInt16();
+            ushort c0 = BitConverter.ToUInt16(source, sourceOffset + 8);
+            ushort c1 = BitConverter.ToUInt16(source, sourceOffset + 10);
 
             byte r0, g0, b0;
             byte r1, g1, b1;
             ConvertRgb565ToRgb888(c0, out r0, out g0, out b0);
             ConvertRgb565ToRgb888(c1, out r1, out g1, out b1);
 
-            uint lookupTable = imageReader.ReadUInt32();
+            uint lookupTable = BitConverter.ToUInt32(source, sourceOffset + 12);
 
             for (int blockY = 0; blockY < 4; blockY++)
             {
@@ -392,6 +390,116 @@ namespace xivModdingFramework.Helpers
             }
         }
 
+        // XXX: It seems like BcnSharp produces the wrong pixel format -- swap Red/Blue channels on its output
+        internal static void SwapRedBlue(byte[] imageData)
+        {
+            for (int i = 0; i < imageData.Length; i += 4)
+            {
+                byte x = imageData[i];
+                byte y = imageData[i + 2];
+                imageData[i] = y;
+                imageData[i + 2] = x;
+            }
+        }
+
+        internal static byte[] DecompressBc4(byte[] imageData, int width, int height)
+        {
+            var result = new byte[width * height * 4];
+
+            int blockCountX = (width + 3) / 4;
+            int blockCountY = (height + 3) / 4;
+
+            Parallel.ForEach(Partitioner.Create(0, blockCountY), range =>
+            {
+                for (int y = range.Item1; y < range.Item2; y++)
+                {
+                    for (int x = 0; x < blockCountX; x++)
+                    {
+                        int offset = (y * blockCountX + x) * 8;
+                        DecompressBc4Block(imageData, offset, x, y, width, height, result);
+                    }
+                }
+            });
+
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static void DecompressBc4Block(byte[] source, int sourceOffset, int x, int y, int width, int height, byte[] imageData)
+        {
+            byte red0 = source[sourceOffset];
+            byte red1 = source[sourceOffset + 1];
+
+            ulong lookupTable = (ulong)source[sourceOffset + 2]
+                              | (ulong)source[sourceOffset + 3] << 8
+                              | (ulong)source[sourceOffset + 4] << 16
+                              | (ulong)source[sourceOffset + 5] << 24
+                              | (ulong)source[sourceOffset + 6] << 32
+                              | (ulong)source[sourceOffset + 7] << 40;
+
+            for (int blockY = 0; blockY < 4; blockY++)
+            {
+                for (int blockX = 0; blockX < 4; blockX++)
+                {
+                    byte r = 0;
+
+                    uint index = (uint)((lookupTable >> 3 * (4 * blockY + blockX)) & 0x07);
+                    if (index == 0)
+                    {
+                        r = red0;
+                    }
+                    else if (index == 1)
+                    {
+                        r = red1;
+                    }
+                    else if (red0 > red1)
+                    {
+                        r = (byte)(((8 - index) * red0 + (index - 1) * red1) / 7);
+                    }
+                    else if (index == 6)
+                    {
+                        r = 0;
+                    }
+                    else if (index == 7)
+                    {
+                        r = 255;
+                    }
+                    else
+                    {
+                        r = (byte)(((6 - index) * red0 + (index - 1) * red1) / 5);
+                    }
+
+                    int px = (x << 2) + blockX;
+                    int py = (y << 2) + blockY;
+                    if ((px < width) && (py < height))
+                    {
+                        int offset = ((py * width) + px) << 2;
+                        imageData[offset] = r;
+                        imageData[offset + 1] = r;
+                        imageData[offset + 2] = r;
+                        imageData[offset + 3] = 255;
+                    }
+                }
+            }
+        }
+
+        internal static byte[] DecompressBc5(byte[] imageData, int width, int height)
+        {
+            var result = new byte[width * height * 4];
+            Bc5Sharp.Decode(imageData, result, width, height);
+            SwapRedBlue(result);
+            return result;
+        }
+
+        internal static byte[] DecompressBc7(byte[] imageData, int width, int height)
+        {
+            var result = new byte[width * height * 4];
+            Bc7Sharp.Decode(imageData, result, width, height);
+            SwapRedBlue(result);
+            return result;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static void ConvertRgb565ToRgb888(ushort color, out byte r, out byte g, out byte b)
         {
             int temp;

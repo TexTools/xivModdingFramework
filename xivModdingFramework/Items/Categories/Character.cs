@@ -22,8 +22,10 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
 
@@ -32,16 +34,10 @@ namespace xivModdingFramework.Items.Categories
     public class Character
     {
 
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _language;
-        private readonly Index _index;
 
-        public Character(DirectoryInfo gameDirectory, XivLanguage lang)
+        public Character()
         {
-            _gameDirectory = gameDirectory;
-            _language = lang;
 
-            _index = new Index(_gameDirectory);
         }
 
         public async Task<List<XivCharacter>> GetCharacterList(string substring = null)
@@ -54,8 +50,9 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the List to be displayed under the Character category
         /// </summary>
         /// <returns>A list containing XivCharacter data</returns>
-        public Task<List<XivCharacter>> GetUnCachedCharacterList()
+        public Task<List<XivCharacter>> GetUnCachedCharacterList(ModTransaction tx = null)
         {
+            // This should be made into discrete tasks at some point probably.
             return Task.Run(async () =>
             {
                 var races = Eqp.PlayableRacesWithNPCs;
@@ -72,17 +69,18 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
 
-                    // Only add to this listing if there is any data.
-                    var matNumbers = await GetNumbersForCharacterItem(c);
-                    if (matNumbers.Length > 0)
+                    var root = c.GetRoot();
+                    var ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else { 
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
-                        if(mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
 
@@ -90,73 +88,77 @@ namespace xivModdingFramework.Items.Categories
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Hair };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Tail };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
 
                     c = new XivCharacter { Name = race.GetDisplayName(), PrimaryCategory = XivStrings.Character, SecondaryCategory = XivStrings.Ear };
                     c.ModelInfo = new XivModelInfo();
                     c.ModelInfo.PrimaryID = raceCode;
                     c.ModelInfo.SecondaryID = 0;
-                    matNumbers = await GetNumbersForCharacterItem(c);
-                    if (matNumbers.Length > 0)
+                    root = c.GetRoot();
+                    ids = await GetAvailableSecondaryIds(race, root.Info.SecondaryType.Value, tx);
+                    if (ids.Count > 0)
                     {
-                        characterList.Add(c);
-                    }
-                    else
-                    {
-                        var mdlNumbers = await GetNumbersForCharacterItem(c, false);
-                        if (mdlNumbers.Length > 0)
+                        foreach (var id in ids)
                         {
-                            characterList.Add(c);
+                            var c2 = (XivCharacter)c.Clone();
+                            c2.ModelInfo.SecondaryID = id;
+                            c2.TertiaryCategory = c.Name;
+                            c2.Name = c2.SecondaryCategory + " " + id;
+                            characterList.Add(c2);
                         }
                     }
+
                 }
 
 
@@ -227,8 +229,7 @@ namespace xivModdingFramework.Items.Categories
                     testDictionary.Add(HashGenerator.GetHash(mtrl), i);
                 }
 
-                var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                numList.Sort();
+                var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
 
                 if (numList.Count > 0)
                 {
@@ -238,10 +239,10 @@ namespace xivModdingFramework.Items.Categories
 
             return availableRacesAndNumbers;
         }
-        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem, bool materials = true)
+        public async Task<int[]> GetNumbersForCharacterItem(XivCharacter charaItem, bool materials = true, ModTransaction tx = null)
         {
 
-            var race = charaItem.ModelInfo.PrimaryID.ToString().PadLeft(4,'0');
+            var race = charaItem.ModelInfo.PrimaryID.ToString().PadLeft(4, '0');
             var availableRacesAndNumbers = new Dictionary<XivRace, int[]>();
 
             var folder = "";
@@ -276,9 +277,75 @@ namespace xivModdingFramework.Items.Categories
                 testDictionary.Add(HashGenerator.GetHash(mtrl), i);
             }
 
-            var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-            numList.Sort();
+            var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara, tx);
             return numList.ToArray();
+        }
+
+        /// <summary>
+        /// Scans for all valid secondary IDs for the given race and secondary type, via a forced scan of
+        /// values 0-300 in the indexes.
+        /// </summary>
+        /// <param name="race"></param>
+        /// <param name="secondaryType"></param>
+        /// <param name="tx"></param>
+        /// <returns></returns>
+        public static async Task<SortedSet<int>> GetAvailableSecondaryIds(XivRace race, XivItemType secondaryType, ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            var availableRacesAndNumbers = new Dictionary<XivRace, int[]>();
+
+            var raceCode = race.GetRaceCode();
+
+            var mdlFolder = "";
+            var mtrlFolder = "";
+
+            if (secondaryType == XivItemType.hair)
+            {
+                mdlFolder = XivStrings.HairMDLFolder;
+                mtrlFolder = XivStrings.HairMtrlFolder;
+            }
+            else if (secondaryType == XivItemType.face)
+            {
+                mdlFolder = XivStrings.FaceMDLFolder;
+                mtrlFolder = XivStrings.FaceMtrlFolder;
+            }
+            else if (secondaryType == XivItemType.body)
+            {
+                mdlFolder = XivStrings.BodyMDLFolder;
+                mtrlFolder = XivStrings.BodyMtrlFolder;
+            }
+            else if (secondaryType == XivItemType.tail)
+            {
+                mdlFolder = XivStrings.TailMDLFolder;
+                mtrlFolder = XivStrings.TailMtrlFolder;
+            }
+            else if (secondaryType == XivItemType.ear)
+            {
+                mdlFolder = XivStrings.EarsMDLFolder;
+                mtrlFolder = XivStrings.EarsMtrlFolder;
+            }
+
+            var testDictionary = new Dictionary<int, int>();
+
+            const int _SCAN_LIMIT = 500;
+            for (var i = 1; i <= 500; i++)
+            {
+                var mdl = string.Format(mdlFolder, raceCode, i.ToString().PadLeft(4, '0'));
+                var mtrl = string.Format(mtrlFolder, raceCode, i.ToString().PadLeft(4, '0'));
+
+                testDictionary.Add(HashGenerator.GetHash(mtrl), i);
+                testDictionary.Add(HashGenerator.GetHash(mdl), i);
+            }
+
+            var index = await tx.GetIndexFile(XivDataFile._04_Chara);
+
+            var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara, tx);
+            return numList;
         }
 
         /// <summary>
@@ -331,7 +398,7 @@ namespace xivModdingFramework.Items.Categories
                     testDictionary.Add(HashGenerator.GetHash(mtrl), i);
                 }
 
-                var numList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
+                var numList = await Index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
 
                 if (numList.Count > 0)
                 {
@@ -343,158 +410,13 @@ namespace xivModdingFramework.Items.Categories
         }
 
         /// <summary>
-        /// Gets the Type and Part for a given Character Item
-        /// </summary>
-        /// <remarks>
-        /// Only Hair and Face Character Items have Types
-        /// </remarks>
-        /// <param name="charaItem">The character item</param>
-        /// <param name="race">The race</param>
-        /// <param name="num">The character item number</param>
-        /// <returns>A dictionary containing</returns>
-        public async Task<Dictionary<string, char[]>> GetTypePartForTextures(XivCharacter charaItem, XivRace race, int num)
-        {
-            var typePartDictionary = new Dictionary<string, char[]>();
-
-            var folder = "";
-            var file = "";
-            var typeDict = HairSlotAbbreviationDictionary;
-
-            var parts = Constants.Alphabet;
-
-            if (charaItem.SecondaryCategory == XivStrings.Hair)
-            {
-                folder = string.Format(XivStrings.HairMtrlFolder, race.GetRaceCode(),
-                    num.ToString().PadLeft(4, '0'));
-                file = XivStrings.HairMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Face)
-            {
-                folder = string.Format(XivStrings.FaceMtrlFolder, race.GetRaceCode(),
-                    num.ToString().PadLeft(4, '0'));
-                typeDict = FaceSlotAbbreviationDictionary;
-                file = XivStrings.FaceMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Ear)
-            {
-                folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(),
-                    num.ToString().PadLeft(4, '0'));
-                typeDict = EarsSlotAbbreviationDictionary;
-                file = XivStrings.EarsMtrlFile;
-            }
-
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
-
-            foreach (var type in typeDict)
-            {
-                var partList = new List<char>();
-
-                foreach (var part in parts)
-                {
-                    var mtrlFile = string.Format(file, race.GetRaceCode(), num.ToString().PadLeft(4, '0'),
-                        type.Value, part);
-
-                    if (fileList.Contains(HashGenerator.GetHash(mtrlFile)))
-                    {
-                        partList.Add(part);
-                    }
-                }
-
-                if (partList.Count > 0)
-                {
-                    typePartDictionary.Add(type.Key, partList.ToArray());
-                }
-            }
-
-            return typePartDictionary;
-        }
-
-        /// <summary>
-        /// Gets the Part for a given Character Item
-        /// </summary>
-        /// <remarks>
-        /// For Body and Tail Character Items since they don't have Types
-        /// </remarks>
-        /// <param name="charaItem">The character item</param>
-        /// <param name="race">The race</param>
-        /// <param name="num">The character item number</param>
-        /// <param name="variant">the variant for the mtrl folder</param>
-        /// <returns>An array of characters containing the parts for the texture</returns>
-        public async Task<char[]> GetPartForTextures(XivCharacter charaItem, XivRace race, int num, int variant = 1)
-        {
-            var folder = "";
-            var file = "";
-
-            var parts = Constants.Alphabet;
-
-            if (charaItem.SecondaryCategory == XivStrings.Body)
-            {
-                folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), variant.ToString().PadLeft(4, '0'));
-                file = XivStrings.BodyMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Tail)
-            {
-                folder = string.Format(XivStrings.TailMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-                file = XivStrings.TailMtrlFile;
-            }
-            else if (charaItem.SecondaryCategory == XivStrings.Ear)
-            {
-                folder = string.Format(XivStrings.EarsMtrlFolder, race.GetRaceCode(), num.ToString().PadLeft(4, '0'));
-
-                file = XivStrings.EarsMtrlFile;
-            }
-
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
-
-            return (from part in parts
-                let mtrlFile = string.Format(file, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), part)
-                where fileList.Contains(HashGenerator.GetHash(mtrlFile))
-                select part).ToArray();
-        }
-
-        public async Task<List<int>> GetVariantsForTextures(XivCharacter charaItem, XivRace race, int num)
-        {
-            var variantList = new List<int>();
-
-            if (charaItem.SecondaryCategory == XivStrings.Body)
-            {
-                var testDictionary = new Dictionary<int, int>();
-
-                for (var i = 0; i < 50; i++)
-                {
-                    var folder = string.Format(XivStrings.BodyMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
-                    testDictionary.Add(HashGenerator.GetHash(folder), i);
-
-                    variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                    variantList.Sort();
-                }
-            }
-
-            if (charaItem.SecondaryCategory == XivStrings.Tail)
-            {
-                var testDictionary = new Dictionary<int, int>();
-
-                for (var i = 0; i < 50; i++)
-                {
-                    var folder = string.Format(XivStrings.TailMtrlFolderVar, race.GetRaceCode(), num.ToString().PadLeft(4, '0'), i.ToString().PadLeft(4, '0'));
-                    testDictionary.Add(HashGenerator.GetHash(folder), i);
-
-                    variantList = await _index.GetFolderExistsList(testDictionary, XivDataFile._04_Chara);
-                    variantList.Sort();
-                }
-            }
-
-            return variantList;
-        }
-
-        /// <summary>
         /// Gets the Type of models for a given Character Item
         /// </summary>
         /// <param name="charaItem">The character item</param>
         /// <param name="race">The race</param>
         /// <param name="num">The character item number</param>
         /// <returns>A dictionary containging [</returns>
-        public async Task<List<string>> GetTypeForModels(XivCharacter charaItem, XivRace race, int num)
+        public async Task<List<string>> GetTypeForModels(XivCharacter charaItem, XivRace race, int num, ModTransaction tx)
         {
             var folder = "";
             var file = "";
@@ -536,7 +458,7 @@ namespace xivModdingFramework.Items.Categories
                 file = XivStrings.EarsMDLFile;
             }
 
-            var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara);
+            var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(folder), XivDataFile._04_Chara, tx);
 
             var typeList = new List<string>();
             foreach (var type in typeDict)
@@ -558,16 +480,16 @@ namespace xivModdingFramework.Items.Categories
             FacePaint, 
             Equipment
         };
-        public async Task<List<string>> GetDecalPaths(XivDecalType type)
+        public static async Task<List<string>> GetDecalPaths(XivDecalType type, ModTransaction tx)
         {
 
-            const int decalMax = 300;
+            const int decalMax = 500;
 
             List<string> ret = new List<string>();
             if (type == XivDecalType.FacePaint)
             {
-                var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
-                    XivDataFile._04_Chara);
+                var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.FacePaintFolder),
+                    XivDataFile._04_Chara, tx);
 
                 for (int i = 0; i < decalMax; i++)
                 {
@@ -582,8 +504,8 @@ namespace xivModdingFramework.Items.Categories
             }
             else if(type == XivDecalType.Equipment)
             {
-                var fileList = await _index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
-                    XivDataFile._04_Chara);
+                var fileList = await Index.GetAllHashedFilesInFolder(HashGenerator.GetHash(XivStrings.EquipDecalFolder),
+                    XivDataFile._04_Chara, tx);
 
 
                 for (int i = 0; i < decalMax; i++)
@@ -637,6 +559,9 @@ namespace xivModdingFramework.Items.Categories
             {"1404", XivRace.AuRa_Female_NPC},
             {"1501", XivRace.Hrothgar_Male},
             {"1504", XivRace.Hrothgar_Male_NPC},
+
+            {"1601", XivRace.Hrothgar_Female},
+            {"1604", XivRace.Hrothgar_Female_NPC},
             {"1701", XivRace.Viera_Male},
             {"1704", XivRace.Viera_Male_NPC},
             {"1801", XivRace.Viera_Female},

@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System.Collections.Generic;
+
 namespace xivModdingFramework.Models.Enums
 {
     /// <summary>
@@ -31,8 +33,34 @@ namespace xivModdingFramework.Models.Enums
         Ubyte4n  = 0x8,
         Short2n  = 0x9,
         Short4n  = 0xA,
-        Half2    = 0xD,
-        Half4    = 0xE,
-        Compress = 0xF
+        Ushort2n = 0xB,
+        Ushort4n = 0xC,
+        Half2    = 0x0D,
+        Half4    = 0x0E,
+        //Half2D = 0x0D,
+        //Half4E = 0x0E,
+        UByte8 = 0x11
+    }
+
+    public static class VertexDataTypeInfo
+    {
+        public static Dictionary<VertexDataType, int> Sizes = new Dictionary<VertexDataType, int>() {
+            { VertexDataType.Float1, 4 },
+            { VertexDataType.Float2, 8 },
+            { VertexDataType.Float3, 12 },
+            { VertexDataType.Float4, 16 },
+            { VertexDataType.Ubyte4, 4 },
+            { VertexDataType.Short2, 4 },
+            { VertexDataType.Short4, 8 },
+            { VertexDataType.Ubyte4n, 4 },
+            { VertexDataType.Short2n, 4 },
+            { VertexDataType.Short4n, 8 },
+            { VertexDataType.Ushort2n, 4 },
+            { VertexDataType.Ushort4n, 8 },
+            { VertexDataType.Half2, 4 },
+            { VertexDataType.Half4, 8 },
+            { VertexDataType.UByte8, 8 },
+        };
+
     }
 }

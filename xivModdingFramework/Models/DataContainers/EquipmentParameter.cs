@@ -20,8 +20,17 @@ namespace xivModdingFramework.Models.DataContainers
         public ushort RotationB;
         public ushort RotationC;
 
-        public byte UnknownHigh;
-        public byte UnknownLow;
+        public byte Byte4High;
+        public byte Byte4Low;
+
+        public byte Byte4
+        {
+            get
+            {
+                byte last = (byte)((Byte4High << 4) | (Byte4Low & 0x0F));
+                return last;
+            }
+        }
 
         public GimmickParameter()
         {
@@ -32,8 +41,8 @@ namespace xivModdingFramework.Models.DataContainers
             RotationB = 0;
             RotationC = 0;
 
-            UnknownHigh = 0;
-            UnknownLow = 0;
+            Byte4High = 0;
+            Byte4Low = 0;
         }
         public GimmickParameter(byte[] bytes)
         {
@@ -52,8 +61,16 @@ namespace xivModdingFramework.Models.DataContainers
             var d3 = l >> 22;
             RotationC = (ushort)(d3 & 0x3FF);
 
-            UnknownHigh = (byte)((bytes[4] >> 4) & 0x0F);
-            UnknownLow = (byte)((bytes[4] & 0x0F));
+            Byte4High = (byte)((bytes[4] >> 4) & 0x0F);
+            Byte4Low = (byte)((bytes[4] & 0x0F));
+        }
+
+        public long ToLong()
+        {
+            var bytes = new byte[8];
+            var entryBytes = GetBytes();
+            Array.Copy(entryBytes, 0, bytes, 0, 5);
+            return BitConverter.ToInt64(bytes, 0);
         }
 
         /// <summary>
@@ -85,7 +102,7 @@ namespace xivModdingFramework.Models.DataContainers
             ret = ret | rot2;
             ret = ret | rot3;
 
-            byte last = (byte)((UnknownHigh << 4) | (UnknownLow & 0x0F));
+            byte last = (byte)((Byte4High << 4) | (Byte4Low & 0x0F));
 
             var bytes = new byte[5];
 
@@ -402,8 +419,15 @@ namespace xivModdingFramework.Models.DataContainers
     /// </summary>
     public class EquipmentDeformationParameter
     {
-        public bool bit0;
-        public bool bit1;
+        /// <summary>
+        /// As far as I'm aware this flag is never actually checked by the game.
+        /// </summary>
+        public bool HasMaterial;
+
+        /// <summary>
+        /// Determines if the race has a racial model.
+        /// </summary>
+        public bool HasModel;
 
         /// <summary>
         /// Gets a single byte representation of this entry.
@@ -412,8 +436,8 @@ namespace xivModdingFramework.Models.DataContainers
         public byte GetByte()
         {
             BitArray r = new BitArray(8);
-            r[0] = bit0;
-            r[1] = bit1;
+            r[0] = HasMaterial;
+            r[1] = HasModel;
             var arr = new byte[1];
             r.CopyTo(arr, 0);
 
@@ -428,8 +452,8 @@ namespace xivModdingFramework.Models.DataContainers
         {
             BitArray r = new BitArray(new byte[] { b });
             var def = new EquipmentDeformationParameter();
-            def.bit0 = r[0];
-            def.bit1 = r[1];
+            def.HasMaterial = r[0];
+            def.HasModel = r[1];
 
             return def;
         }
@@ -473,6 +497,16 @@ namespace xivModdingFramework.Models.DataContainers
                     { "sho", new EquipmentDeformationParameter() }
                 };
             }
+        }
+
+        public static bool IsAccessory(string slot)
+        {
+            var accessories = new List<string>() { "ear", "nek", "wrs", "rir", "ril" };
+            if (accessories.Contains(slot))
+            {
+                return true;
+            }
+            return false;
         }
 
         public static List<string> SlotsAsList(bool accessory)

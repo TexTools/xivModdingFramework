@@ -199,7 +199,7 @@
     <value>Buddy</value>
   </data>
   <data name="BuddyAction" xml:space="preserve">
-    <value>buddyaction_0_{0}.exd</value>
+    <value>Buddy Action</value>
   </data>
   <data name="Carbuncle" xml:space="preserve">
     <value>Carbuncle</value>
@@ -217,13 +217,13 @@
     <value>Company</value>
   </data>
   <data name="CompanyAction" xml:space="preserve">
-    <value>companyaction_0_{0}.exd</value>
+    <value>Company Action</value>
   </data>
   <data name="Craft" xml:space="preserve">
     <value>Craft</value>
   </data>
   <data name="CraftAction" xml:space="preserve">
-    <value>craftaction_100000_{0}.exd</value>
+    <value>Crafting Action</value>
   </data>
   <data name="DemiHuman" xml:space="preserve">
     <value>DemiHuman</value>
@@ -334,7 +334,7 @@
     <value>Event</value>
   </data>
   <data name="EventAction" xml:space="preserve">
-    <value>eventaction_0_{0}.exd</value>
+    <value>Event Action</value>
   </data>
   <data name="EXDDat" xml:space="preserve">
     <value>0a0000</value>
@@ -906,8 +906,8 @@
   <data name="Elezen_Wildwood" xml:space="preserve">
     <value>Elezen - Wildwood</value>
   </data>
-  <data name="Hrothgar_Hellion" xml:space="preserve">
-    <value>Hrothgar - Hellion</value>
+  <data name="Hrothgar_Helion" xml:space="preserve">
+    <value>Hrothgar - Helion</value>
   </data>
   <data name="Hrothgar_Lost" xml:space="preserve">
     <value>Hrothgar - Lost</value>
@@ -968,5 +968,20 @@
   </data>
   <data name="Viera_Male_NPC" xml:space="preserve">
     <value>Viera Male NPC</value>
+  </data>
+  <data name="Map" xml:space="preserve">
+    <value>Map</value>
+  </data>
+  <data name="Minimap" xml:space="preserve">
+    <value>Minimap</value>
+  </data>
+  <data name="Fish" xml:space="preserve">
+    <value>Fish</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>Painting</value>
+  </data>
+  <data name="Painting Icons" xml:space="preserve">
+    <value>Painting Icons</value>
   </data>
 </root>

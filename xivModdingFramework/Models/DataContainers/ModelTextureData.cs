@@ -14,12 +14,56 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using xivModdingFramework.Helpers;
+using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Materials.FileTypes;
+using xivModdingFramework.Models.Helpers;
+
 namespace xivModdingFramework.Models.DataContainers
 {
     /// <summary>
     /// This class holds the data for the textures to be used on the 3D Model
     /// </summary>
     public class ModelTextureData
+    {
+        public int Width { get; set; }
+
+        public int Height { get; set; }
+
+
+        //Color Data
+        public byte[] Diffuse { get; set; }
+        public byte[] Specular { get; set; }
+        public byte[] Emissive { get; set; }
+
+        // Other Common Data
+        public byte[] Normal { get; set; }
+        public byte[] Alpha { get; set; }
+
+        // PBR Data
+        public byte[] Occlusion { get; set; }
+        public byte[] Roughness { get; set; }
+        public byte[] Metalness { get; set; }
+        public byte[] Subsurface { get; set; }
+
+
+        public string MaterialPath { get; set; }
+
+        public bool IsSkin {
+            get
+            {
+                return ModelModifiers.IsSkinMaterial(MaterialPath);
+            }
+        }
+
+        public bool RenderBackfaces { get; set; }
+        public TextureSampler.ETilingMode UTilingMode { get; set; }
+        public TextureSampler.ETilingMode VTilingMode { get; set; }
+    }
+    /// <summary>
+    /// This class holds the data for the textures to be used on the 3D Model
+    /// </summary>
+    public class PbrModelTextureData
     {
         public int Width { get; set; }
 
@@ -35,6 +79,20 @@ namespace xivModdingFramework.Models.DataContainers
 
         public byte[] Emissive { get; set; }
 
+        public byte[] Metalness { get; set; }
+
+        public byte[] Roughness{ get; set; }
+
         public string MaterialPath { get; set; }
+
+        public bool IsSkin
+        {
+            get
+            {
+                return ModelModifiers.IsSkinMaterial(MaterialPath);
+            }
+        }
+
+        public bool RenderBackfaces { get; set; }
     }
 }

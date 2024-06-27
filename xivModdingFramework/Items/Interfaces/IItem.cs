@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core.Utilities.ImagePacker;
 using System;
 using System.Collections.Generic;
 using xivModdingFramework.General.Enums;
@@ -28,7 +29,7 @@ namespace xivModdingFramework.Items.Interfaces
         /// <summary>
         /// The item Name
         /// </summary>
-        string Name { get; }
+        string Name { get; set;  }
 
         /// <summary>
         /// The top level category
@@ -38,7 +39,7 @@ namespace xivModdingFramework.Items.Interfaces
         /// <remarks>
         /// This would be a category such as Gear, Character, Companion, and UI
         /// </remarks>
-        string PrimaryCategory { get; }
+        string PrimaryCategory { get; set; }
 
         /// <summary>
         /// The second level category.
@@ -46,7 +47,7 @@ namespace xivModdingFramework.Items.Interfaces
         /// <remarks>
         /// This would be a category such as Body, Legs, Ears, Hair, Minions, Maps
         /// </remarks>
-        string SecondaryCategory { get; }
+        string SecondaryCategory { get; set; }
 
         /// <summary>
         /// The third level category.
@@ -76,6 +77,42 @@ namespace xivModdingFramework.Items.Interfaces
         /// </summary>
         /// <returns></returns>
         public string GetModlistItemCategory();
+    }
+
+    /// <summary>
+    /// Simple shell IItem that can be used as a filler when writing mods.
+    /// </summary>
+    public class SimpleIItem : IItem
+    {
+        public string Name { get; set; } = "";
+
+        public string PrimaryCategory { get; set; } = "";
+
+        public string SecondaryCategory { get; set; } = "";
+
+        public string TertiaryCategory { get; set; } = "";
+
+        public XivDataFile DataFile => XivDataFile._04_Chara;
+        public SimpleIItem(string name, string category)
+        {
+            Name  = name;
+            SecondaryCategory = category;
+        }
+
+        public int CompareTo(object obj)
+        {
+            return 0;
+        }
+
+        public string GetModlistItemName()
+        {
+            return Name;
+        }
+
+        public string GetModlistItemCategory()
+        {
+            return SecondaryCategory;
+        }
     }
 
 

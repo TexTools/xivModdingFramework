@@ -22,34 +22,23 @@ namespace xivModdingFramework
 {
     public class GameInfo
     {
-        private const string GameVersionFile = "ffxivgame.ver";
+        public const string GameVersionFileName = "ffxivgame.ver";
 
         /// <summary>
         /// The directory in which the game is installed.
         /// </summary>
         public DirectoryInfo GameDirectory { get; }
 
-
-        // These Lumina settings live here mostly for convenience, as they also should not be highly changeable data.
-        // In the future, it may make sense to move them into the SQL metadata cache, but for now this is a more known-stable place to keep them.
-
-        /// <summary>
-        /// Lumina output directory.
-        /// </summary>
-        public DirectoryInfo LuminaDirectory { get; }
-
-        /// <summary>
-        /// Should mod output be redirected to Lumina?
-        /// </summary>
-        public bool UseLumina { get; }
-
-
         /// <summary>
         /// The current version of the game.
         /// </summary>
         public Version GameVersion { get; }
 
-        public int DxMode { get; }
+        public string GameVersionFile { get
+            {
+                return GetGameVersionFile();
+            } 
+        }
 
 
         /// <summary>
@@ -63,14 +52,18 @@ namespace xivModdingFramework
         /// </summary>
         /// <param name="gameDirectory">The directory in which the game is installed.</param>
         /// <param name="xivLanguage">The language to use when parsing the game data.</param>
-        public GameInfo(DirectoryInfo gameDirectory, XivLanguage xivLanguage, int dxMode = 11, DirectoryInfo luminaDirectory = null, bool useLumina = false)
+        public GameInfo(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
         {
             GameDirectory = gameDirectory;
             GameLanguage  = xivLanguage;
-            GameVersion   = GetGameVersion();
-            LuminaDirectory = luminaDirectory;
-            UseLumina = useLumina;
-            DxMode = dxMode;
+            try
+            {
+                GameVersion = GetGameVersion();
+            } catch
+            {
+                // Default.  No version file is a non-critical bug.
+                GameVersion = new Version("0.0.0.0");
+            }
 
             if (!gameDirectory.FullName.Contains(Path.Combine("game", "sqpack", "ffxiv")))
             {
@@ -78,6 +71,41 @@ namespace xivModdingFramework
             }
         }
 
+        private string GetGameVersionFile()
+        {
+            try
+            {
+                var versionBasePath = GameDirectory.FullName.Substring(0, GameDirectory.FullName.IndexOf("sqpack", StringComparison.Ordinal));
+                var versionFile = Path.Combine(versionBasePath, GameVersionFileName);
+
+                if (!File.Exists(versionFile))
+                {
+                    return null;
+                }
+
+                return versionFile;
+            }
+            catch
+            {
+                return null;
+            }
+
+        }
+
+        public static Version ReadVersionFile(string file)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
+                {
+                    return new Version();
+                }
+                var versionData = File.ReadAllLines(file);
+                return new Version(versionData[0].Substring(0, versionData[0].LastIndexOf(".", StringComparison.Ordinal)));
+            } catch {
+                return new Version();
+            }
+        }
 
         /// <summary>
         /// Gets the games current version.
@@ -85,11 +113,19 @@ namespace xivModdingFramework
         /// <returns>The game version.</returns>
         private Version GetGameVersion()
         {
-            var versionBasePath = GameDirectory.FullName.Substring(0, GameDirectory.FullName.IndexOf("sqpack", StringComparison.Ordinal));
-            var versionFile = Path.Combine(versionBasePath, GameVersionFile);
-
-            var versionData = File.ReadAllLines(versionFile);
-            return new Version(versionData[0].Substring(0, versionData[0].LastIndexOf(".", StringComparison.Ordinal)));
+            try
+            {
+                var file = GetGameVersionFile();
+                if (string.IsNullOrWhiteSpace(file))
+                {
+                    return new Version();
+                }
+                return ReadVersionFile(file);
+            }
+            catch
+            {
+                return new Version();
+            }
         }
     }
 }

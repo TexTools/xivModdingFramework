@@ -14,37 +14,37 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Resources;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Exd.Enums;
 using xivModdingFramework.Exd.FileTypes;
+using xivModdingFramework.General;
 using xivModdingFramework.General.DataContainers;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
-
+using xivModdingFramework.World;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
 namespace xivModdingFramework.Items.Categories
 {
     public class Housing
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly XivLanguage _xivLanguage;
-        public Housing(DirectoryInfo gameDirectory, XivLanguage xivLanguage)
+        public Housing()
         {
-            _gameDirectory = gameDirectory;
-            _xivLanguage = xivLanguage;
         }
 
         /// <summary>
@@ -60,23 +60,26 @@ namespace xivModdingFramework.Items.Categories
         /// Gets the list of all Housing Items
         /// </summary>
         /// <returns>A list of XivFurniture objects containing housing items</returns>
-        public async Task<List<XivFurniture>> GetUncachedFurnitureList()
+        public async Task<List<IItemModel>> GetUncachedFurnitureList(ModTransaction tx = null)
         {
-            var furnitureList = new List<XivFurniture>();
+            var furnitureList = new List<IItemModel>();
 
-            furnitureList.AddRange(await GetIndoorFurniture());
-            furnitureList.AddRange(await GetPaintings());
-            furnitureList.AddRange(await GetOutdoorFurniture());
+            var tasks = new List<Task<List<IItemModel>>>();
+
+            tasks.Add(GetIndoorFurniture(tx));
+            tasks.Add(GetOutdoorFurniture(tx));
+            tasks.Add(GetPaintings(tx));
+            tasks.Add(GetFish(tx));
+
+            await Task.WhenAll(tasks);
+
+            foreach(var t in tasks)
+            {
+                furnitureList.AddRange(t.Result);
+            }
 
             return furnitureList;
         }
-
-        private static Dictionary<string, int> DataLengthByPatch = new Dictionary<string, int>()
-        {
-            { "5.3", 160 },
-            { "5.4", 168 },
-            { "5.5", 160 },
-        };
 
 
         /// <summary>
@@ -89,35 +92,17 @@ namespace xivModdingFramework.Items.Categories
         /// This method does option one
         /// </remarks>
         /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetIndoorFurniture()
+        private async Task<List<IItemModel>> GetIndoorFurniture(ModTransaction tx = null)
         {
             var indoorLock = new object();
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch
-            const int itemIndexOffset = 10;
-            const int modelNumberOffset = 12;
-            const int itemCategoryOffset = 14;
+            var ex = new Ex();
+            var housingDictionary = await ex.ReadExData(XivEx.housingfurniture, tx);
+            var itemDictionary = await ex.ReadExData(XivEx.item, tx);
 
-            const int itemNameDataOffset = 14;
-            int itemDataLength = DataLengthByPatch["5.5"];
-            const int itemIconDataOffset = 136;
+            var furnitureList = new List<IItemModel>();
 
-            if(_xivLanguage == XivLanguage.Korean)
-            {
-                itemDataLength = DataLengthByPatch["5.5"];
-            } 
-            else if (_xivLanguage == XivLanguage.Chinese)
-            {
-                itemDataLength = DataLengthByPatch["5.5"];
-            }
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var housingDictionary = await ex.ReadExData(XivEx.housingfurniture);
-            var itemDictionary = await ex.ReadExData(XivEx.item);
-
-            var furnitureList = new List<XivFurniture>();
-
-            await Task.Run(() => Parallel.ForEach(housingDictionary.Values, (housingItem) =>
+            await Task.Run(() => Parallel.ForEach(housingDictionary.Values, (housingRow) =>
             {
                 try
                 {
@@ -128,32 +113,13 @@ namespace xivModdingFramework.Items.Categories
                         ModelInfo = new XivModelInfo()
                     };
 
-                    using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
-                    {
-                        br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                        var itemIndex = br.ReadUInt16();
+                    var itemIndex = (uint)housingRow.GetColumnByName("ItemId");
+                    item.ModelInfo.PrimaryID = (ushort) housingRow.GetColumnByName("PrimaryId");
+                    var housingCategory = (byte) housingRow.GetColumnByName("Category");
 
-                        br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
-                        item.ModelInfo.PrimaryID = br.ReadInt16();
-
-                        br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
-                        var housingCategory = br.ReadByte();
-
-                        using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
-                        {
-                            br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
-                            var nameOffset = br1.ReadInt16();
-
-                            br1.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
-                            item.IconNumber = br1.ReadUInt16();
-
-                            var gearNameOffset = itemDataLength + nameOffset;
-                            var gearNameLength = itemDictionary[itemIndex].Length - gearNameOffset;
-                            br1.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                            var nameString = Encoding.UTF8.GetString(br1.ReadBytes(gearNameLength)).Replace("\0", "");
-                            item.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-                        }
-                    }
+                    // Get the associated item row.
+                    var itemRow = itemDictionary[(int)itemIndex];
+                    AttachItemInfo(item, itemRow);
 
                     if (!item.Name.Equals(string.Empty))
                     {
@@ -173,129 +139,146 @@ namespace xivModdingFramework.Items.Categories
             return furnitureList;
         }
 
-        /// <summary>
-        /// Gets the list of indoor furniture
-        /// </summary>
-        /// <remarks>
-        /// Housing items can be obtained one of two ways
-        /// One: checking the housingfurniture exd for the item index, and going to that item to grab the data
-        /// Two: iterating through the entire item list seeing if the item contains an index to a housing item (offset 112, 4 bytes)
-        /// This method does option two as the item index was removed from the picture exd file in patch 5.2
-        /// </remarks>
-        /// <returns>A list of XivFurniture objects containing indoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetPaintings()
+        private void AttachItemInfo(XivFurniture furnishing, Ex.ExdRow itemRow)
+        {
+            furnishing.IconId = (ushort)itemRow.GetColumnByName("Icon");
+            furnishing.Name = (string)itemRow.GetColumnByName("Name");
+        }
+
+        private async Task<List<IItemModel>> GetPaintings(ModTransaction tx = null)
         {
             var paintingsLock = new object();
-            // These are the offsets to relevant data
-            // These will need to be changed if data gets added or removed with a patch            
-            int iconNumberOffset = 0;
+            var furnitureList = new List<IItemModel>(300);
 
-            const int itemNameDataOffset = 14;
-            const int housingIndexOffset = 112;
-            int itemDataLength = DataLengthByPatch["5.5"];
-            const int itemIconDataOffset = 136;
-
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var pictureDictionary = await ex.ReadExData(XivEx.picture);
-            var itemDictionary = await ex.ReadExData(XivEx.item);
-
-
-            if (_xivLanguage == XivLanguage.Korean)
+            var root = new XivDependencyRootInfo()
             {
-                itemDataLength = DataLengthByPatch["5.5"];
-            }
-            else if (_xivLanguage == XivLanguage.Chinese)
+                PrimaryId = 0,
+                PrimaryType = XivItemType.painting,
+            };
+
+            if(tx == null)
             {
-                itemDataLength = DataLengthByPatch["5.5"];
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
             }
 
+            var format = "bgcommon/hou/indoor/pic/ta/{0}/material/pic_ta_2{0}a.mtrl";
 
-            var furnitureList = new List<XivFurniture>();
-
-            await Task.Run(() => Parallel.ForEach(itemDictionary.Values, (item) =>
+            var increment = 100;
+            List<Task<List<int>>> tasks = new List<Task<List<int>>>();
+            for(int i =0; i< 10000; i+= increment)
             {
-                var painting = new XivFurniture
+                tasks.Add(Index.CheckExistsMultiple(tx, format, i, i + increment));
+            }
+
+            await Task.WhenAll(tasks);
+
+            foreach(var task in tasks)
+            {
+                foreach(var r in task.Result)
                 {
-                    PrimaryCategory = XivStrings.Housing,
-                    SecondaryCategory = XivStrings.Paintings,
-                    ModelInfo = new XivModelInfo()
-                };
-
-                using (var br = new BinaryReaderBE(new MemoryStream(item)))
-                {
-                    br.BaseStream.Seek(housingIndexOffset, SeekOrigin.Begin);
-                    var pictureIndex = br.ReadInt32();
-
-                    if (pictureIndex == 0 || pictureIndex > (pictureDictionary.Count - 1)) return;
-
-                    br.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
-                    var nameOffset = br.ReadInt16();
-
-                    br.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
-                    painting.IconNumber = br.ReadUInt16();
-
-                    var gearNameOffset = itemDataLength + nameOffset;
-                    var gearNameLength = item.Length - gearNameOffset;
-                    br.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                    var nameString = Encoding.UTF8.GetString(br.ReadBytes(gearNameLength)).Replace("\0", "");
-                    painting.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-
-                    using (var br1 = new BinaryReaderBE(new MemoryStream(pictureDictionary[pictureIndex])))
+                    var item = new XivFramePicture()
                     {
-                        br1.BaseStream.Seek(iconNumberOffset, SeekOrigin.Begin);
-                        painting.ModelInfo.PrimaryID = br1.ReadInt32();
-                    }
+                        Name = "Housing Painting #" + r,
+                        PrimaryCategory = XivStrings.Housing,
+                        SecondaryCategory = XivStrings.Paintings,
+                        ModelInfo = new XivModelInfo()
+                        {
+                            PrimaryID = r,
+                        }
+                    };
+                    furnitureList.Add(item);
                 }
+            }
 
-                if (!painting.Name.Equals(string.Empty) && (painting.Name.IndexOf("painting", System.StringComparison.OrdinalIgnoreCase) >= 0))
-                {
-                    lock (paintingsLock)
-                    {
-                        furnitureList.Add(painting);
-                    }
-                }
-            }));
-
-            furnitureList.Sort();
 
             return furnitureList;
+        }
+        private async Task<List<IItemModel>> GetFish(ModTransaction tx = null)
+        {
+            var paintingsLock = new object();
+            var fishList = new List<IItemModel>(1000);
+
+            if (tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            var formatS  = "bgcommon/hou/indoor/gyo/sm/{0}/asset/fsh_sm_m{0}.sgb";
+            var formatM  = "bgcommon/hou/indoor/gyo/mi/{0}/asset/fsh_mi_m{0}.sgb";
+            var formatL  = "bgcommon/hou/indoor/gyo/la/{0}/asset/fsh_la_m{0}.sgb";
+            var formatXL = "bgcommon/hou/indoor/gyo/ll/{0}/asset/fsh_ll_m{0}.sgb";
+
+            var increment = 100;
+            List<Task<List<int>>> tasksS = new List<Task<List<int>>>();
+            List<Task<List<int>>> tasksM = new List<Task<List<int>>>();
+            List<Task<List<int>>> tasksL = new List<Task<List<int>>>();
+            List<Task<List<int>>> tasksXL = new List<Task<List<int>>>();
+            for (int i = 0; i < 10000; i += increment)
+            {
+                tasksS.Add(Index.CheckExistsMultiple(tx, formatS, i, i + increment));
+                tasksM.Add(Index.CheckExistsMultiple(tx, formatM, i, i + increment));
+                tasksL.Add(Index.CheckExistsMultiple(tx, formatL, i, i + increment));
+                tasksXL.Add(Index.CheckExistsMultiple(tx, formatXL, i, i + increment));
+            }
+
+            // Need to condense to a single await to avoid unhandled exceptions in the event the first await fails.
+            var allTasks = new List<Task>();
+            allTasks.AddRange(tasksS);
+            allTasks.AddRange(tasksM);
+            allTasks.AddRange(tasksL);
+            allTasks.AddRange(tasksXL);
+            await Task.WhenAll(allTasks);
+
+            AddFish(fishList, tasksS, 1, "Small");
+            AddFish(fishList, tasksM, 2, "Medium");
+            AddFish(fishList, tasksL, 3, "Large");
+            AddFish(fishList, tasksXL, 4, "X-Large");
+
+            return fishList;
+        }
+
+        private void AddFish(List<IItemModel> list, List<Task<List<int>>> tasks, int size, string sizeName)
+        {
+            foreach (var task in tasks)
+            {
+                foreach (var r in task.Result)
+                {
+                    var item = new XivFish()
+                    {
+                        Name = sizeName + " Aquarium Fish #" + r,
+                        PrimaryCategory = XivStrings.Housing,
+                        SecondaryCategory = XivStrings.Fish,
+                        ModelInfo = new XivModelInfo()
+                        {
+                            PrimaryID = r,
+                            SecondaryID = size
+                        }
+                    };
+                    list.Add(item);
+                }
+            }
         }
 
         /// <summary>
         /// Gets the list of outdoor furniture
         /// </summary>
         /// <returns>A list of XivFurniture objects containing outdoor furniture item info</returns>
-        private async Task<List<XivFurniture>> GetOutdoorFurniture()
+        private async Task<List<IItemModel>> GetOutdoorFurniture(ModTransaction tx = null)
         {
             var outdoorLock = new object();
             // These are the offsets to relevant data
             // These will need to be changed if data gets added or removed with a patch
-            const int itemIndexOffset = 10;
-            const int modelNumberOffset = 12;
-            const int itemCategoryOffset = 13;
-
-            const int itemNameDataOffset = 14;
-            int itemDataLength = DataLengthByPatch["5.5"];
-            const int itemIconDataOffset = 136;
 
 
-            if (_xivLanguage == XivLanguage.Korean)
-            {
-                itemDataLength = DataLengthByPatch["5.5"];
-            }
-            else if (_xivLanguage == XivLanguage.Chinese)
-            {
-                itemDataLength = DataLengthByPatch["5.5"];
-            }
+            var ex = new Ex();
+            var housingEx = await ex.ReadExData(XivEx.housingyardobject, tx);
+            var itemsEx = await ex.ReadExData(XivEx.item, tx);
 
+            var furnitureList = new List<IItemModel>();
 
-            var ex = new Ex(_gameDirectory, _xivLanguage);
-            var housingDictionary = await ex.ReadExData(XivEx.housingyardobject);
-            var itemDictionary = await ex.ReadExData(XivEx.item);
-
-            var furnitureList = new List<XivFurniture>();
-
-            await Task.Run(() => Parallel.ForEach(housingDictionary.Values, (housingItem) =>
+            await Task.Run(() => Parallel.ForEach(housingEx.Values, (row) =>
             {
                 var item = new XivFurniture
                 {
@@ -304,32 +287,15 @@ namespace xivModdingFramework.Items.Categories
                     ModelInfo = new XivModelInfo()
                 };
 
-                using (var br = new BinaryReaderBE(new MemoryStream(housingItem)))
-                {
-                    br.BaseStream.Seek(itemIndexOffset, SeekOrigin.Begin);
-                    var itemIndex = br.ReadUInt16();
+                var itemIndex = (int) ((uint) row.GetColumnByName("ItemId"));
+                item.ModelInfo.PrimaryID = (ushort) row.GetColumnByName("PrimaryId");
 
-                    br.BaseStream.Seek(modelNumberOffset, SeekOrigin.Begin);
-                    item.ModelInfo.PrimaryID = br.ReadByte();
 
-                    br.BaseStream.Seek(itemCategoryOffset, SeekOrigin.Begin);
-                    var housingCategory = br.ReadByte();
+                // Benchmark
+                if (!itemsEx.ContainsKey(itemIndex))
+                    return;
 
-                    using (var br1 = new BinaryReaderBE(new MemoryStream(itemDictionary[itemIndex])))
-                    {
-                        br1.BaseStream.Seek(itemNameDataOffset, SeekOrigin.Begin);
-                        var nameOffset = br1.ReadInt16();
-
-                        br1.BaseStream.Seek(itemIconDataOffset, SeekOrigin.Begin);
-                        item.IconNumber = br1.ReadUInt16();
-
-                        var gearNameOffset = itemDataLength + nameOffset;
-                        var gearNameLength = itemDictionary[itemIndex].Length - gearNameOffset;
-                        br1.BaseStream.Seek(gearNameOffset, SeekOrigin.Begin);
-                        var nameString = Encoding.UTF8.GetString(br1.ReadBytes(gearNameLength)).Replace("\0", "");
-                        item.Name = new string(nameString.Where(c => !char.IsControl(c)).ToArray());
-                    }
-                }
+                AttachItemInfo(item, itemsEx[itemIndex]);
 
                 if (!item.Name.Equals(string.Empty))
                 {
@@ -345,31 +311,29 @@ namespace xivModdingFramework.Items.Categories
             return furnitureList;
         }
 
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(IItemModel itemModel, ModTransaction tx = null)
         {
-
-            return await GetFurnitureModelParts(itemModel.ModelInfo.PrimaryID, itemModel.SecondaryCategory);
+            return await GetFurnitureModelParts(itemModel.ModelInfo.PrimaryID, itemModel.ModelInfo.SecondaryID, itemModel.GetPrimaryItemType(), tx);
         }
 
 
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, XivItemType type)
-        {
-            var cat = type == XivItemType.indoor ? XivStrings.Furniture_Indoor : XivStrings.Furniture_Outdoor;
-            return await GetFurnitureModelParts(modelID, cat);
-        }
 
         /// <summary>
         /// Gets the parts list for furniture
         /// </summary>
         /// <param name="itemModel">The item to get the parts for</param>
         /// <returns>A dictionary containing the part string and mdl path string</returns>
-        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, string category)
+        public async Task<Dictionary<string, string>> GetFurnitureModelParts(int modelID, int? secondaryId, XivItemType type, ModTransaction tx = null)
         {
             var furniturePartDict = new Dictionary<string, string>();
 
-            var assets = await GetFurnitureAssets(modelID, category);
+            var assets = await GetFurnitureAssets(modelID, secondaryId, type, tx);
+            if(assets == null)
+            {
+                return new Dictionary<string, string>();
+            }
 
-            foreach (var mdl in assets.MdlList)
+            foreach (var mdl in assets.Models)
             {
                 if (mdl.Contains("base"))
                 {
@@ -421,36 +385,80 @@ namespace xivModdingFramework.Items.Categories
             /// </summary>
             /// <param name="modelID">The model id to get the assets for</param>
             /// <returns>A HousingAssets object containing the asset info</returns>
-        private async Task<HousingAssets> GetFurnitureAssets(int modelID, string category)
+        private async Task<HousingAssets> GetFurnitureAssets(int modelID, int? secondaryId, XivItemType type, ModTransaction tx = null)
         {
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one;
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
 
             var id = modelID.ToString().PadLeft(4, '0');
 
             var assetFolder = "";
             var assetFile = "";
 
-            if (category.Equals(XivStrings.Furniture_Indoor))
+            if (type == XivItemType.indoor)
             {
                 assetFolder = $"bgcommon/hou/indoor/general/{id}/asset";
                 assetFile = $"fun_b0_m{id}.sgb";
             }
-            else if (category.Equals(XivStrings.Furniture_Outdoor))
+            else if (type == XivItemType.outdoor)
             {
                 assetFolder = $"bgcommon/hou/outdoor/general/{id}/asset";
                 assetFile = $"gar_b0_m{id}.sgb";
             }
+            else if (type == XivItemType.fish)
+            {
+                var size = XivFish.IntSizeToString(secondaryId);
+                assetFolder = $"bgcommon/hou/indoor/gyo/{size}/{id}/asset";
+                assetFile = $"fsh_{size}_m{id}.sgb";
+            }
 
-            var assetOffset = await index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile),
-                XivDataFile._01_Bgcommon);
+            var path = assetFolder + "/" + assetFile;
+            
 
-            var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
+            //var sgb = Sgb.GetXivSgb(assetData);
 
             var housingAssets = new HousingAssets();
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
+                await GetAdditionalAssets(housingAssets, new List<string>() { path }, tx);
+            });
+
+            return housingAssets;
+        }
+
+        /// <summary>
+        /// Recursively retrieves all housing assets from a set of SGB files.
+        /// </summary>
+        private async Task GetAdditionalAssets(HousingAssets assets, IEnumerable<string> paths, ModTransaction tx = null, HashSet<string> scannedPaths = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            if(scannedPaths == null)
+            {
+                scannedPaths = new HashSet<string>();
+            }
+
+            foreach (var asset in paths)
+            {
+                if (scannedPaths.Contains(asset))
+                {
+                    continue;
+                }
+                if (!await tx.FileExists(asset))
+                {
+                    continue;
+                }
+
+                var assetData = await tx.ReadFile(asset);
+                var relatedSgbs = new HashSet<string>();
                 using (var br = new BinaryReader(new MemoryStream(assetData)))
                 {
                     br.BaseStream.Seek(20, SeekOrigin.Begin);
@@ -486,187 +494,31 @@ namespace xivModdingFramework.Items.Categories
                         if (path.Equals(string.Empty)) continue;
 
                         // Add the attribute to the list
-                        if (pathCounts == 0)
+                        if (path.Contains(".mdl"))
                         {
-                            housingAssets.Shared = path;
+                            assets.Models.Add(path);
                         }
-                        else if (pathCounts == 1)
+                        else if (path.Contains(".sgb"))
                         {
-                            housingAssets.BaseFileName = path;
+                            relatedSgbs.Add(path);
                         }
-                        else
+                        else if (path.Contains("."))
                         {
-                            if (path.Contains(".mdl"))
-                            {
-                                housingAssets.MdlList.Add(path);
-                            }
-                            else if (path.Contains(".sgb"))
-                            {
-                                housingAssets.AdditionalAssetList.Add(path);
-                            }
-                            else if (!path.Contains("."))
-                            {
-                                housingAssets.BaseFolder = path;
-                            }
-                            else
-                            {
-                                housingAssets.OthersList.Add(path);
-                            }
+                            assets.OtherFiles.Add(path);
                         }
 
                         pathCounts++;
                     }
                 }
-            });
 
-            if (housingAssets.AdditionalAssetList.Count > 0)
-            {
-                await GetAdditionalAssets(housingAssets);
-            }
-
-
-            return housingAssets;
-        }
-
-        /// <summary>
-        /// Gets additional assets when the original asset file contains asset file paths within it
-        /// </summary>
-        /// <param name="assets">The current asset object</param>
-        private async Task GetAdditionalAssets(HousingAssets assets)
-        {
-            var index = new Index(_gameDirectory);
-            var dat = new Dat(_gameDirectory);
-
-            foreach (var additionalAsset in assets.AdditionalAssetList.ToList())
-            {
-                var assetFolder = Path.GetDirectoryName(additionalAsset).Replace("\\", "/");
-                var assetFile = Path.GetFileName(additionalAsset);
-
-                var assetOffset = await index.GetDataOffset(HashGenerator.GetHash(assetFolder), HashGenerator.GetHash(assetFile), XivDataFile._01_Bgcommon);
-
-                var assetData = await dat.GetType2Data(assetOffset, XivDataFile._01_Bgcommon);
-
-                await Task.Run(() =>
+                if (relatedSgbs.Count > 0)
                 {
-                    using (var br = new BinaryReader(new MemoryStream(assetData)))
-                    {
-                        br.BaseStream.Seek(20, SeekOrigin.Begin);
+                    await GetAdditionalAssets(assets, relatedSgbs, tx, scannedPaths);
+                }
 
-                        var skip = br.ReadInt32() + 20;
-
-                        br.BaseStream.Seek(skip + 4, SeekOrigin.Begin);
-
-                        var stringsOffset = br.ReadInt32();
-
-                        br.BaseStream.Seek(skip + stringsOffset, SeekOrigin.Begin);
-
-                        var pathCounts = 0;
-
-                        while (true)
-                        {
-                            // Because we don't know the length of the string, we read the data until we reach a 0 value
-                            // That 0 value is the space between strings
-                            byte a;
-                            var pathName = new List<byte>();
-                            while ((a = br.ReadByte()) != 0)
-                            {
-                                if (a == 0xFF) break;
-
-                                pathName.Add(a);
-                            }
-
-                            if (a == 0xFF) break;
-
-                            // Read the string from the byte array and remove null terminators
-                            var path = Encoding.ASCII.GetString(pathName.ToArray()).Replace("\0", "");
-
-                            if (path.Equals(string.Empty)) continue;
-
-                            // Add the attribute to the list
-                            if (pathCounts == 0)
-                            {
-                                assets.Shared = path;
-                            }
-                            else if (pathCounts == 1)
-                            {
-                                assets.BaseFileName = path;
-                            }
-                            else
-                            {
-                                if (path.Contains(".mdl"))
-                                {
-                                    assets.MdlList.Add(path);
-                                }
-                                else if (path.Contains(".sgb"))
-                                {
-                                    assets.AdditionalAssetList.Add(path);
-                                }
-                                else if (!path.Contains("."))
-                                {
-                                    assets.BaseFolder = path;
-                                }
-                                else
-                                {
-                                    assets.OthersList.Add(path);
-                                }
-                            }
-
-                            pathCounts++;
-                        }
-                    }
-                });
             }
         }
 
-        /// <summary>
-        /// Searches for housing items given a model ID
-        /// </summary>
-        /// <param name="modelID">The Model ID of the housing item</param>
-        /// <param name="type">The type of housing item to search for</param>
-        /// <returns>A list of Search Results</returns>
-        public async Task<List<SearchResults>> SearchHousingByModelID(int modelID, XivItemType type)
-        {
-            var searchResultsList = new List<SearchResults>();
-            var index = new Index(_gameDirectory);
-            var id = modelID.ToString().PadLeft(4, '0');
-
-            var folder = "";
-
-            if (type == XivItemType.furniture)
-            {
-                folder = $"bgcommon/hou/indoor/general/{id}/material";
-            }
-
-            if (await index.FolderExists(folder, XivDataFile._01_Bgcommon))
-            {
-                var searchResults = new SearchResults
-                {
-                    Body = "-",
-                    Slot = XivStrings.Furniture_Indoor,
-                    Variant = int.Parse(id)
-                };
-
-                searchResultsList.Add(searchResults);
-            }
-
-            folder = $"bgcommon/hou/outdoor/general/{id}/material";
-
-            if (await index.FolderExists(folder, XivDataFile._01_Bgcommon))
-            {
-                var searchResults = new SearchResults
-                {
-                    Body = "-",
-                    Slot = XivStrings.Furniture_Outdoor,
-                    Variant = int.Parse(id)
-                };
-
-                searchResultsList.Add(searchResults);
-            }
-
-            searchResultsList.Sort();
-
-            return searchResultsList;
-        }
     }
 
     /// <summary>
@@ -674,16 +526,7 @@ namespace xivModdingFramework.Items.Categories
     /// </summary>
     public class HousingAssets
     {
-        public string Shared { get; set; }
-
-        public string BaseFileName { get; set; }
-
-        public List<string> MdlList { get; set; } = new List<string>();
-
-        public List<string> AdditionalAssetList { get; set; } = new List<string>();
-
-        public List<string> OthersList { get; set;} = new List<string>();
-
-        public string BaseFolder { get; set; }
+        public List<string> Models { get; set; } = new List<string>();
+        public List<string> OtherFiles { get; set;} = new List<string>();
     }
 }

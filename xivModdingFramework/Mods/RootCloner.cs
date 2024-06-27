@@ -1,7 +1,9 @@
-﻿using System;
+﻿using SharpDX.Win32;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -13,6 +15,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Models.DataContainers;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Models.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.DataContainers;
@@ -34,6 +37,9 @@ namespace xivModdingFramework.Mods
             if (root.Info.PrimaryType == XivItemType.equipment) return true;
             if (root.Info.PrimaryType == XivItemType.accessory) return true;
             if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.hair) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.ear) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.tail) return true;
+            if (root.Info.PrimaryType == XivItemType.human && root.Info.SecondaryType == XivItemType.face) return true;
 
             return false;
         }
@@ -45,54 +51,35 @@ namespace xivModdingFramework.Mods
         /// <param name="Destination">Destination root to copy to.</param>
         /// <param name="ApplicationSource">Application to list as the source for the resulting mod entries.</param>
         /// <returns>Returns a Dictionary of all the file conversion</returns>
-        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, IndexFile index = null, ModList modlist = null, ModPack modPack = null)
+        public static async Task<Dictionary<string, string>> CloneRoot(XivDependencyRoot Source, XivDependencyRoot Destination, string ApplicationSource, int singleVariant = -1, string saveDirectory = null, IProgress<string> ProgressReporter = null, ModTransaction tx = null)
         {
             if(!IsSupported(Source) || !IsSupported(Destination))
             {
                 throw new InvalidDataException("Cannot clone unsupported root.");
             }
 
-            if(XivCache.GameInfo.UseLumina)
-            {
-                // Using the root cloner with Lumina import mode enabled is unstable/not safe.
-                // ( The state of the game files in the TT system may not match the state of the 
-                // Lumina mod setup, and the modlist/etc. can get bashed as this function directly
-                // modifies the modlist during the cloning process. )
-                throw new Exception("Item Conversion cannot be used with Lumina import mode.");
-            }
-
-
             if (ProgressReporter != null)
             {
                 ProgressReporter.Report("Stopping Cache Worker...");
             }
-            var workerStatus = XivCache.CacheWorkerEnabled;
-            XivCache.CacheWorkerEnabled = false;
+
+            var boiler = await TxBoiler.BeginWrite(tx);
+            tx = boiler.Transaction;
             try
             {
+                var destItem = Destination.GetFirstItem();
+                var srcItem = (await Source.GetAllItems(singleVariant, tx))[0];
+                var iCat = destItem.SecondaryCategory;
+                var iName = destItem.Name;
+
+                var modPack = new ModPack(null) { Author = "System", Name = "Item Copy - " + srcItem.Name + " to " + iName, Url = "", Version = "1.0" };
+                boiler.OwnModpack = modPack;
+
+
                 var df = IOUtil.GetDataFileFromPath(Source.ToString());
+                var index = await tx.GetIndexFile(df);
+                var modlist = await tx.GetModList();
 
-                var _imc = new Imc(XivCache.GameInfo.GameDirectory);
-                var _mdl = new Mdl(XivCache.GameInfo.GameDirectory, df);
-                var _dat = new Dat(XivCache.GameInfo.GameDirectory);
-                var _index = new Index(XivCache.GameInfo.GameDirectory);
-                var _mtrl = new Mtrl(XivCache.GameInfo.GameDirectory);
-                var _modding = new Modding(XivCache.GameInfo.GameDirectory);
-
-                var doSave = false;
-                if (index == null)
-                {
-                    doSave = true;
-                    index = await _index.GetIndexFile(df);
-                    modlist = await _modding.GetModListAsync();
-                }
-
-
-                bool locked = _index.IsIndexLocked(df);
-                if(locked)
-                {
-                    throw new Exception("Game files currently in use.");
-                }
 
 
                 if (ProgressReporter != null)
@@ -101,15 +88,15 @@ namespace xivModdingFramework.Mods
                 }
 
                 // First, try to get everything, to ensure it's all valid.
-                ItemMetadata originalMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
+                ItemMetadata originalMetadata = await GetCachedMetadata(Source, tx);
 
 
-                var originalModelPaths = await Source.GetModelFiles(index, modlist);
-                var originalMaterialPaths = await Source.GetMaterialFiles(-1, index, modlist);
-                var originalTexturePaths = await Source.GetTextureFiles(-1, index, modlist);
+                var originalModelPaths = await Source.GetModelFiles(tx);
+                var originalMaterialPaths = await Source.GetMaterialFiles(-1, tx, false);
+                var originalTexturePaths = await Source.GetTextureFiles(-1, tx);
 
                 var originalVfxPaths = new HashSet<string>();
-                if (Imc.UsesImc(Source))
+                if (Imc.UsesImc(Source) && Imc.UsesImc(Destination))
                 {
                     var avfxSets = originalMetadata.ImcEntries.Select(x => x.Vfx).Distinct();
                     foreach (var avfx in avfxSets)
@@ -126,35 +113,60 @@ namespace xivModdingFramework.Mods
                 }
 
                 // Time to start editing things.
+                bool crossTypeSwap = false;
 
                 // First, get a new, clean copy of the metadata, pointed at the new root.
-                var newMetadata = await GetCachedMetadata(index, modlist, Source, df, _dat);
-                newMetadata.Root = Destination.Info.ToFullRoot();
+                ItemMetadata newMetadata;
                 ItemMetadata originalDestinationMetadata = null;
+
                 try
                 {
-                    originalDestinationMetadata = await GetCachedMetadata(index, modlist, Destination, df, _dat);
-                } catch
+                    originalDestinationMetadata = await GetCachedMetadata(Destination, tx);
+                }
+                catch
                 {
                     originalDestinationMetadata = new ItemMetadata(Destination);
                 }
 
-                // Set 0 needs special handling.
-                if(Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
+                if (Source.Info.PrimaryType == Destination.Info.PrimaryType)
                 {
-                    var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
-                    var set1Metadata = await GetCachedMetadata(index, modlist, set1Root, df, _dat);
+                    newMetadata = await GetCachedMetadata(Source, tx);
+                    newMetadata.Root = Destination.Info.ToFullRoot();
 
-                    newMetadata.EqpEntry = set1Metadata.EqpEntry;
-
-                    if (Source.Info.Slot == "met")
+                    // Set 0 needs special handling.
+                    if (Source.Info.PrimaryType == XivItemType.equipment && Source.Info.PrimaryId == 0)
                     {
-                        newMetadata.GmpEntry = set1Metadata.GmpEntry;
+                        var set1Root = new XivDependencyRoot(Source.Info.PrimaryType, 1, null, null, Source.Info.Slot);
+                        var set1Metadata = await GetCachedMetadata(set1Root, tx);
+
+                        newMetadata.EqpEntry = set1Metadata.EqpEntry;
+
+                        if (Source.Info.Slot == "met")
+                        {
+                            newMetadata.GmpEntry = set1Metadata.GmpEntry;
+                        }
                     }
-                } else if (Destination.Info.PrimaryType == XivItemType.equipment && Destination.Info.PrimaryId == 0)
+                    else if (Destination.Info.PrimaryType == XivItemType.equipment && Destination.Info.PrimaryId == 0)
+                    {
+                        newMetadata.EqpEntry = null;
+                        newMetadata.GmpEntry = null;
+                    }
+
+                }
+                else if((Source.Info.PrimaryType == XivItemType.equipment || Source.Info.PrimaryType == XivItemType.accessory) && Destination.Info.PrimaryType == XivItemType.accessory)
                 {
-                    newMetadata.EqpEntry = null;
-                    newMetadata.GmpEntry = null;
+                    crossTypeSwap = true;
+
+                    // For this we have to work from a fresh copy the destination and alter it to resemble the source.
+                    newMetadata = await ItemMetadata.GetMetadata(Destination, true, tx);
+                    var sourceMetadata = await ItemMetadata.GetMetadata(Source, false, tx);
+
+                    // Accessories only have these two types of metadata, which don't internally care about where they came from.
+                    newMetadata.ImcEntries = sourceMetadata.ImcEntries;
+                    newMetadata.EqdpEntries = sourceMetadata.EqdpEntries;
+                } else
+                {
+                    throw new InvalidDataException("Cannot convert non-same-type root other than Equipment => Accessory.");
                 }
 
 
@@ -199,10 +211,6 @@ namespace xivModdingFramework.Mods
                     newAvfxPaths.Add(path, UpdatePath(Source, Destination, path));
                 }
 
-                var destItem = Destination.GetFirstItem();
-                var srcItem = (await Source.GetAllItems(singleVariant))[0];
-                var iCat = destItem.SecondaryCategory;
-                var iName = destItem.Name;
 
 
                 var files = newModelPaths.Select(x => x.Value).Union(
@@ -230,21 +238,21 @@ namespace xivModdingFramework.Mods
                 if (Destination != Source)
                 {
                     var dPath = Destination.Info.GetRootFolder();
-                    var allMods = modlist.Mods.ToList();
+                    var allMods = modlist.GetMods().ToList();
                     foreach (var mod in allMods)
                     {
-                        if (mod.fullPath.StartsWith(dPath) && !mod.IsInternal())
+                        if (mod.FilePath.StartsWith(dPath) && !mod.IsInternal())
                         {
                             if (Destination.Info.SecondaryType != null || Destination.Info.Slot == null)
                             {
                                 // If this is a slotless root, purge everything.
-                                await _modding.DeleteMod(mod.fullPath, false, index, modlist);
+                                await Modding.DeleteMod(mod.FilePath, tx);
                             }
-                            else if (allFiles.Contains(mod.fullPath) || mod.fullPath.Contains(Destination.Info.GetBaseFileName(true)))
+                            else if (allFiles.Contains(mod.FilePath) || mod.FilePath.Contains(Destination.Info.GetBaseFileName(true)))
                             {
                                 // Otherwise, only purge the files we're replacing, and anything else that
                                 // contains our slot name.
-                                await _modding.DeleteMod(mod.fullPath, false, index, modlist);
+                                await Modding.DeleteMod(mod.FilePath, tx);
                             }
                         }
                     }
@@ -260,12 +268,14 @@ namespace xivModdingFramework.Mods
                 {
                     var src = kv.Key;
                     var dst = kv.Value;
-                    var offset = index.Get8xDataOffset(src);
-                    var xmdl = await _mdl.GetRawMdlData(src, false, offset);
+                    var xmdl = await Mdl.GetXivMdl(src, false, tx);
                     var tmdl = TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
                         continue;
+
+                    var srcRace = IOUtil.GetRaceFromPath(src);
+                    var dstRace = IOUtil.GetRaceFromPath(dst);
 
                     tmdl.Source = dst;
                     xmdl.MdlPath = dst;
@@ -279,9 +289,29 @@ namespace xivModdingFramework.Mods
                         }
                     }
 
+                    if(crossTypeSwap && Destination.Info.PrimaryType == XivItemType.accessory)
+                    {
+                        // We want to remove any skin meshes here.
+                        var groups = tmdl.MeshGroups.ToList();
+                        var rex = ModelModifiers.SkinMaterialRegex;
+                        foreach (var mg in groups)
+                        {
+                            var match = rex.Match(mg.Material);
+                            if (match.Success)
+                            {
+                                tmdl.MeshGroups.Remove(mg);
+                            }
+                        }
+                    }
+
+                    if(srcRace != dstRace && (int)srcRace > 100 && (int)dstRace > 100)
+                    {
+                        await ModelModifiers.RaceConvertRecursive(tmdl, dstRace, srcRace, null, tx);
+                    }
+
                     // Save new Model.
-                    var bytes = await _mdl.MakeNewMdlFile(tmdl, xmdl, null);
-                    await _dat.WriteModFile(bytes, dst, ApplicationSource, destItem, index, modlist);
+                    var bytes = await Mdl.MakeCompressedMdlFile(tmdl, xmdl);
+                    var newMdlOffset = await Dat.WriteModFile(bytes, dst, ApplicationSource, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
@@ -295,7 +325,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, index, modlist);
+                    await Dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
                 }
 
 
@@ -304,6 +334,7 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Copying materials...");
                 }
                 HashSet<string> CopiedMaterials = new HashSet<string>();
+
                 // Load every Material file and edit the texture references to the new texture paths.
                 foreach (var kv in newMaterialPaths)
                 {
@@ -311,20 +342,20 @@ namespace xivModdingFramework.Mods
                     var dst = kv.Value;
                     try
                     {
-                        var offset = index.Get8xDataOffset(src);
-                        if (offset == 0) continue;
-                        var xivMtrl = await _mtrl.GetMtrlData(offset, src, 11);
+                        var exists = await tx.FileExists(src);
+                        if (!exists) continue;
+                        var xivMtrl = await Mtrl.GetXivMtrl(src, false, tx);
                         xivMtrl.MTRLPath = dst;
 
-                        for (int i = 0; i < xivMtrl.TexturePathList.Count; i++)
+                        for (int i = 0; i < xivMtrl.Textures.Count; i++)
                         {
                             foreach (var tkv in newTexturePaths)
                             {
-                                xivMtrl.TexturePathList[i] = xivMtrl.TexturePathList[i].Replace(tkv.Key, tkv.Value);
+                                xivMtrl.Textures[i].TexturePath = xivMtrl.Textures[i].TexturePath.Replace(tkv.Key, tkv.Value);
                             }
                         }
 
-                        await _mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, index, modlist);
+                        await Mtrl.ImportMtrl(xivMtrl, destItem, ApplicationSource, false, tx);
                         CopiedMaterials.Add(dst);
                     }
                     catch (Exception ex)
@@ -343,13 +374,14 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
 
-                    await _dat.CopyFile(src, dst, ApplicationSource, true, destItem, index, modlist);
+                    await Dat.CopyFile(src, dst, ApplicationSource, true, destItem, tx);
                 }
 
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Creating missing variants...");
                 }
+
                 // Check to see if we need to add any variants
                 var cloneNum = newMetadata.ImcEntries.Count >= 2 ? 1 : 0;
                 while (originalDestinationMetadata.ImcEntries.Count > newMetadata.ImcEntries.Count)
@@ -408,19 +440,15 @@ namespace xivModdingFramework.Mods
                     }
                 }
 
-                await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource, index, modlist);
-
-                // Save the new Metadata file via the batch function so that it's only written to the memory cache for now.
-                await ItemMetadata.ApplyMetadataBatched(new List<ItemMetadata>() { newMetadata }, index, modlist, false);
-
-                
-
-
+                // Save and apply metadata
+                await ItemMetadata.SaveMetadata(newMetadata, ApplicationSource, tx);
+                await ItemMetadata.ApplyMetadata(newMetadata, tx);
 
                 if (ProgressReporter != null)
                 {
                     ProgressReporter.Report("Filling in missing material sets...");
                 }
+
                 // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
                 if (Imc.UsesImc(Destination))
                 {
@@ -453,8 +481,13 @@ namespace xivModdingFramework.Mods
                             // Shouldn't ever actually hit this, but if we do, nothing to be done about it.
                             if (existentCopy == null) continue;
 
+                            if (!allFiles.Contains(destPath))
+                            {
+                                allFiles.Add(destPath);
+                            }
+
                             // Copy the material over.
-                            await _dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, index, modlist);
+                            await Dat.CopyFile(existentCopy, destPath, ApplicationSource, true, destItem, tx);
                         }
                     }
                 }
@@ -464,39 +497,39 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Updating modlist...");
                 }
 
-                if (modPack == null)
-                {
-                    modPack = new ModPack() { author = "System", name = "Item Copy - " + srcItem.Name + " to " + iName, url = "", version = "1.0" };
-                }
 
                 List<Mod> mods = new List<Mod>();
-                foreach (var mod in modlist.Mods)
+                var mListMods = modlist.GetMods();
+                foreach (var mod in mListMods)
                 {
-                    if (allFiles.Contains(mod.fullPath))
+                    if (allFiles.Contains(mod.FilePath))
                     {
                         // Ensure all of our modified files are attributed correctly.
-                        mod.name = iName;
-                        mod.category = iCat;
-                        mod.source = ApplicationSource;
-                        mod.modPack = modPack;
+                        var nMod = mod;
+                        nMod.ItemName = iName;
+                        nMod.ItemCategory = iCat;
+                        nMod.SourceApplication = ApplicationSource;
 
-                        mods.Add(mod);
+                        if (tx.ModPack != null)
+                        {
+                            nMod.ModPack = tx.ModPack.Value.Name;
+                        } else
+                        {
+                            nMod.ModPack = modPack.Name;
+                        }
+
+                        mods.Add(nMod);
                     }
                 }
 
-                if (!modlist.ModPacks.Any(x => x.name == modPack.name))
+                // Save the changes.
+                foreach(var mod in mods)
                 {
-                    modlist.ModPacks.Add(modPack);
+                    modlist.AddOrUpdateMod(mod);
                 }
 
-                if(doSave)
-                {
-                    // Save everything.
-                    await _index.SaveIndexFile(index);
-                    await _modding.SaveModListAsync(modlist);
-                }
 
-                XivCache.QueueDependencyUpdate(allFiles.ToList());
+
 
                 if(saveDirectory != null)
                 {
@@ -504,37 +537,37 @@ namespace xivModdingFramework.Mods
                     ProgressReporter.Report("Creating TTMP File...");
                     var desc = "Item Converter Modpack - " + srcItem.Name + " -> " + iName + "\nCreated at: " + DateTime.Now.ToString();
                     // Time to save the modlist to file.
-                    var dir = new DirectoryInfo(saveDirectory);
-                    var _ttmp = new TTMP(dir, ApplicationSource);
                     var smpd = new SimpleModPackData()
                     {
-                        Author = modPack.author,
+                        Author = modPack.Author,
                         Description = desc,
-                        Url = modPack.url,
+                        Url = modPack.Url,
                         Version = new Version(1, 0, 0),
-                        Name = modPack.name,
+                        Name = modPack.Name,
                         SimpleModDataList = new List<SimpleModData>()
                     };
 
                     foreach(var mod in mods)
                     {
-                        var size = await _dat.GetCompressedFileSize(mod.data.modOffset, df);
                         var smd = new SimpleModData()
                         {
                             Name = iName,
-                            FullPath = mod.fullPath,
-                            DatFile = df.GetDataFileName(),
+                            FullPath = mod.FilePath,
+                            DatFile = df.GetFileName(),
                             Category = iCat,
                             IsDefault = false,
-                            ModSize = size,
-                            ModOffset = mod.data.modOffset
+                            ModOffset = mod.ModOffset8x
                         };
                         smpd.SimpleModDataList.Add(smd);
                     }
 
-                    await _ttmp.CreateSimpleModPack(smpd, XivCache.GameInfo.GameDirectory, null, true);
+                    await TTMP.CreateSimpleModPack(smpd, saveDirectory, null, true, tx);
                 }
 
+
+                XivCache.QueueDependencyUpdate(allFiles.ToList());
+                // Commit our transaction.
+                await boiler.Commit();
 
 
                 if (ProgressReporter != null)
@@ -548,26 +581,33 @@ namespace xivModdingFramework.Mods
                 dict.Add(Source.Info.GetRootFile(), Destination.Info.GetRootFile());
                 return dict;
 
-            } finally
+            } catch (Exception ex)
             {
-                XivCache.CacheWorkerEnabled = workerStatus;
+                await boiler.Catch();
+                throw;
             }
         }
 
-        private static async Task<ItemMetadata> GetCachedMetadata(IndexFile index, ModList modlist, XivDependencyRoot root, XivDataFile df, Dat _dat)
+        private static async Task<ItemMetadata> GetCachedMetadata(XivDependencyRoot root, ModTransaction tx)
         {
-            var originalMetadataOffset = index.Get8xDataOffset(root.Info.GetRootFile());
-            ItemMetadata originalMetadata = null;
-            if (originalMetadataOffset == 0)
+            if(tx == null)
             {
-                originalMetadata = await ItemMetadata.GetMetadata(root);
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            var metaPath = root.Info.GetRootFile();
+            ItemMetadata metadata = null;
+
+            if (!await tx.FileExists(metaPath))
+            {
+                metadata = await ItemMetadata.GetMetadata(root, true, tx);
             }
             else
             {
-                var data = await _dat.GetType2Data(originalMetadataOffset, df);
-                originalMetadata = await ItemMetadata.Deserialize(data);
+                var data = await tx.ReadFile(metaPath);
+                metadata = await ItemMetadata.Deserialize(data);
             }
-            return originalMetadata;
+            return metadata;
         }
 
         const string CommonPath = "chara/common/";
@@ -583,8 +623,6 @@ namespace xivModdingFramework.Mods
                 path = Destination.Info.GetRootFolder() + "common/" + afterCommon;
                 return path;
             }
-
-            // Things that live in the common folder get to stay there/don't get copied.
 
             var file = UpdateFileName(Source, Destination, path);
             var folder = UpdateFolder(Source, Destination, path);
@@ -655,30 +693,165 @@ namespace xivModdingFramework.Mods
                 return file;
             }
 
-            var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})");
+            var rex = new Regex("[a-z][0-9]{4}([a-z][0-9]{4})(_[a-z]{3})?");
             var match = rex.Match(file);
             if(!match.Success)
             {
+                // Doesn't contain a root name reference, can just copy it through.
                 return file;
             }
 
             if (Source.Info.SecondaryType == null)
             {
-                // Equipment/Accessory items. Only replace the back half of the file names.
+                // Equipment/Accessory items. Only replace the front half of the file names and the slot.
                 var srcString = match.Groups[1].Value;
                 var dstString = Destination.Info.GetBaseFileName(false);
 
                 file = file.Replace(srcString, dstString);
+
+                // Has slotname.
+                if(match.Groups.Count >= 3 && Destination.Info.Slot != null)
+                {
+                    var srcSlot = match.Groups[2].Value;
+                    var dstSlot = "_" + Destination.Info.Slot;
+
+                    if(srcSlot != "_" + Source.Info.Slot)
+                    {
+                        // Naughty modders cross-referencing materials and such.
+                        // Can't leave name intact b/c it might bash.
+                        dstSlot = srcSlot + dstSlot;
+                    }
+
+                    file = file.Replace(srcSlot, dstSlot);
+                }
+
+
             } else
             {
                 // Replace the entire root chunk for roots that have two identifiers.
                 var srcString = match.Groups[0].Value;
-                var dstString = Destination.Info.GetBaseFileName(false);
+                var dstString = Destination.Info.GetBaseFileName(true);
+
+                var fakeSlot = "";
+                if(match.Groups[2].Success)
+                {
+                    fakeSlot = match.Groups[2].Value.Substring(1);
+                    if(fakeSlot != Source.Info.Slot)
+                    {
+                        var info = Destination.Info;
+                        info.Slot = fakeSlot;
+                        dstString = info.GetBaseFileName(true);
+                    }
+                }
 
                 file = file.Replace(srcString, dstString);
             }
 
             return file;
+        }
+
+
+        /// <summary>
+        /// Clones a set of roots to a set of destination roots, in order, as part of a larger mod import transaction.
+        /// The source roots are reset back to their original offsets after cloning.
+        /// </summary>
+        /// <param name="roots"></param>
+        /// <param name="importedFiles"></param>
+        /// <param name="tx"></param>
+        /// <param name="readTx"></param>
+        /// <param name="sourceApplication"></param>
+        /// <returns></returns>
+        internal static async Task<HashSet<string>> CloneAndResetRoots(Dictionary<XivDependencyRoot, (XivDependencyRoot Root, int Variant)> roots, HashSet<string> importedFiles, ModTransaction tx, Dictionary<string, TxFileState> originalStates, string sourceApplication, IProgress<(int current, int total, string message)> progress = null)
+        {
+            if (roots.Count == 0)
+            {
+                return new HashSet<string>();
+            }
+
+            // We currently have all the files loaded into our in-memory indices in their default locations.
+            var conversionsByDf = roots.GroupBy(x => IOUtil.GetDataFileFromPath(x.Key.Info.GetRootFile()));
+            var newModList = await tx.GetModList();
+
+            HashSet<string> clearedFiles = new HashSet<string>();
+            var total = roots.Count;
+            var count = 0;
+
+            // This is a bit odd, but we need to go ahead and force clear the cache.
+            // Because we're mid-modpack install and have old data that hasn't yet been queued.
+            XivCache.QueueDependencyUpdate(importedFiles);
+
+
+            foreach (var dfe in conversionsByDf)
+            {
+                HashSet<string> filesToReset = new HashSet<string>();
+                var df = dfe.Key;
+                var newIndex = await tx.GetIndexFile(df);
+
+                foreach (var conversion in dfe)
+                {
+                    var source = conversion.Key;
+                    var destination = conversion.Value.Root;
+                    var variant = conversion.Value.Variant;
+
+
+                    progress.Report((count, total, "Updating Destination Items..."));
+                    var convertedFiles = await RootCloner.CloneRoot(source, destination, sourceApplication, variant, null, null, tx);
+
+                    // We're going to reset the original files back to their pre-modpack install state after, as long as they got moved.
+                    foreach (var fileKv in convertedFiles)
+                    {
+
+                        if (fileKv.Key != fileKv.Value)
+                        {
+                            // Note the new file that was added.
+                            importedFiles.Add(fileKv.Value);
+                            
+                            // Reset the original file.
+                            filesToReset.Add(fileKv.Key);
+                        }
+
+                    }
+
+                    // Remove any remaining lingering files which belong to this root.
+                    // Ex. Extraneous unused files in the modpack.  This helps keep
+                    // any unnecessary files from poluting the original destination item post conversion.
+                    foreach (var file in importedFiles.ToList())
+                    {
+                        var root = XivDependencyGraph.ExtractRootInfo(file);
+                        if (root == source.Info)
+                        {
+                            if (!filesToReset.Contains(file))
+                            {
+                                filesToReset.Add(file);
+                            }
+                        }
+                    }
+
+                    count++;
+                }
+
+                // Reset the states of all the requested files, and remove them form the import list.
+                foreach (var file in filesToReset)
+                {
+                    if (originalStates.ContainsKey(file))
+                    {
+                        // Restore the state of the files.
+                        await tx.RestoreFileState(originalStates[file]);
+                        importedFiles.Remove(file);
+                    }
+                    else
+                    {
+                        // If we got here, we have mods that weren't in the original modpack import, that got included in the root clone.
+                        // This should never happen if the modpack includes the entire subset of files necessary to properly fill out its item root.
+                        
+                        // If it /does/ happen, it means we just copied some unknown (possibly orphaned) files into the destination item directory.
+                        // Which isn't necessarily dangerous, but isn't correct, either.
+                        throw new Exception("Root CloneAndReset wanted to copy more files than were provided by the modpack import.");
+                    }
+                }
+                clearedFiles.UnionWith(filesToReset);
+            }
+            return clearedFiles;
         }
     }
 }

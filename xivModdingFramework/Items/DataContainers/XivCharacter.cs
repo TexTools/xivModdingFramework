@@ -15,11 +15,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.Items.DataContainers
@@ -66,6 +70,8 @@ namespace xivModdingFramework.Items.DataContainers
         /// </remarks>
         public XivDataFile DataFile { get; set; } = XivDataFile._04_Chara;
 
+        public uint IconId { get; set; }
+
         /// <summary>
         /// The Primary Model Information of the Character Item 
         /// </summary>
@@ -92,6 +98,28 @@ namespace xivModdingFramework.Items.DataContainers
 
 
             return item;
+        }
+
+        public async Task<List<string>> GetDecalTextures(ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                // Readonly TX if we don't have one.
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            if(SecondaryCategory == XivStrings.Face_Paint)
+            {
+                return await Character.GetDecalPaths(Character.XivDecalType.FacePaint, tx);
+            }
+            else if(SecondaryCategory == XivStrings.Equipment_Decals)
+            {
+                return await Character.GetDecalPaths(Character.XivDecalType.Equipment, tx);
+            }
+            else
+            {
+                return new List<string>();
+            }
         }
 
         /// <summary>

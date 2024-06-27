@@ -14,11 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using SharpDX;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Tga;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
+using TeximpNet.Compression;
+using TeximpNet.DDS;
 using xivModdingFramework.Helpers;
+using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.Enums;
 
@@ -29,6 +40,56 @@ namespace xivModdingFramework.Textures.FileTypes
     /// </summary>
     public static class DDS
     {
+        // Flags value indicating DWFourCC has real data.
+        internal const uint _DDS_PixelFormatOffset = 76;
+        internal const uint _DWFourCCFlag = 0x04;
+
+        internal static uint _DX10 = (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DX10"), 0);
+        /// <summary>
+        /// A dictionary containing the int representations of known DDS FourCC Values to Xiv Tex Enum
+        /// File types not listed here will fall over to DXGI header extension writing using "DX10" and their DxgiTypeToXivTex enum value.
+        /// </summary>
+        internal static readonly Dictionary<uint, XivTexFormat> DdsTypeToXivTex = new Dictionary<uint, XivTexFormat>
+        {
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT1"), 0) , XivTexFormat.DXT1 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT3"), 0) , XivTexFormat.DXT3 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("DXT5"), 0) , XivTexFormat.DXT5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI1"), 0) , XivTexFormat.BC4 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC4U"), 0) , XivTexFormat.BC4 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI2"), 0) , XivTexFormat.BC5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
+
+            //ARGB 16F
+            { 0x71, XivTexFormat.A16B16G16R16F },
+
+            //Uncompressed RGBA
+            { 0, XivTexFormat.A8R8G8B8 }
+        };
+
+        internal static uint GetDDSType(XivTexFormat format)
+        {
+            return DdsTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
+        }
+
+        /// <summary>
+        /// A dictionary containing the int representations of known DXGI header extension enum values to Xiv Tex Enum
+        /// </summary>
+        internal static readonly Dictionary<uint, XivTexFormat> DxgiTypeToXivTex = new Dictionary<uint, XivTexFormat>
+        {
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM, XivTexFormat.DXT1 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM, XivTexFormat.DXT3 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM, XivTexFormat.DXT5 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM, XivTexFormat.BC4 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM, XivTexFormat.BC5 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM, XivTexFormat.BC7 },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
+            {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, XivTexFormat.A8R8G8B8 }
+        };
+        internal static uint GetDxgiType(XivTexFormat format)
+        {
+            return DxgiTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
+        }
+
         /// <summary>
         /// Creates a DDS file for the given Texture
         /// </summary>
@@ -36,35 +97,31 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <param name="xivTex">The Texture information</param>
         public static void MakeDDS(XivTex xivTex, string savePath)
         {
-            var DDS = new List<byte>();
-            switch (xivTex.TextureTypeAndPath.Type)
-            {
-                case XivTexType.ColorSet:
-                    DDS.AddRange(CreateColorDDSHeader());
-                    DDS.AddRange(xivTex.TexData);
-                    break;
-                case XivTexType.Vfx:
-                case XivTexType.Diffuse:
-                case XivTexType.Specular:
-                case XivTexType.Normal:
-                case XivTexType.Multi:
-                case XivTexType.Mask:
-                case XivTexType.Skin:
-                case XivTexType.Map:
-                case XivTexType.Icon:
-                default:
-                    DDS.AddRange(CreateDDSHeader(xivTex));
+            var DDS = CreateDDSHeader(xivTex).ToList();
 
-                    var data = xivTex.TexData;
-                    if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8 && xivTex.Layers > 1)
-                    {
-                        data = ShiftLayers(data);
-                    }
-                    DDS.AddRange(data);
-                    break;
+            var data = xivTex.TexData;
+            if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8 && xivTex.Layers > 1)
+            {
+                data = ShiftLayers(data);
             }
+            DDS.AddRange(data);
 
             File.WriteAllBytes(savePath, DDS.ToArray());
+        }
+
+
+        public static byte[] MakeDDS(byte[] data, XivTexFormat format, int width, int height, int layers, int mipCount)
+        {
+            var DDS = new List<byte>();
+            DDS.AddRange(CreateDDSHeader(format, width, height, layers, mipCount));
+
+            if (format == XivTexFormat.A8R8G8B8 && layers > 1)
+            {
+                data = ShiftLayers(data);
+            }
+            DDS.AddRange(data);
+
+            return DDS.ToArray();
         }
 
         // This is a simple shift of the layers around in order to convert ARGB to RGBA
@@ -92,7 +149,13 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns>Byte array containing DDS header</returns>
         private static byte[] CreateDDSHeader(XivTex xivTex)
         {
-            uint dwPitchOrLinearSize, pfFlags, dwFourCC;
+            return CreateDDSHeader(xivTex.TextureFormat, xivTex.Width, xivTex.Height, xivTex.Layers, xivTex.MipMapCount);
+        }
+
+
+        private static byte[] CreateDDSHeader(XivTexFormat format, int width, int height, int layers, int mipCount)
+        {
+            uint dwPitchOrLinearSize, pfFlags;
             var header = new List<byte>();
 
             // DDS header magic number
@@ -105,34 +168,34 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Flags to indicate which members contain valid data.
             uint dwFlags = 528391;
-            if(xivTex.Layers > 1)
+            if(layers > 1)
             {
                 dwFlags = 0x00000004;
             }
             header.AddRange(BitConverter.GetBytes(dwFlags));
 
-            // Surface height (in pixels).
-            var dwHeight = (uint)xivTex.Height;
+            // Surface height (in pixels). 
+            var dwHeight = (uint)height;
             header.AddRange(BitConverter.GetBytes(dwHeight));
 
             // Surface width (in pixels).
-            var dwWidth = (uint)xivTex.Width;
+            var dwWidth = (uint)width;
             header.AddRange(BitConverter.GetBytes(dwWidth));
 
             // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
-            if (xivTex.TextureFormat == XivTexFormat.A16B16G16R16F)
+            if (format == XivTexFormat.A16B16G16R16F)
             {
                 dwPitchOrLinearSize = 512;
             }
-            else if (xivTex.TextureFormat == XivTexFormat.A8R8G8B8)
+            else if (format == XivTexFormat.A8R8G8B8)
             {
                 dwPitchOrLinearSize = (dwHeight * dwWidth) * 4;
             }
-            else if (xivTex.TextureFormat == XivTexFormat.DXT1)
+            else if (format == XivTexFormat.DXT1)
             {
                 dwPitchOrLinearSize = (dwHeight * dwWidth) / 2;
             }
-            else if (xivTex.TextureFormat == XivTexFormat.A4R4G4B4 || xivTex.TextureFormat == XivTexFormat.A1R5G5B5)
+            else if (format == XivTexFormat.A4R4G4B4 || format == XivTexFormat.A1R5G5B5)
             {
                 dwPitchOrLinearSize = (dwHeight * dwWidth) * 2;
             }
@@ -148,7 +211,7 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(dwDepth));
 
             // Number of mipmap levels, otherwise unused.
-            var dwMipMapCount = (uint)xivTex.MipMapCount;
+            var dwMipMapCount = (uint)mipCount;
             header.AddRange(BitConverter.GetBytes(dwMipMapCount));
 
             // Unused.
@@ -162,7 +225,7 @@ namespace xivModdingFramework.Textures.FileTypes
             const uint pfSize = 32;
             header.AddRange(BitConverter.GetBytes(pfSize));
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 // Values which indicate what type of data is in the surface.
                 case XivTexFormat.A8R8G8B8:
@@ -179,40 +242,15 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             header.AddRange(BitConverter.GetBytes(pfFlags));
 
-            switch (xivTex.TextureFormat)
+            uint dwFourCC = GetDDSType(format);
+            if (layers > 1 || (dwFourCC == 0 && format != XivTexFormat.A8R8G8B8))
             {
-                // Four-character codes for specifying compressed or custom formats.
-                case XivTexFormat.DXT1:
-                    dwFourCC = 0x31545844;
-                    break;
-                case XivTexFormat.DXT5:
-                    dwFourCC = 0x35545844;
-                    break;
-                case XivTexFormat.DXT3:
-                    dwFourCC = 0x33545844;
-                    break;
-                case XivTexFormat.A16B16G16R16F:
-                    dwFourCC = 0x71;
-                    break;
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.A8:
-                case XivTexFormat.A4R4G4B4:
-                case XivTexFormat.A1R5G5B5:
-                    dwFourCC = 0;
-                    break;
-                default:
-                    return null;
-            }
-
-            if(xivTex.Layers > 1)
-            {
-                var bytes = System.Text.Encoding.UTF8.GetBytes("DX10");
-                dwFourCC = BitConverter.ToUInt32(bytes, 0);
+                dwFourCC = _DX10;
             }
 
             header.AddRange(BitConverter.GetBytes(dwFourCC));
 
-            switch (xivTex.TextureFormat)
+            switch (format)
             {
                 case XivTexFormat.A8R8G8B8:
                     {
@@ -362,15 +400,27 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             // Need to write DX10 header here.
-            if(xivTex.Layers > 1)
+            if(dwFourCC == _DX10)
             {
                 // DXGI_FORMAT dxgiFormat
                 uint dxgiFormat = 0;
-                if (xivTex.TextureFormat == XivTexFormat.DXT1) {
+                if (format == XivTexFormat.DXT1) {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM;
-                } else if (xivTex.TextureFormat == XivTexFormat.DXT5)
+                } else if (format == XivTexFormat.DXT3)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM;
+                } else if (format == XivTexFormat.DXT5)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
+                } else if (format == XivTexFormat.BC4)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM;					
+                } else if (format == XivTexFormat.BC5)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM;
+                } else if (format == XivTexFormat.BC7)
+                {
+                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM;
                 } else {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
                 }
@@ -384,7 +434,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 header.AddRange(BitConverter.GetBytes((int)0));
 
                 // UINT arraySize
-                header.AddRange(BitConverter.GetBytes(xivTex.Layers));
+                header.AddRange(BitConverter.GetBytes(layers));
 
                 // UINT miscFlags2
                 header.AddRange(BitConverter.GetBytes((int)0));
@@ -394,86 +444,17 @@ namespace xivModdingFramework.Textures.FileTypes
         }
 
         /// <summary>
-        /// Creates the DDS header for given texture data.
-        /// <see cref="https://msdn.microsoft.com/en-us/library/windows/desktop/bb943982(v=vs.85).aspx"/>
-        /// </summary>
-        /// <returns>Byte array containing DDS header</returns>
-        private static byte[] CreateColorDDSHeader()
-        {
-            var header = new List<byte>();
-
-            // DDS header magic number
-            const uint dwMagic = 0x20534444;
-            header.AddRange(BitConverter.GetBytes(dwMagic));
-
-            // Size of structure. This member must be set to 124.
-            const uint dwSize = 124;
-            header.AddRange(BitConverter.GetBytes(dwSize));
-
-            // Flags to indicate which members contain valid data.
-            const uint dwFlags = 528399;
-            header.AddRange(BitConverter.GetBytes(dwFlags));
-
-            // Surface height (in pixels).
-            const uint dwHeight = 16;
-            header.AddRange(BitConverter.GetBytes(dwHeight));
-
-            // Surface width (in pixels).
-            const uint dwWidth = 4;
-            header.AddRange(BitConverter.GetBytes(dwWidth));
-
-            // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
-            const uint dwPitchOrLinearSize = 512;
-            header.AddRange(BitConverter.GetBytes(dwPitchOrLinearSize));
-
-            // Depth of a volume texture (in pixels), otherwise unused.
-            const uint dwDepth = 0;
-            header.AddRange(BitConverter.GetBytes(dwDepth));
-
-            // Number of mipmap levels, otherwise unused.
-            const uint dwMipMapCount = 0;
-            header.AddRange(BitConverter.GetBytes(dwMipMapCount));
-
-            // Unused.
-            var dwReserved1 = new byte[44];
-            header.AddRange(dwReserved1);
-
-            // DDS_PIXELFORMAT start
-
-            // Structure size; set to 32 (bytes).
-            const uint pfSize = 32;
-            header.AddRange(BitConverter.GetBytes(pfSize));
-
-            // Values which indicate what type of data is in the surface.
-            const uint pfFlags = 4;
-            header.AddRange(BitConverter.GetBytes(pfFlags));
-
-            // Four-character codes for specifying compressed or custom formats.
-            const uint dwFourCC = 0x71;
-            header.AddRange(BitConverter.GetBytes(dwFourCC));
-
-            // dwRGBBitCount, dwRBitMask, dwGBitMask, dwBBitMask, dwABitMask, dwCaps, dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-            // Unused.
-            var blank1 = new byte[40];
-            header.AddRange(blank1);
-
-            return header.ToArray();
-        }
-
-        /// <summary>
-        /// Reads and parses data from the DDS file to be imported.
+        /// Compresses a normal DDS File into just the core image data that FFXIV stores.
+        /// This assumes the Binary Reader is already positioned at the end of whatever header there is (.DDS or .Tex)
         /// </summary>
         /// <param name="br">The currently active BinaryReader.</param>
-        /// <param name="xivTex">The Texture data.</param>
         /// <param name="newWidth">The width of the DDS texture to be imported.</param>
         /// <param name="newHeight">The height of the DDS texture to be imported.</param>
         /// <param name="newMipCount">The number of mipmaps the DDS texture to be imported contains.</param>
-        /// <returns>A tuple containing the compressed DDS data, a list of offsets to the mipmap parts, a list with the number of parts per mipmap.</returns>
-        public static async Task<(List<byte> compressedDDS, List<short> mipPartOffsets, List<short> mipPartCounts)> ReadDDS(BinaryReader br, XivTexFormat format, int newWidth, int newHeight, int newMipCount)
+        /// <returns>A List structure of the resulting binary data keyed on [MipMap#] => Compressed Data Parts</returns>
+        public static async Task<List<List<byte[]>>> CompressDDSBody(BinaryReader br, XivTexFormat format, int newWidth, int newHeight, int newMipCount)
         {
-            var compressedDDS = new List<byte>();
-            var mipPartOffsets = new List<short>();
-            var mipPartCount = new List<short>();
+            var ddsParts = new List<List<byte[]>>();
 
             int mipLength;
 
@@ -483,7 +464,10 @@ namespace xivModdingFramework.Textures.FileTypes
                     mipLength = (newWidth * newHeight) / 2;
                     break;
                 case XivTexFormat.DXT5:
+                case XivTexFormat.BC4:
+                case XivTexFormat.BC5:
                 case XivTexFormat.A8:
+                case XivTexFormat.BC7:
                     mipLength = newWidth * newHeight;
                     break;
                 case XivTexFormat.A1R5G5B5:
@@ -505,95 +489,15 @@ namespace xivModdingFramework.Textures.FileTypes
                     break;
             }
 
-            br.BaseStream.Seek(128, SeekOrigin.Begin);
-
+            // Queue all the compression tasks.
+            var totalBytesRead = 0;
+            var mipTasks = new List<Task<List<byte[]>>>();
             for (var i = 0; i < newMipCount; i++)
             {
-                var mipParts = (int)Math.Ceiling(mipLength / 16000f);
-                mipPartCount.Add((short)mipParts);
+                var uncompBytes = br.ReadBytes(mipLength);
+                totalBytesRead += uncompBytes.Length;
 
-                if (mipParts > 1)
-                {
-                    for (var j = 0; j < mipParts; j++)
-                    {
-                        int uncompLength;
-                        var comp = true;
-
-                        if (j == mipParts - 1)
-                        {
-                            uncompLength = mipLength % 16000;
-                        }
-                        else
-                        {
-                            uncompLength = 16000;
-                        }
-
-                        var uncompBytes = br.ReadBytes(uncompLength);
-                        var compressed = await IOUtil.Compressor(uncompBytes);
-
-                        if (compressed.Length > uncompLength)
-                        {
-                            compressed = uncompBytes;
-                            comp = false;
-                        }
-
-                        compressedDDS.AddRange(BitConverter.GetBytes(16));
-                        compressedDDS.AddRange(BitConverter.GetBytes(0));
-
-                        compressedDDS.AddRange(!comp
-                            ? BitConverter.GetBytes(32000)
-                            : BitConverter.GetBytes(compressed.Length));
-
-                        compressedDDS.AddRange(BitConverter.GetBytes(uncompLength));
-                        compressedDDS.AddRange(compressed);
-
-                        var padding = 128 - (compressed.Length % 128);
-
-                        compressedDDS.AddRange(new byte[padding]);
-
-                        mipPartOffsets.Add((short)(compressed.Length + padding + 16));
-                    }
-                }
-                else
-                {
-                    int uncompLength;
-                    var comp = true;
-
-                    if (mipLength != 16000)
-                    {
-                        uncompLength = mipLength % 16000;
-                    }
-                    else
-                    {
-                        uncompLength = 16000;
-                    }
-
-                    var uncompBytes = br.ReadBytes(uncompLength);
-                    var compressed = await IOUtil.Compressor(uncompBytes);
-
-                    if (compressed.Length > uncompLength)
-                    {
-                        compressed = uncompBytes;
-                        comp = false;
-                    }
-
-                    compressedDDS.AddRange(BitConverter.GetBytes(16));
-                    compressedDDS.AddRange(BitConverter.GetBytes(0));
-
-                    compressedDDS.AddRange(!comp
-                        ? BitConverter.GetBytes(32000)
-                        : BitConverter.GetBytes(compressed.Length));
-
-                    compressedDDS.AddRange(BitConverter.GetBytes(uncompLength));
-                    compressedDDS.AddRange(compressed);
-
-                    var padding = 128 - (compressed.Length % 128);
-
-                    compressedDDS.AddRange(new byte[padding]);
-
-                    mipPartOffsets.Add((short)(compressed.Length + padding + 16));
-                }
-
+                mipTasks.Add(Dat.CompressData(uncompBytes.ToList()));
                 if (mipLength > 32)
                 {
                     mipLength = mipLength / 4;
@@ -604,7 +508,423 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
-            return (compressedDDS, mipPartOffsets, mipPartCount);
+            // Wait for them to finish.
+            await Task.WhenAll(mipTasks);
+            foreach(var task in mipTasks)
+            {
+                ddsParts.Add(task.Result);
+            }
+
+
+            // Return parts.
+            return ddsParts;
+        }
+
+        #region Pixel Conversion Functions
+
+        /// <summary>
+        /// Converts the given DDS Compressed pixel data into 8.8.8.8 RGBA pixel data.
+        /// </summary>
+        /// <param name="DdsCompressedPixelData"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <param name="DDSFormat"></param>
+        /// <returns></returns>
+        public static async Task<byte[]> ConvertPixelData(byte[] DdsCompressedPixelData, int width, int height, XivTexFormat DDSFormat, int layers = 1, int targetLayer = -1)
+        {
+            return await Task.Run(async () =>
+            {
+                byte[] imageData = null;
+                if (layers == 0)
+                {
+                    layers = 1;
+                }
+
+                switch (DDSFormat)
+                {
+                    case XivTexFormat.DXT1:
+                        imageData = DxtUtil.DecompressDxt1(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.DXT3:
+                        imageData = DxtUtil.DecompressDxt3(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.DXT5:
+                        imageData = DxtUtil.DecompressDxt5(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.BC4:
+                        imageData = DxtUtil.DecompressBc4(DdsCompressedPixelData, width, height * layers);
+                        break;						
+                    case XivTexFormat.BC5:
+                        imageData = DxtUtil.DecompressBc5(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.BC7:
+                        imageData = DxtUtil.DecompressBc7(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A4R4G4B4:
+                        imageData = await Read4444Image(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A1R5G5B5:
+                        imageData = await Read5551Image(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A8R8G8B8:
+                        imageData = await SwapRBColors(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.L8:
+                    case XivTexFormat.A8:
+                        imageData = await Read8bitImage(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.A16B16G16R16F:
+                        imageData = await ReadHalfFloatImage(DdsCompressedPixelData, width, height * layers);
+                        break;
+                    case XivTexFormat.X8R8G8B8:
+                    case XivTexFormat.R32F:
+                    case XivTexFormat.G16R16F:
+                    case XivTexFormat.G32R32F:
+                    case XivTexFormat.A32B32G32R32F:
+                    case XivTexFormat.D16:
+                    default:
+                        imageData = DdsCompressedPixelData;
+                        break;
+                }
+
+                if (targetLayer >= 0)
+                {
+                    var bytesPerLayer = imageData.Length / layers;
+                    var offset = bytesPerLayer * targetLayer;
+
+                    byte[] nData = new byte[bytesPerLayer];
+                    Array.Copy(imageData, offset, nData, 0, bytesPerLayer);
+
+                    imageData = nData;
+                }
+
+                return imageData;
+            });
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed A1R5G5B5 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        internal static async Task<byte[]> Read5551Image(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var pixel = br.ReadUInt16() & 0xFFFF;
+
+                                var red = ((pixel & 0x7E00) >> 10) * 8;
+                                var green = ((pixel & 0x3E0) >> 5) * 8;
+                                var blue = ((pixel & 0x1F)) * 8;
+                                var alpha = ((pixel & 0x8000) >> 15) * 255;
+
+                                convertedBytes.Add((byte)red);
+                                convertedBytes.Add((byte)green);
+                                convertedBytes.Add((byte)blue);
+                                convertedBytes.Add((byte)alpha);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+
+        /// <summary>
+        /// Creates bitmap from decompressed A4R4G4B4 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        internal static async Task<byte[]> Read4444Image(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var pixel = br.ReadUInt16() & 0xFFFF;
+                                var red = ((pixel & 0xF)) * 16;
+                                var green = ((pixel & 0xF0) >> 4) * 16;
+                                var blue = ((pixel & 0xF00) >> 8) * 16;
+                                var alpha = ((pixel & 0xF000) >> 12) * 16;
+
+                                convertedBytes.Add((byte)blue);
+                                convertedBytes.Add((byte)green);
+                                convertedBytes.Add((byte)red);
+                                convertedBytes.Add((byte)alpha);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed A8/L8 texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The created bitmap.</returns>
+        internal static async Task<byte[]> Read8bitImage(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(() =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var pixel = br.ReadByte() & 0xFF;
+
+                                convertedBytes.Add((byte)pixel);
+                                convertedBytes.Add((byte)pixel);
+                                convertedBytes.Add((byte)pixel);
+                                convertedBytes.Add(255);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+        internal static async Task<byte[]> ReadHalfFloatImage(byte[] textureData, int width, int height)
+        {
+            var convertedBytes = new List<byte>();
+
+            await Task.Run(async () =>
+            {
+                using (var ms = new MemoryStream(textureData))
+                {
+                    using (var br = new BinaryReader(ms))
+                    {
+                        for (var y = 0; y < height; y++)
+                        {
+                            for (var x = 0; x < width; x++)
+                            {
+                                var r = new Half(br.ReadUInt16());
+                                var g = new Half(br.ReadUInt16());
+                                var b = new Half(br.ReadUInt16());
+                                var a = new Half(br.ReadUInt16());
+
+                                // 255 * value, clamped to 0-255.
+                                var byteR = (byte)Math.Max(0, Math.Min(255, Math.Round(r * 255.0f)));
+                                var byteG = (byte)Math.Max(0, Math.Min(255, Math.Round(g * 255.0f)));
+                                var byteB = (byte)Math.Max(0, Math.Min(255, Math.Round(b * 255.0f)));
+                                var byteA = (byte)Math.Max(0, Math.Min(255, Math.Round(a * 255.0f)));
+
+                                convertedBytes.Add(byteR);
+                                convertedBytes.Add(byteG);
+                                convertedBytes.Add(byteB);
+                                convertedBytes.Add(byteA);
+                            }
+                        }
+                    }
+                }
+            });
+
+            return convertedBytes.ToArray();
+        }
+
+        /// <summary>
+        /// Creates bitmap from decompressed Linear texture data.
+        /// </summary>
+        /// <param name="textureData">The decompressed texture data.</param>
+        /// <param name="width">The textures width.</param>
+        /// <param name="height">The textures height.</param>
+        /// <returns>The raw byte data in 32bit</returns>
+        internal static async Task<byte[]> SwapRBColors(byte[] textureData, int width, int height)
+        {
+            var data = new byte[width * height * 4];
+            await TextureHelpers.ModifyPixels((int offset) =>
+            {
+                data[offset + 0] = textureData[offset + 2];
+                data[offset + 1] = textureData[offset + 1];
+                data[offset + 2] = textureData[offset + 0];
+                data[offset + 3] = textureData[offset + 3];
+            }, width, height);
+
+            return data;
+        }
+        #endregion
+
+
+        public static async Task<byte[]> TexConvRawPixels(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false, bool omitHeader = true)
+        {
+            return await Task.Run(async () =>
+            {
+                // ImageSharp => TexConv Route.
+                var ddsFile = await DDS.TexConv(rgbaData, width, height, format, generateMipMaps);
+                try
+                {
+                    using (var fs = File.OpenRead(ddsFile))
+                    {
+                        using (var br = new BinaryReader(fs))
+                        {
+                            if (omitHeader)
+                            {
+                                br.BaseStream.Seek(148, SeekOrigin.Begin);
+                            }
+                            return br.ReadAllBytes();
+                        }
+                    }
+                }
+                finally
+                {
+                    IOUtil.DeleteTempFile(ddsFile);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Takes uncompressed RGBA data and uses TexConv.exe to convert it into a DDS file in the temp directory.
+        /// </summary>
+        /// <param name="rgbaData"></param>
+        /// <param name="width"></param>
+        /// <param name="height"></param>
+        /// <param name="format"></param>
+        /// <param name="generateMipMaps"></param>
+        /// <returns></returns>
+        public static async Task<string> TexConv(byte[] rgbaData, int width, int height, string format, bool generateMipMaps = false)
+        {
+            var tmpDir = IOUtil.GetFrameworkTempFolder();
+            Directory.CreateDirectory(tmpDir);
+            var input = Path.Combine(tmpDir, Guid.NewGuid().ToString() + ".tga");
+            using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
+            {
+                var encoder = new TgaEncoder();
+                encoder.Compression = TgaCompression.None;
+                encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
+                img.SaveAsTga(input,encoder);
+            }
+
+            try
+            {
+                return await TexConv(input, format, generateMipMaps);
+            }
+            finally
+            {
+                IOUtil.DeleteTempFile(input);
+            }
+        }
+
+
+        public static async Task<string> TexConv(string file, string format, bool generateMipMaps = true)
+        {
+            // TexConv does not handle PNGs correctly.  Rip the raw bytes ourselves and resave as TGA.
+            if (file.ToLower().EndsWith(".png"))
+            {
+                var decoder = new PngDecoder();
+                byte[] data;
+                int width, height;
+                using (var img = Image.Load<Rgba32>(file, decoder))
+                {
+                    width = img.Width;
+                    height = img.Height;
+                    data = IOUtil.GetImageSharpPixels(img);
+                }
+                // TexConv does not handle PNG reading correctly.
+                return await TexConv(data, width, height, format, generateMipMaps);
+            }
+
+            return await Task.Run(() =>
+            {
+
+                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var workingDirectory = Path.Combine(cwd, "converters");
+                var converter = Path.Combine(workingDirectory, "texconv.exe");
+
+                var mipArg = "-m " + (generateMipMaps ? 0 : 1);
+                var formatArg = "-f " + format;
+
+
+                var guid = Guid.NewGuid().ToString();
+                var input = guid + Path.GetExtension(file);
+                var output = guid + ".dds";
+                var inFull = Path.Combine(workingDirectory, input);
+
+                //var bcq = "-bc q";
+                var bcq = "";
+
+                File.Copy(file, inFull);
+                try
+                {
+
+                    var outFile = Path.Combine(workingDirectory, output);
+                    var tmpDir = IOUtil.GetFrameworkTempFolder();
+                    Directory.CreateDirectory(tmpDir);
+                    var outTemp = Path.Combine(tmpDir, output);
+
+                    var args = $"{formatArg} {mipArg} {bcq} -tgazeroalpha -sepalpha -y {input}";
+
+                    var proc = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = converter,
+                            Arguments = args,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            WorkingDirectory = workingDirectory,
+                        }
+                    };
+
+
+                    proc.Start();
+                    proc.WaitForExit();
+                    var code = proc.ExitCode;
+
+
+                    var command = converter + " " + args;
+
+                    if (code != 0)
+                    {
+                        throw new Exception("TexConv.exe threw error code: " + proc.ExitCode);
+                    }
+
+                    File.Move(outFile, outTemp);
+
+                    return outTemp;
+                }
+                finally
+                {
+                    File.Delete(inFull);
+                }
+            });
         }
 
         public enum DXGI_FORMAT : uint

@@ -26,334 +26,533 @@ using xivModdingFramework.Resources;
 using xivModdingFramework.Cache;
 
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using xivModdingFramework.Mods.Enums;
+using System.Diagnostics;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.SqPack.DataContainers;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.Helpers
 {
-    public class ProblemChecker
+    public static class ProblemChecker
     {
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly Index _index;
-        private readonly Dat _dat;
-
-        public ProblemChecker(DirectoryInfo gameDirectory)
-        {
-            _gameDirectory = gameDirectory;
-            _index = new Index(_gameDirectory);
-            _dat = new Dat(_gameDirectory);
-        }
 
         /// <summary>
-        /// Checks the index for the number of dats the game will attempt to read
+        /// Validates index hashes and resaves the files if their hashes are off.
         /// </summary>
-        /// <returns>True if there is a problem, False otherwise</returns>
-        public Task<bool> CheckIndexDatCounts(XivDataFile dataFile)
-        {
-            return Task.Run(() =>
-            {
-                var indexDatCounts = _index.GetIndexDatCount(dataFile);
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
-
-                if (indexDatCounts.Index1 != largestDatNum)
-                {
-                    return true;
-                }
-
-                if (indexDatCounts.Index2 != largestDatNum)
-                {
-                    return true;
-                }
-
-                return false;
-            });
-        }
-
-        /// <summary>
-        /// Checks the index for any empty dat files
-        /// </summary>
-        /// <returns>A list of dats which are empty if any</returns>
-        public Task<List<int>> CheckForEmptyDatFiles(XivDataFile dataFile)
-        {
-            return Task.Run(() =>
-            {
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
-                var emptyList = new List<int>();
-
-                for (var i = 0; i < largestDatNum; i++)
-                {
-                    var fileInfo = new FileInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.dat{i}"));
-
-                    if (fileInfo.Length == 0)
-                    {
-                        emptyList.Add(i);
-                    }
-                }
-
-                return emptyList;
-            });
-        }
-
-        /// <summary>
-        /// Checks the index for the number of dats the game will attempt to read
-        /// </summary>
-        /// <returns>True if there is a problem, False otherwise</returns>
-        public Task<bool> CheckForLargeDats(XivDataFile dataFile)
-        {
-            return Task.Run(() =>
-            {
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile) + 1;
-
-                var fileSizeList = new List<long>();
-
-                for (var i = 0; i < largestDatNum; i++)
-                {
-                    var fileInfo = new FileInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.dat{i}"));
-
-                    try
-                    {
-                        fileSizeList.Add(fileInfo.Length);
-                    }
-                    catch
-                    {
-                        return true;
-                    }
-                }
-
-                if (largestDatNum > 8 || fileSizeList.FindAll(x => x.Equals(2048)).Count > 1)
-                {
-                    return true;
-                }
-
-                return false;
-            });
-        }
-
-        /// <summary>
-        /// Repairs the dat count in the index files
-        /// </summary>
-        public Task RepairIndexDatCounts(XivDataFile dataFile)
-        {
-            return Task.Run(() =>
-            {
-                var largestDatNum = _dat.GetLargestDatNumber(dataFile);
-
-                _index.UpdateIndexDatCount(dataFile, largestDatNum);
-            });
-        }
-
-        /// <summary>
-        /// This function returns TRUE if the backups should be used, and FALSE if they should not.
-        /// </summary>
-        /// <param name="dataFile"></param>
-        /// <param name="backupsDirectory"></param>
         /// <returns></returns>
-        public Task<bool> CheckForOutdatedBackups(XivDataFile dataFile, DirectoryInfo backupsDirectory)
+        /// <exception cref="Exception"></exception>
+        public static async Task RevalidateAllIndexHashes()
         {
-            return Task.Run(() =>
+            if (!XivCache.GameWriteEnabled)
             {
-                var backupDataFile =
-                    new DirectoryInfo(Path.Combine(backupsDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
-                var currentDataFile =
-                    new DirectoryInfo(Path.Combine(_gameDirectory.FullName, $"{dataFile.GetDataFileName()}.win32.index"));
+                throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+            }
 
-                // Since the material addition directly adds to section 1 we can no longer check for outdated using that section header
-                // so instead compare the hashes of sections 2 and 3
-                byte[] currentHashSection2;
-                byte[] currentHashSection3;
-                byte[] backupHashSection2;
-                byte[] backupHashSection3;
+            await Task.Run(async () =>
+            {
+                // The simplest way to do this is to just open a tx, pull every index, and save.
+                // That way all hashes/etc. will be recalculated.
+                var tx = await ModTransaction.BeginTransaction(true, null, null, false, false);
                 try
                 {
-                    currentHashSection2 = _index.GetIndexSection2Hash(currentDataFile);
-                    currentHashSection3 = _index.GetIndexSection3Hash(currentDataFile);
+                    foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+                    {
+                        if (CheckHashes(df))
+                        {
+                            continue;
+                        }
+                        await tx.GetIndexFile(df);
+                    }
+
+                    await ModTransaction.CommitTransaction(tx, true);
                 }
                 catch
                 {
-                    // Base files are fucked, use *any* backups.
-                    return true;
+                    await ModTransaction.CancelTransaction(tx);
                 }
+            });
 
-                try
+        }
+        public static bool CheckHashes(XivDataFile df)
+        {
+            var index1Path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
+            var index2Path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+            using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
+            {
+                if (!CheckHashes(index1Stream))
                 {
-                    backupHashSection2 = _index.GetIndexSection2Hash(backupDataFile);
-                    backupHashSection3 = _index.GetIndexSection3Hash(backupDataFile);
-                }
-                catch
-                {
-                    // Backups are fucked, can't use those.
                     return false;
                 }
+            }
+            using (var index2Stream = new BinaryReader(File.OpenRead(index2Path)))
+            {
+                if (!CheckHashes(index2Stream))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        private static bool CheckHashes(BinaryReader br)
+        {
+            br.BaseStream.Seek(IndexFile._SqPackHeaderSize, SeekOrigin.Begin);
+            var headerSize = br.ReadUInt32();
+            if (headerSize != IndexFile._IndexHeaderSize)
+            {
+                throw new Exception("Invalid index or index file format changed.");
+            }
 
+            var segmentHeaderOffsets = new List<int>()
+            {
+                (int)IndexFile._SqPackHeaderSize + 8,
+                (int)IndexFile._SqPackHeaderSize + 84,
+                (int)IndexFile._SqPackHeaderSize + 156,
+                (int)IndexFile._SqPackHeaderSize + 228,
+            };
 
-                return backupHashSection2.SequenceEqual(currentHashSection2) && backupHashSection3.SequenceEqual(currentHashSection3);
-            });
+            foreach (var offset in segmentHeaderOffsets)
+            {
+                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                if (!CheckSegmentHash(br))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
 
-        public Task PerformStartOver(DirectoryInfo backupsDirectory, IProgress<string> progress = null, XivLanguage language = XivLanguage.None)
+        private static bool CheckSegmentHash(BinaryReader br)
         {
-            return Task.Run(async () =>
+            int segmentOffset = br.ReadInt32();
+            int segmentSize = br.ReadInt32();
+            var hash = br.ReadBytes(64);
+            br.BaseStream.Seek(segmentOffset, SeekOrigin.Begin);
+            var data = br.ReadBytes(segmentSize);
+            var sh = SHA1.Create();
+            var hash2 = sh.ComputeHash(data);
+
+            for (int i = 0; i < hash.Length && i < hash2.Length; i++)
             {
-                var modding = new Modding(_gameDirectory);
-                var backupsRestored = false;
+                if (hash[i] != hash2[i])
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
-                // Stop the cache worker since we're blowing up the entire index file and db anyways.
-                // The cache rebuild will start it up again after the cache is rebuilt.
-                XivCache.CacheWorkerEnabled = false;
 
+        /// <summary>
+        /// Performs a full reset of game files.  Restores Index Backups, Deletes extra DATs, etc.
+        /// If for some reason we cannot restore the Index Backups (Ex. They don't exist, or are for the wrong game version), 
+        /// all mods are deleted instead.  If that also fails, an error is thrown instead.
+        /// </summary>
+        /// <param name="backupsDirectory"></param>
+        /// <param name="progress"></param>
+        /// <param name="language"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public static async Task ResetAllGameFiles(DirectoryInfo backupsDirectory, IProgress<string> progress = null)
+        {
+            await Task.Run(async () =>
+            {
+                if (!Dat.AllowDatAlteration)
+                {
+                    throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+                }
+
+                progress?.Report("Shutting down Cache Worker...");
+                var workerStatus = XivCache.CacheWorkerEnabled;
+                await XivCache.SetCacheWorkerState(false);
                 try
                 {
-                    // Try restoring the indexes FIRST.
-                    backupsRestored = await RestoreBackups(backupsDirectory);
-                    progress?.Report("Restoring index file backups...");
-
-                    if (!backupsRestored)
+                    if (!Index.CanWriteAllIndexes())
                     {
-                        throw new Exception("Start Over Failed: Index backups missing/outdated.");
+                        throw new Exception("Unable to open one or more index files for writing.  The files may currently be in use.");
                     }
-                }
-                catch(Exception ex)
-                {
+
+                    progress?.Report("Restoring index file backups...");
                     try
                     {
-                        // If the index restore failed, try just disabling.
-                        await modding.DeleteAllFilesAddedByTexTools();
-                        await modding.ToggleAllMods(false);
-                        progress?.Report("Index restore failed, attempting to delete all mods instead...");
-                    } catch
-                    {
-                        throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Disable all mods.");
+                        // Try restoring the indexes FIRST.
+                        RestoreIndexBackups(backupsDirectory.FullName);
                     }
-                }
-                finally
-                {
+                    catch (Exception ex)
+                    {
+                        try
+                        {
+                            // Index backup failed for some reason.
+                            // Try at least deleting all existing mods.
+                            using (var tx = await ModTransaction.BeginTransaction(true))
+                            {
+                                progress?.Report("Index restore failed, attempting to delete all mods instead...");
+                                await Modding.SetAllModStates(EModState.UnModded, null, tx);
+                                await ModTransaction.CommitTransaction(tx);
+
+                                // Wait for anything listening to the TX events to do its thing.
+                                await Task.Delay(3000);
+                            }
+                        }
+                        catch (Exception ex2)
+                        {
+                            // Hard failure.
+                            throw new Exception("Start Over Failed: Index Backups Invalid and Unable to Delete all mods.");
+                        }
+                    }
+
                     progress?.Report("Deleting modded dat files...");
 
-                    var dat = new Dat(_gameDirectory);
 
                     // Delete modded dat files
                     foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
                     {
-                        var datFiles = await dat.GetModdedDatList(xivDataFile);
+                        var datFiles = Dat.GetModdedDatList(xivDataFile);
 
                         foreach (var datFile in datFiles)
                         {
                             File.Delete(datFile);
                         }
-
-                        if (datFiles.Count > 0)
-                        {
-                            await RepairIndexDatCounts(xivDataFile);
-                        }
                     }
+
+                    // If for some reason our DAT counts don't match up, update them.
+                    Index.UNSAFE_NormalizeAllIndexDatCounts();
 
                     progress?.Report("Cleaning up mod list...");
 
-                    var modListDirectory = new DirectoryInfo(Path.Combine(_gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
+                    var modListDirectory = new DirectoryInfo(Path.Combine(XivCache.GameInfo.GameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
 
                     // Delete mod list
                     File.Delete(modListDirectory.FullName);
 
-                    modding.CreateModlist();
+                    Modding.CreateModlist();
 
                     progress?.Report("Rebuilding Cache...");
 
                     await Task.Run(async () =>
                     {
-                        XivCache.RebuildCache(XivCache.CacheVersion);
+                        await XivCache.RebuildCache(XivCache.CacheVersion);
                     });
                 }
+                finally
+                {
+                    await XivCache.SetCacheWorkerState(workerStatus);
+                }
             });
         }
 
-        public Task BackupIndexFiles(DirectoryInfo backupsDirectory)
+        /// <summary>
+        /// Retrieves the file list of available index backup files.  (Ex. Does not include the game version file)
+        /// </summary>
+        /// <param name="backupDirectory"></param>
+        /// <returns></returns>
+        public static List<string> GetAvailableIndexBackups(string backupDirectory)
         {
-            return Task.Run(async () => {
-                var indexFiles = new XivDataFile[] { XivDataFile._0A_Exd, XivDataFile._04_Chara, XivDataFile._06_Ui, XivDataFile._01_Bgcommon };
-                var index = new Index(_gameDirectory);
-                var modding = new Modding(_gameDirectory);
+            var allBackups = new List<string>();
+            if (!Directory.Exists(backupDirectory))
+            {
+                return allBackups;
+            }
 
-                if (index.IsIndexLocked(XivDataFile._0A_Exd))
+            var ffxivBackups = Path.Combine(backupDirectory, "ffxiv");
+            if (!Directory.Exists(ffxivBackups))
+            {
+                // Old style TT backups folder or empty backups folder, needs to be updated before it can be used.
+                return allBackups;
+            }
+
+            allBackups = IOUtil.GetFilesInFolder(backupDirectory, "*" + Index.IndexExtension).ToList();
+            allBackups.AddRange(IOUtil.GetFilesInFolder(backupDirectory, "*" + Index.Index2Extension));
+            return allBackups;
+        }
+
+
+        /// <summary>
+        /// Check if the index backups that are stored exist and are for this game version.
+        /// </summary>
+        /// <param name="backupDirectory"></param>
+        /// <returns></returns>
+        public static bool AreBackupsValid(string backupDirectory)
+        {
+            var currentVersion = XivCache.GameInfo.GameVersion;
+            var backupFile = Path.Combine(backupDirectory, GameInfo.GameVersionFileName);
+            var backupVersion = GameInfo.ReadVersionFile(backupFile);
+
+            if (currentVersion != backupVersion)
+            {
+                return false;
+            }
+
+            var backups = GetAvailableIndexBackups(backupDirectory);
+            if (backups.Count == 0)
+            {
+                return false;
+            }
+
+            // Backups must include the Chara index backup as we use it in validation.
+            var charaIndex2Backup = backups.FirstOrDefault(x => x.EndsWith(Path.Combine("ffxiv","040000.win32.index2")));
+            if (charaIndex2Backup == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                AssertIndexIsClean(charaIndex2Backup, XivDataFile._04_Chara);
+            }
+            catch(Exception ex)
+            {
+                Trace.WriteLine(ex);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Restores Indexes to their backup state, if backups exist.
+        /// </summary>
+        /// <param name="backupDirectory"></param>
+        /// <exception cref="Exception"></exception>
+        /// <exception cref="InvalidDataException"></exception>
+        public static void RestoreIndexBackups(string backupDirectory)
+        {
+            if (!Dat.AllowDatAlteration)
+            {
+                throw new Exception("Cannot perform Dat Manipulations while DAT writing is disabled.");
+            }
+
+            if (!AreBackupsValid(backupDirectory))
+            {
+                throw new Exception("Cannot restore Index Backups when Index Backups are missing, from another FFXIV version, or invalid.");
+            }
+
+            var basePath = XivCache.GameInfo.GameDirectory.Parent.FullName;
+            var validParents = new List<string>()
+            {
+                "ffxiv",
+                "ex1",
+                "ex2",
+                "ex3",
+                "ex4",
+                "ex5",
+                "ex6",
+                "ex7",
+                "ex8",
+                "ex9",
+            };
+
+            var backups = GetAvailableIndexBackups(backupDirectory);
+            foreach (var backup in backups)
+            {
+                var parPath = new DirectoryInfo(backup).Parent.ToString();
+                if (!validParents.Contains(parPath))
                 {
-                    throw new Exception("Index files are in use by another process.");
+                    continue;
                 }
 
+                var target = Path.GetFullPath(Path.Combine(basePath, parPath, Path.GetFileName(backup)));
+                File.Copy(backup, target, true);
+
+            }
+        }
+
+        /// <summary>
+        /// Safely attempts to clear old index backups, and creates the index backups folder after.
+        /// Will Error if there is anything unusual about the backup folder state.
+        /// </summary>
+        /// <param name="backupDirectory"></param>
+        /// <exception cref="Exception"></exception>
+        public static void ClearIndexBackups(string backupDirectory)
+        {
+            Directory.CreateDirectory(backupDirectory);
+            var files = IOUtil.GetFilesInFolder(backupDirectory);
+
+            foreach(var file in files)
+            {
+                if(!file.EndsWith(Index.IndexExtension) && !file.EndsWith(Index.Index2Extension))
+                {
+                    if (!file.EndsWith(".ver"))
+                    {
+                        throw new Exception("Unexpected files in Index Backup Directory, cannot safely clear previous backups.");
+                    }
+                }
+            }
+
+            IOUtil.RecursiveDeleteDirectory(backupDirectory);
+            Directory.CreateDirectory(backupDirectory);
+        }
+
+        /// <summary>
+        /// Clears and creates new index backups.
+        /// Will Error if there is an open transaction.
+        /// </summary>
+        /// <param name="backupDirectory"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public static async Task CreateIndexBackups(string backupDirectory)
+        {
+            // Run on a new task since this can be potentially heavy if there's a lot of mods to disable.
+            await Task.Run(async () =>
+            {
+                if (ModTransaction.ActiveTransaction != null)
+                {
+                    throw new Exception("Cannot create Index Backups while there is an open write-enabled transaction.");
+                }
+
+                if (backupDirectory.StartsWith(XivCache.GameInfo.GameDirectory.Parent.FullName))
+                {
+                    throw new Exception("Cannot use the game directory as backup directory.");
+                }
+
+                // Readonly TX to check stuff.
+                var rtx = ModTransaction.BeginReadonlyTransaction();
+                var ml = await rtx.GetModList();
+
+                List<Mod> enabledMods = new List<Mod>();
+                if (await Modding.AnyModsEnabled(rtx))
+                {
+                    // Have to use a real TX here, which also means we need write access.
+                    if (!Dat.AllowDatAlteration)
+                    {
+                        throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
+                    }
+
+                    using (var tx = await ModTransaction.BeginTransaction(true))
+                    {
+                        enabledMods = await Modding.GetActiveMods(tx);
+                        await Modding.SetAllModStates(EModState.Disabled, null, tx);
+                        await ModTransaction.CommitTransaction(tx);
+                    }
+                }
+
+                // Reset Index DAT counts to their default game state.
+                Index.UNSAFE_ResetAllIndexDatCounts();
                 try
                 {
-                    // Toggle off all mods
-                    await modding.ToggleAllMods(false);
-                }
-                catch
-                {
-                    throw new Exception("Failed to disable mods.\n\n" +
-                        "Please check For problems by selecting Help -> Check For Problems");
-                }
 
-
-                var originalFiles = Directory.GetFiles(_gameDirectory.FullName);
-                foreach (var originalFile in originalFiles)
-                {
+                    // Validate that the indexes refer only to base game indexes.
                     try
                     {
-                        if (originalFile.Contains(".win32.index"))
-                        {
-                            File.Copy(originalFile, $"{backupsDirectory}/{Path.GetFileName(originalFile)}", true);
-                        }
+                        await AssertIndexIsClean(XivDataFile._04_Chara);
                     }
-                    catch (Exception ex)
+                    catch
                     {
-                        throw new Exception("Failed to copy index files.\n\n" + ex.Message);
+                        throw new InvalidDataException("Cannot create index backups.  Indexes are unclean and still refer to modified dats even after disabling all mods.");
+                    }
+
+
+
+                    ClearIndexBackups(backupDirectory);
+
+                    foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+                    {
+                        var path = Path.Combine(backupDirectory, XivDataFiles.GetFilePath(df));
+                        var folder = new DirectoryInfo(path).Parent.FullName;
+
+                        Directory.CreateDirectory(folder);
+
+
+                        var index1path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
+                        var index2path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+                        var index1backup = path + Index.IndexExtension;
+                        var index2backup = path + Index.Index2Extension;
+
+                        File.Copy(index1path, index1backup);
+                        File.Copy(index2path, index2backup);
+                    }
+
+
+                    var versionFile = XivCache.GameInfo.GameVersionFile;
+                    if (!string.IsNullOrWhiteSpace(versionFile))
+                    {
+                        var fName = Path.GetFileName(versionFile);
+                        var versionTarget = Path.Combine(backupDirectory, fName);
+                        File.Copy(versionFile, versionTarget);
+                    }
+                }
+                finally
+                {
+                    // Return DAT counts to normal.
+                    Index.UNSAFE_NormalizeAllIndexDatCounts();
+
+                    if (enabledMods.Count > 0)
+                    {
+                        // Re-Enable mods.
+                        using (var tx = await ModTransaction.BeginTransaction(true))
+                        {
+                            var paths = enabledMods.Select(x => x.FilePath);
+                            await Modding.SetModStates(EModState.Enabled, paths, null, tx);
+                            await ModTransaction.CommitTransaction(tx);
+                        }
                     }
                 }
             });
         }
 
-        public Task<bool> RestoreBackups(DirectoryInfo backupsDirectory)
+        public static void AssertIndexIsClean(string index2Path, XivDataFile datafile)
         {
-            return Task.Run(async () =>
+            var offsets = IndexFile.GetOffsetsFromRawIndex2File(index2Path);
+            var originalList = Dat.GetOriginalDatList(datafile);
+            var maxSafeDat = originalList.Count;
+
+            foreach (var offset in offsets)
             {
-                var backupFiles = Directory.GetFiles(backupsDirectory.FullName);
-                var filesToCheck = new XivDataFile[] { XivDataFile._0A_Exd, XivDataFile._04_Chara, XivDataFile._06_Ui, XivDataFile._01_Bgcommon };
-                var outdated = false;
+                var parts = IOUtil.Offset8xToParts(offset);
 
-                foreach (var xivDataFile in filesToCheck)
+                if (parts.DatNum > maxSafeDat)
                 {
-                    var backupFile = new DirectoryInfo($"{backupsDirectory.FullName}\\{xivDataFile.GetDataFileName()}.win32.index");
-
-                    if (!File.Exists(backupFile.FullName)) continue;
-
-                    try
-                    {
-                        var outdatedCheck = await CheckForOutdatedBackups(xivDataFile, backupsDirectory);
-
-                        if (!outdatedCheck)
-                        {
-                            outdated = true;
-                        }
-                    }
-                    catch { 
-                        // If the outdated check errored out, we likely have completely broken internal dat files.
-                        // ( Either deleted or 0 byte files ), so replacing them with *anything* is an improvement.
-                    }
+                    throw new InvalidDataException("The given index references modded data files.");
                 }
+            }
+        }
 
-                var _index = new Index(_gameDirectory);
-                // Make sure backups exist and are up to date unless called with forceRestore true
-                if (backupFiles.Length != 0 && !outdated)
+        public static async Task AssertIndexIsClean(XivDataFile dataFile)
+        {
+            var rtx = ModTransaction.BeginReadonlyTransaction();
+            var iFile = await rtx.GetIndexFile(XivDataFile._04_Chara);
+
+            var offsets = iFile.GetAllIndex2Offsets();
+
+            var originalList = Dat.GetOriginalDatList(dataFile);
+            var maxSafeDat = originalList.Count;
+
+            foreach(var offset in offsets)
+            {
+                var parts = IOUtil.Offset8xToParts(offset);
+
+                if(parts.DatNum > maxSafeDat)
                 {
-                    // Copy backups to ffxiv folder
-                    foreach (var backupFile in backupFiles)
-                    {
-                        if (backupFile.Contains(".win32.index"))
-                        {
-                            File.Copy(backupFile, $"{_gameDirectory}/{Path.GetFileName(backupFile)}", true);
-                        }
-                    }
-
-                    // Update all the index counts to be safe, in case the user's index backups were generated when some mod dats existed.
-                    _index.UpdateAllIndexDatCounts();
-                    return true;
+                    throw new InvalidDataException("The given index references modded data files.");
                 }
-                return false;
-            });            
+            }
+        }
+
+        public static async Task AssertAllIndexesAreClean()
+        {
+            var broken = new List<XivDataFile>();
+            foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+            {
+                try
+                {
+                    await AssertIndexIsClean(df);
+                }
+                catch (Exception ex)
+                {
+                    broken.Add(df);
+                }
+            }
+            if(broken.Count == 0)
+            {
+                return;
+            }
+
+            var mes = "The following Indexes have invalid offsets contained within them:\n\n";
+            foreach(var df in broken)
+            {
+                mes += XivDataFiles.GetFilePath(df) + "\n";
+            }
+            throw new InvalidDataException(mes);
         }
     }
 }
