@@ -58,6 +58,15 @@ namespace xivModdingFramework.Helpers
                 {
                     foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
                     {
+                        var index1Path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
+                        var index2Path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+
+                        if(!File.Exists(index1Path) || !File.Exists(index2Path))
+                        {
+                            // Trial user or otherwise situation where the indexes aren't available.
+                            continue;
+                        }
+
                         if (CheckHashes(df))
                         {
                             continue;
@@ -78,6 +87,7 @@ namespace xivModdingFramework.Helpers
         {
             var index1Path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
             var index2Path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+
             using (var index1Stream = new BinaryReader(File.OpenRead(index1Path)))
             {
                 if (!CheckHashes(index1Stream))
@@ -455,11 +465,19 @@ namespace xivModdingFramework.Helpers
 
                         var index1path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
                         var index2path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+
                         var index1backup = path + Index.IndexExtension;
                         var index2backup = path + Index.Index2Extension;
 
-                        File.Copy(index1path, index1backup);
-                        File.Copy(index2path, index2backup);
+                        if (File.Exists(index1path))
+                        {
+                            File.Copy(index1path, index1backup);
+                        }
+
+                        if (File.Exists(index2path))
+                        {
+                            File.Copy(index2path, index2backup);
+                        }
                     }
 
 
@@ -492,6 +510,11 @@ namespace xivModdingFramework.Helpers
 
         public static void AssertIndexIsClean(string index2Path, XivDataFile datafile)
         {
+            if (!File.Exists(index2Path))
+            {
+                return;
+            }
+
             var offsets = IndexFile.GetOffsetsFromRawIndex2File(index2Path);
             var originalList = Dat.GetOriginalDatList(datafile);
             var maxSafeDat = originalList.Count;

@@ -1648,7 +1648,16 @@ namespace xivModdingFramework.Materials.FileTypes
 
             var tx = ModTransaction.BeginReadonlyTransaction();
 
-            var index = await tx.GetIndexFile(dataFile);
+            IndexFile index;
+            try
+            {
+                index = await tx.GetIndexFile(dataFile);
+            }
+            catch
+            {
+                // Index doesn't exist.
+                return new List<SimplifiedMtrlInfo>();
+            }
 
 
             // Populate dictionaries.
