@@ -793,7 +793,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 {
                     return (ESamplerId)SamplerIdRaw;
                 }
-                return ESamplerId.Invalid;
+                return ESamplerId.Unknown;
             }
             set
             {
