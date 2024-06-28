@@ -34,9 +34,6 @@ namespace xivModdingFramework.Models.FileTypes
         public static int _EQP_GAP_1_END = -1;
         public static int _EQP_GAP_2_END = -1;
 
-        private readonly DirectoryInfo _gameDirectory;
-        private readonly DirectoryInfo _modListDirectory;
-
         // Full EQP entries are 8 bytes long.
         public const int EquipmentParameterEntrySize = 8;
 
@@ -65,8 +62,8 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.Hrothgar_Male,
 
             XivRace.Hrothgar_Female,
-            XivRace.Viera_Female,
             XivRace.Viera_Male,
+            XivRace.Viera_Female,
 
         };
 
@@ -113,10 +110,8 @@ namespace xivModdingFramework.Models.FileTypes
             XivRace.NPC_Female
         };
 
-        public Eqp(DirectoryInfo gameDirectory)
+        public Eqp()
         {
-            _gameDirectory = gameDirectory;
-            _modListDirectory = new DirectoryInfo(Path.Combine(gameDirectory.Parent.Parent.FullName, XivStrings.ModlistFilePath));
         }
 
         public async Task SaveGmpEntries(List<(uint PrimaryId, GimmickParameter GmpData)> entries, IItem referenceItem, ModTransaction tx = null)
@@ -1114,22 +1109,9 @@ namespace xivModdingFramework.Models.FileTypes
 
         #region Raw Internal Functions
 
-        // Cache to help reduce the amount of checks we have to do to see what EQDP files actually exist, since this can never change at runtime.
-        // Keyed by [IsAccessory][XivRace] => Exists(t/f)
-        private static Dictionary<bool, Dictionary<XivRace, bool>> _eqdpFileExistsCache = new Dictionary<bool, Dictionary<XivRace, bool>>()
-        {
-            { true, new Dictionary<XivRace, bool>() },
-            { false, new Dictionary<XivRace, bool>() }
-        };
 
         private static async Task<bool> EqdpFileExists(XivRace race, bool accessory, ModTransaction tx = null)
         {
-            if(_eqdpFileExistsCache[accessory].ContainsKey(race))
-            {
-                return _eqdpFileExistsCache[accessory][race];
-            }
-
-            bool exists = false;
             if (tx == null)
             {
                 tx = ModTransaction.BeginReadonlyTransaction();
@@ -1138,10 +1120,6 @@ namespace xivModdingFramework.Models.FileTypes
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
             exists = index.FileExists(fileName);
-            // EQDP files are just keyed by race, and typically all exist, unless it's for some unusual NPC race.
-            // As such, there's no real penalty to retaining this cache indefinitely, regardless of mod status.
-            _eqdpFileExistsCache[accessory].Add(race, exists);
-
             return exists;
         }
 
