@@ -659,7 +659,7 @@ namespace xivModdingFramework.Cache
             // Try to resolve Meta files first.
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
-                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                var _eqp = new Eqp();
 
                 List<XivRace> races = null;
                 races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true, tx);

@@ -927,7 +927,7 @@ namespace xivModdingFramework.Cache
                     var root = new XivDependencyRootInfo();
                     root.PrimaryType = primary;
                     root.SecondaryType = (secondary == XivItemType.none ? null : (XivItemType?) secondary);
-                    var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                    var eqp = new Eqp();
                     var races = (XivRace[])Enum.GetValues(typeof(XivRace));
                     var slots = XivItemTypes.GetAvailableSlots(primary);
                     if(secondary != XivItemType.none)

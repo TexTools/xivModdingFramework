@@ -1323,7 +1323,7 @@ namespace xivModdingFramework.Models.Helpers
             }
             catch(Exception ex)
             {
-                throw (ex);
+                throw;
             }
         }
 

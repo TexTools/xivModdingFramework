@@ -4539,7 +4539,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // File already exists, no adjustments needed.
                 if ((await tx.FileExists(path))) return;
 
-                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                var _eqp = new Eqp();
                 var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
                 var baseModelOrder = newRace.GetModelPriorityList();
 
