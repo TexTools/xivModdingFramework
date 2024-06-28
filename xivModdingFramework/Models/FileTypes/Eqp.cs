@@ -1119,7 +1119,7 @@ namespace xivModdingFramework.Models.FileTypes
             var index = await tx.GetIndexFile(XivDataFile._04_Chara);
             var rootPath = accessory ? AccessoryDeformerParameterRootPath : EquipmentDeformerParameterRootPath;
             var fileName = rootPath + "c" + race.GetRaceCode() + "." + EquipmentDeformerParameterExtension;
-            exists = index.FileExists(fileName);
+            var exists = index.FileExists(fileName);
             return exists;
         }
 
