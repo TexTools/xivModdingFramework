@@ -1079,6 +1079,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         metaData = await PMP.GetImportMetadata(imported, root, tx);
                     }
 
+                    if(metaData == null)
+                    {
+                        // Invalid path/root
+                        continue;
+                    }
+
                     seenMetadata.Add(path, metaData);
                 }
                 else
