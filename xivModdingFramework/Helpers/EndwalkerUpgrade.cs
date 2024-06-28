@@ -706,7 +706,7 @@ namespace xivModdingFramework.Helpers
                 for (int i = 0; i < 16; i++)
                 {
                     var oldOffset = i * 2;
-                    var newOffset = (i * 2) * 4;
+                    var newOffset = i * 4;
 
                     var newDyeBlock = (uint)0;
                     var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
@@ -725,6 +725,8 @@ namespace xivModdingFramework.Helpers
 
                 mtrl.ColorSetDyeData = newDyeData;
             }
+
+            mtrl.AdditionalData = new byte[] { 0x34, 0x05, 0, 0, };
 
 
             var normalTex = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
