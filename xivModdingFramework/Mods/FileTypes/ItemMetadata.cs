@@ -273,12 +273,12 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
                     await meta.FillMissingFiles(source, tx);
                 }
-
                 await boiler.Commit();
             }
-            catch
+            catch(Exception ex)
             {
                 await boiler.Catch();
+                throw;
             }
         }
 
