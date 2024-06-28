@@ -655,16 +655,16 @@ namespace xivModdingFramework.Helpers
                 newData.Add(mtrl.ColorSetData[pixel + 0]);
                 newData.Add(mtrl.ColorSetData[pixel + 1]);
                 newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(1.0f);
+                newData.Add(0);
 
                 //Unknown1
                 newData.Add(0);
                 newData.Add(0);
-                newData.Add(2.0f);
+                newData.Add(0);
                 newData.Add(0);
 
                 //Unknown2
-                newData.Add(0.5f);
+                newData.Add(0);
                 newData.Add(0);
                 newData.Add(0);
                 newData.Add(0);
@@ -898,15 +898,17 @@ namespace xivModdingFramework.Helpers
                 row[i] = 1.0f;
             }
 
-            row[11] = 1.0f;
-            row[12] = 0.09997559f;
-            row[13] = 0.1999512f;
-            row[14] = 5.0f;
+            row[11] = 0;
+            row[12] = 0;
+            row[13] = 0;
+            row[14] = 0;
 
 
-            row[16] = 0.5f;
-            row[25] = 0.0078125f;
-            row[26] = 1.0f;
+            row[16] = 0;
+            row[25] = 0;
+
+            // Tile opacity
+            row[6 * 4 + 2] = 1.0f;
 
 
             row[7 * 4 + 0] = 16.0f;
