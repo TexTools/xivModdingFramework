@@ -357,8 +357,7 @@ namespace xivModdingFramework.Cache
                 // in preprartion for calling rebuild.
                 // Needs to be done in -this- thread before
                 // Rebuild is Asynchronously called.
-                SQLiteConnection.ClearAllPools();
-                GC.WaitForPendingFinalizers();
+                WaitForSqlCleanup();
             }
             return result;
         }
@@ -479,8 +478,7 @@ namespace xivModdingFramework.Cache
             // That data is considere inviolate, and should never be changed
             // unless the user specifically requests to rebuild it, or
             // manually replaces the roots DB.  (It takes an hour or more to build)
-            SQLiteConnection.ClearAllPools();
-            GC.WaitForPendingFinalizers();
+            WaitForSqlCleanup()
 
             try
             {
@@ -1747,8 +1745,7 @@ namespace xivModdingFramework.Cache
         {
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
 
-            SQLiteConnection.ClearAllPools();
-            GC.WaitForPendingFinalizers();
+            WaitForSqlCleanup();
             File.Delete(_rootCachePath.FullName);
 
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
@@ -2140,6 +2137,13 @@ namespace xivModdingFramework.Cache
             }
         }
 
+        public static void WaitForSqlCleanup()
+        {
+            SQLiteConnection.ClearAllPools();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+
         /// <summary>
         /// Queues dependency information pre-calculation for the given file(s).
         /// </summary>
@@ -2167,7 +2171,7 @@ namespace xivModdingFramework.Cache
             try
             {
                 // This is required because our SQL library is stupid.
-                GC.WaitForPendingFinalizers();
+                WaitForSqlCleanup();
                 using (var db = new SQLiteConnection(CacheConnectionString))
                 {
                     db.BusyTimeout = 3;
@@ -2472,10 +2476,7 @@ namespace xivModdingFramework.Cache
             Trace.WriteLine("Stopping Cache Worker on thread: " + Thread.CurrentThread.ManagedThreadId);
 
             // Ensure we're good and clean up after ourselves.
-            SQLiteConnection.ClearAllPools();
-
-            // It'd be nice to be able to use this...
-            GC.WaitForPendingFinalizers();
+            WaitForSqlCleanup();
             // But the SQlite library sometimes hangs indefinitely if you call it.
             // So instead...
 
@@ -2485,8 +2486,8 @@ namespace xivModdingFramework.Cache
 
                 try
                 {
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
+                    WaitForSqlCleanup();
+
                     var fs = File.OpenWrite(_dbPath.FullName);
                     fs.Dispose();
                     accessFailed = false;

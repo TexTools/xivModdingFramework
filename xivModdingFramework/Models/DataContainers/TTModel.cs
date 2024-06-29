@@ -1541,8 +1541,12 @@ namespace xivModdingFramework.Models.DataContainers
                 db.Close();
             }
 
+            // Try to make sure the DB is properly unlocked.'
 
-            if(settings != null && settings.ShiftImportUV)
+            XivCache.WaitForSqlCleanup();
+            File.Delete(filePath);
+
+            if (settings != null && settings.ShiftImportUV)
             {
                 ModelModifiers.ShiftImportUV(model, loggingFunction);
             }
