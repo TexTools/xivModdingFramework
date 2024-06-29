@@ -370,7 +370,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 if (boiler.OwnTx)
                 {
-                    progress?.Report((0, 0, "Committing Transaction..."));
+                    progress?.Report((0, 0, "Compressing files and Committing Transaction..."));
                 }
                 await boiler.Commit();
 
