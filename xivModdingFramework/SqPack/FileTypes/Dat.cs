@@ -1860,10 +1860,20 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var largestDatNum = GetLargestDatNumber(dataFile) + 1;
                 var emptyList = new List<string>();
 
+                // Never delete dat0.
+                if (largestDatNum == 0) return emptyList;
+
                 for (var i = 0; i < largestDatNum; i++)
                 {
                     var datPath = Dat.GetDatPath(dataFile, i);
                     var fileInfo = new FileInfo(datPath);
+
+                    var list = Dat.GetModdedDatList(dataFile);
+
+                    // Do not allow deleting non-mod-dats.
+                    if (!list.Contains(datPath))
+                        continue;
+
 
                     if (fileInfo.Length == 0)
                     {

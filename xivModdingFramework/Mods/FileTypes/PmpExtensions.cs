@@ -40,6 +40,13 @@ namespace xivModdingFramework.Mods.FileTypes
         Character,
         Weapon,
         Font,
+
+        // HACKHACK: These are wrong and should be their own enum, but hackfix for the moment.
+        Body,
+        Face,
+        Ear,
+        Tail,
+        Hair,
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum PMPModelRace : byte
@@ -213,7 +220,7 @@ namespace xivModdingFramework.Mods.FileTypes
             { XivItemType.accessory, PMPObjectType.Accessory },
             { XivItemType.demihuman, PMPObjectType.DemiHuman },
             { XivItemType.monster, PMPObjectType.Monster },
-            { XivItemType.body, PMPObjectType.Unknown },
+            { XivItemType.body, PMPObjectType.Body },
         };
 
         public static PmpIdentifierJson GetPenumbraIdentifierFromRoot(XivDependencyRoot root, int variant = 1)

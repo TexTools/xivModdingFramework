@@ -245,14 +245,16 @@ namespace xivModdingFramework.Cache
             const string MaterialFolderWithVariant = "{0}material/v{1}/";
             const string MaterialFolderWithoutVariant = "{0}material/";
 
-            var basePath = GetRootFolder();
 
+            var info = this;
             if (PrimaryType == XivItemType.human && SecondaryType == XivItemType.hair)
             {
                 // Stupid hair exception handling.
-                var hairRoot = Mtrl.GetHairMaterialRoot(this);
-                basePath = hairRoot.GetRootFolder();
+                var rt = this;
+                info = Mtrl.GetHairMaterialRoot(rt);
             }
+
+            var basePath = info.GetRootFolder();
 
             if (UsesMaterialSets())
             {
@@ -263,10 +265,10 @@ namespace xivModdingFramework.Cache
                 basePath = String.Format(MaterialFolderWithoutVariant, basePath);
             }
 
-            var materialName = "mt_" + GetBaseFileName();
+            var materialName = "mt_" + info.GetBaseFileName();
             if (PrimaryType == XivItemType.equipment || PrimaryType == XivItemType.accessory)
             {
-                materialName = "mt_" + GetRacialBaseName(race);
+                materialName = "mt_" + info.GetRacialBaseName(race);
             }
 
             if(PrimaryType == XivItemType.human && SecondaryType == XivItemType.body && Slot != null)
