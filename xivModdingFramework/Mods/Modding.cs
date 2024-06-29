@@ -661,7 +661,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task CleanUpModlistItems(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
         {
-            if (XivCache.GameWriteEnabled)
+            if (!XivCache.GameWriteEnabled)
             {
                 throw new Exception("Cannot alter game files while FFXIV file writing is disabled.");
             }
