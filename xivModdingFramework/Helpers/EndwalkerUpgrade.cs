@@ -689,6 +689,10 @@ namespace xivModdingFramework.Helpers
                 if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
                 {
                     // Not sure what this is exactly used for on glass but it's not proper diffuse.
+                    // Screen multiply it to be lighter, as very dark values cause it to become fully opaque.
+                    newData[offset + 0] = 1 - ((1 - mtrl.ColorSetData[pixel + 0]) * 0.5f);
+                    newData[offset + 1] = 1 - ((1 - mtrl.ColorSetData[pixel + 1]) * 0.5f);
+                    newData[offset + 2] = 1 - ((1 - mtrl.ColorSetData[pixel + 2]) * 0.5f);
                 }
                 else
                 {
@@ -1000,10 +1004,6 @@ namespace xivModdingFramework.Helpers
 
             if (pack == EShaderPack.CharacterGlass)
             {
-                // Clear ""Diffuse""
-                row[0 * 4 + 0] = 1.0f;
-                row[0 * 4 + 1] = 1.0f;
-                row[0 * 4 + 2] = 1.0f;
 
                 // Spec alpha
                 row[1 * 4 + 3] = 0;
