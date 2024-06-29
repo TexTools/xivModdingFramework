@@ -422,6 +422,12 @@ namespace xivModdingFramework.Textures.FileTypes
             var root = await XivCache.GetFirstRoot(internalPath);
             bool useMips = root != null;
 
+            if (internalPath.StartsWith("chara/common/texture/decal_face"))
+            {
+                // Hacky exception is fine for now.
+                useMips = true;
+            }
+
 
             // First of all, check if the file is a DDS file.
             using(var f = File.OpenRead(externalPath))

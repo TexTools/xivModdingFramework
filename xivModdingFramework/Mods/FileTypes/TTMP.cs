@@ -896,7 +896,7 @@ namespace xivModdingFramework.Mods.FileTypes
         }
         public static bool DoesModpackNeedTexFix(ModPackJson mpl)
         {
-            return DoesModpackNeedTexFix(mpl.Version);
+            return DoesModpackNeedTexFix(mpl.TTMPVersion);
         }
         public static bool DoesModpackNeedTexFix(string version)
         {
