@@ -2170,8 +2170,6 @@ namespace xivModdingFramework.Cache
 
             try
             {
-                // This is required because our SQL library is stupid.
-                WaitForSqlCleanup();
                 using (var db = new SQLiteConnection(CacheConnectionString))
                 {
                     db.BusyTimeout = 3;

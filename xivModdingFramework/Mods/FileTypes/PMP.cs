@@ -458,7 +458,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
 
                     // Import the file...
-                    await SmartImport.Import(externalPath, internalPath, _Source, tx);
+
+                    var data = File.ReadAllBytes(externalPath);
+                    await Dat.WriteModFile(data, internalPath, _Source, null, tx, false);
+                    XivCache.QueueDependencyUpdate(internalPath);
                     i++;
                 }
                 catch (Exception ex)
