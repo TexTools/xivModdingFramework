@@ -1434,8 +1434,8 @@ namespace xivModdingFramework.Materials.FileTypes
                 return root;
             } else if (root.SecondaryId < 116)
             {
-                // 101-115 have Midlander M/F, and Miqo M/F
-                if (root.PrimaryId == 701 || root.PrimaryId == 801)
+                // 101-115 have Midlander M/F, and Miqo M/F/Hroth M/F
+                if (root.PrimaryId == 701 || root.PrimaryId == 801 || root.PrimaryId == 1501 || root.PrimaryId == 1601)
                 {
                     return root;
                 }

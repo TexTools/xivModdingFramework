@@ -40,7 +40,13 @@ namespace xivModdingFramework.Mods.FileTypes
         Character,
         Weapon,
         Font,
+
+        // HACKHACK: These are wrong and should be their own enum, but hackfix for the moment.
         Body,
+        Face,
+        Ear,
+        Tail,
+        Hair,
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum PMPModelRace : byte

@@ -1750,7 +1750,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 // This is always 0 for now.  Support element for Liinko's work on multi-model export.
                                 cmd.Parameters.AddWithValue("model", 0);
                                 cmd.Parameters.AddWithValue("material_id", GetMaterialIndex(meshIdx));
-                                cmd.Parameters.AddWithValue("type", (int) m.MeshType);
+                                cmd.Parameters.AddWithValue("type", m.MeshType.ToString());
                                 cmd.ExecuteScalar();
                             }
 
@@ -2215,7 +2215,7 @@ namespace xivModdingFramework.Models.DataContainers
                                     cmd.Parameters.AddWithValue("model", modelIdx);
                                     cmd.Parameters.AddWithValue("mesh", meshIdx);
                                     cmd.Parameters.AddWithValue("material_id", tempMatDict[Path.GetFileNameWithoutExtension(m.Material)]);
-                                    cmd.Parameters.AddWithValue("type", (int)m.MeshType);
+                                    cmd.Parameters.AddWithValue("type", m.MeshType.ToString());
                                     cmd.ExecuteScalar();
                                 }
 
