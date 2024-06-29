@@ -478,7 +478,7 @@ namespace xivModdingFramework.Cache
             // That data is considere inviolate, and should never be changed
             // unless the user specifically requests to rebuild it, or
             // manually replaces the roots DB.  (It takes an hour or more to build)
-            WaitForSqlCleanup()
+            WaitForSqlCleanup();
 
             try
             {
