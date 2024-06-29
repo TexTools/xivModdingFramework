@@ -41,6 +41,7 @@ namespace xivModdingFramework.Helpers
         public enum EUpgradeTextureUsage
         {
             IndexMaps,
+            GearMask,
             HairMaps,
         };
 
@@ -555,22 +556,15 @@ namespace xivModdingFramework.Helpers
             {
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx, files);
 
-                ret.Add(texInfo.normalToCreateFrom, new UpgradeInfo()
-                {
-                     Usage = EUpgradeTextureUsage.IndexMaps,
-                      Files = new Dictionary<string, string>()
-                      {
-                          { "normal", texInfo.normalToCreateFrom },
-                          { "index", texInfo.indexTextureToCreate }
-                      },
-                });
+                var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
+                var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
 
-                if (!_ConvertedTextures.Contains(texInfo.normalToCreateFrom))
+                if(idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]))
                 {
                     (string indexFilePath, byte[] data) data = (null, null);
                     try
                     {
-                        data = await CreateIndexFromNormal(texInfo.indexTextureToCreate, texInfo.normalToCreateFrom, tx, files);
+                        data = await CreateIndexFromNormal(idInfo.Value.Files["index"], idInfo.Value.Files["normal"], tx, files);
                     }
                     catch
                     {
@@ -589,13 +583,42 @@ namespace xivModdingFramework.Helpers
                             await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
                         }
                     }
-                    _ConvertedTextures.Add(texInfo.normalToCreateFrom);
+                    _ConvertedTextures.Add(idInfo.Value.Files["normal"]);
                 }
+
+
+                if (maskInfo.Key != null && !_ConvertedTextures.Contains(maskInfo.Value.Files["mask_old"]))
+                {
+                    var maskPathOld = maskInfo.Value.Files["mask_old"];
+                    var maskPathNew = maskInfo.Value.Files["mask_new"];
+
+                    if (await Exists(maskPathOld, files, tx))
+                    {
+                        var data = await ResolveFile(maskPathOld, files, tx);
+                        if (files == null)
+                        {
+                            if (data != null)
+                            {
+
+                                data = await UpgradeMaskTex(data);
+                                await WriteFile(data, maskPathNew, files, tx, source);
+                            }
+                            else
+                            {
+                                // Resave the material with texture validation to create dummy textures if none exist.
+                                await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                            }
+                        }
+                        _ConvertedTextures.Add(maskPathNew);
+                    }
+                }
+
             }
             else if (mtrl.ShaderPack == EShaderPack.Hair)
             {
                 ret = await UpdateEndwalkerHairMaterial(mtrl, source, tx, _ConvertedTextures, files);
             }
+
             return ret;
         }
 
@@ -607,12 +630,13 @@ namespace xivModdingFramework.Helpers
         /// <param name="updateShaders"></param>
         /// <param name="source"></param>
         /// <returns></returns>
-        private static async Task<(string indexTextureToCreate, string normalToCreateFrom)> UpdateEndwalkerColorset(XivMtrl mtrl, string source, ModTransaction tx, Dictionary<string, FileStorageInformation> files = null)
+        private static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerColorset(XivMtrl mtrl, string source, ModTransaction tx, Dictionary<string, FileStorageInformation> files = null)
         {
+            var ret = new Dictionary<string, UpgradeInfo>();
             if (mtrl.ColorSetData.Count != 256)
             {
                 // This is already upgraded.
-                return (null, null);
+                return ret;
             }
 
             if (mtrl.ShaderPack == EShaderPack.Character)
@@ -624,105 +648,133 @@ namespace xivModdingFramework.Helpers
                 // Don't need to change the shaderpack for anything else here.
             }
 
+            if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            {
+                var samplePath = "chara/equipment/e5001/material/v0001/mt_c0101e5001_met_b.mtrl";
+                var sample = await Mtrl.GetXivMtrl(samplePath, true, tx);
+
+                // Fix alpha threshhold for old gear.
+                // Not sure if this 100% correct, but in the mod samples I've found, all had
+                // invalid alpha threshold values.
+                mtrl.ShaderKeys = sample.ShaderKeys;
+                mtrl.ShaderConstants = sample.ShaderConstants;
+                mtrl.AdditionalData = sample.AdditionalData;
+                mtrl.MaterialFlags &= ~EMaterialFlags1.Unknown0004;
+                mtrl.MaterialFlags &= ~EMaterialFlags1.Unknown0008;
+            }
+
             if (mtrl.ColorSetData == null)
             {
                 await Mtrl.ImportMtrl(mtrl, null, source, false, tx);
-                return (null, null);
+                return ret;
             }
 
             // Update Colorset
             List<Half> newData = new List<Half>(1024);
-            for (int i = 0; i < mtrl.ColorSetData.Count; i += 16)
-            {
-                var pixel = i + 0;
 
-                // Diffuse Pixel
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel + 7]);  // SE flipped Specular Power and Gloss values for some reason.
-
-                pixel += 4;
-
-                // Specular Pixel
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel - 1]);  // SE flipped Specular Power and Gloss values for some reason.
-
-                pixel += 4;
-                // Emissive Pixel
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(0);
-
-                //Unknown1
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-
-                //Unknown2
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-
-                //Unknown3
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-                newData.Add(0);
-
-                //Unknown + subsurface material id
-                newData.Add(0);
-                newData.Add(mtrl.ColorSetData[pixel + 3]);
-                newData.Add(1.0f);  //  Subsurface Material Alpha
-                newData.Add(0);
-
-                pixel += 4;
-                //Subsurface scaling data.
-                newData.Add(mtrl.ColorSetData[pixel + 0]);
-                newData.Add(mtrl.ColorSetData[pixel + 1]);
-                newData.Add(mtrl.ColorSetData[pixel + 2]);
-                newData.Add(mtrl.ColorSetData[pixel + 3]);
-
-                // Add a blank row after, since only populating every other row.
-            }
-
-            for (int i = 0; i < 16; i++)
+            for (int i = 0; i < 32; i++)
             {
                 // Add empty rows after.
-                newData.AddRange(GetDefaultColorsetRow());
+                newData.AddRange(GetDefaultColorsetRow(mtrl.ShaderPack));
             }
+
+            for (int i = 0; i < 16; i ++)
+            {
+                var pixel = i * 16;
+
+                var offset = i * 8 * 4;
+
+                // Diffuse Pixel
+
+                if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
+                {
+                    // Not sure what this is exactly used for on glass but it's not proper diffuse.
+                    // Screen multiply it to be lighter, as very dark values cause it to become fully opaque.
+                    newData[offset + 0] = 1 - ((1 - mtrl.ColorSetData[pixel + 0]) * 0.5f);
+                    newData[offset + 1] = 1 - ((1 - mtrl.ColorSetData[pixel + 1]) * 0.5f);
+                    newData[offset + 2] = 1 - ((1 - mtrl.ColorSetData[pixel + 2]) * 0.5f);
+                }
+                else
+                {
+                    newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
+                    newData[offset + 1] = (mtrl.ColorSetData[pixel + 1]);
+                    newData[offset + 2] = (mtrl.ColorSetData[pixel + 2]);
+                }
+                if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
+                {
+                    newData[offset + 3] = mtrl.ColorSetData[pixel + 7];  // SE flipped Specular Power and Gloss values for some reason.
+                }
+
+                pixel += 4;
+                offset += 4;
+
+                // Specular Pixel
+                newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
+                newData[offset + 1] = mtrl.ColorSetData[pixel + 1];
+                newData[offset + 2] = mtrl.ColorSetData[pixel + 2];
+                if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
+                {
+                    newData[offset + 3] = mtrl.ColorSetData[pixel - 1];  // SE flipped Specular Power and Gloss values for some reason.
+                }
+
+                pixel += 4;
+                offset += 4;
+
+                // Emissive Pixel
+                newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
+                newData[offset + 1] = mtrl.ColorSetData[pixel + 1];
+                newData[offset + 2] = mtrl.ColorSetData[pixel + 2];
+
+                // Skip next 3 pixels
+                offset += 4;
+                offset += 4;
+                offset += 4;
+                offset += 4;
+
+                //Unknown + subsurface material id
+                newData[offset + 1] = mtrl.ColorSetData[pixel + 3];
+                newData[offset + 2] = 1.0f;  //  Subsurface Material Alpha
+
+                pixel += 4;
+                offset += 4;
+
+                //Subsurface scaling data.
+                newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
+                newData[offset + 1] = mtrl.ColorSetData[pixel + 1];
+                newData[offset + 2] = mtrl.ColorSetData[pixel + 2];
+                newData[offset + 3] = mtrl.ColorSetData[pixel + 3];
+            }
+
 
             mtrl.ColorSetData = newData;
             if (mtrl.ColorSetDyeData != null && mtrl.ColorSetDyeData.Length > 0)
             {
                 // Update Dye information.
                 var newDyeData = new byte[128];
-                // Update old dye information
-                for (int i = 0; i < 16; i++)
+
+                if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
                 {
-                    var oldOffset = i * 2;
-                    var newOffset = i * 4;
+                    // Update old dye information
+                    for (int i = 0; i < 16; i++)
+                    {
+                        var oldOffset = i * 2;
+                        var newOffset = i * 4;
 
-                    var newDyeBlock = (uint)0;
-                    var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
+                        var newDyeBlock = (uint)0;
+                        var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
 
-                    // Old dye bitmask was 5 bits long.
-                    uint dyeBits = (uint)(oldDyeBlock & 0x1F);
-                    uint oldTemplate = (uint)(oldDyeBlock >> 5);
+                        // Old dye bitmask was 5 bits long.
+                        uint dyeBits = (uint)(oldDyeBlock & 0x1F);
+                        uint oldTemplate = (uint)(oldDyeBlock >> 5);
 
-                    newDyeBlock |= (oldTemplate << 16);
-                    newDyeBlock |= dyeBits;
+                        newDyeBlock |= (oldTemplate << 16);
+                        newDyeBlock |= dyeBits;
 
-                    var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
+                        var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
 
-                    Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                        Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                    }
                 }
-
                 mtrl.ColorSetDyeData = newDyeData;
             }
 
@@ -757,10 +809,43 @@ namespace xivModdingFramework.Helpers
                 specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
             }
 
+            var idInfo = new UpgradeInfo()
+            {
+                Usage = EUpgradeTextureUsage.IndexMaps,
+                Files = new Dictionary<string, string>()
+                      {
+                          { "normal", normalPath },
+                          { "index", idPath }
+                      },
+            };
+
+            ret.Add(normalPath, idInfo);
+
+            if(mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            {
+                var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
+                if (maskSamp != null)
+                {
+                    var maskPath = maskSamp.Dx11Path;
+                    maskSamp.TexturePath = maskPath.Replace(".tex", "_dt_mask.tex");
+
+                    var maskInfo = new UpgradeInfo()
+                    {
+                        Usage = EUpgradeTextureUsage.GearMask,
+                        Files = new Dictionary<string, string>()
+                        {
+                            { "mask_old", maskPath },
+                            { "mask_new", maskPath.Replace(".tex", "_dt_mask.tex") }
+                        },
+                    };
+                    ret.Add(maskPath, maskInfo);
+                }
+            }
+
             var data = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
             await WriteFile(data, mtrl.MTRLPath, files, tx);
 
-            return (idPath, normalPath);
+            return ret;
         }
 
 
@@ -890,7 +975,7 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        private static Half[] GetDefaultColorsetRow()
+        private static Half[] GetDefaultColorsetRow(EShaderPack pack)
         {
             var row = new Half[32];
 
@@ -915,6 +1000,33 @@ namespace xivModdingFramework.Helpers
 
             row[7 * 4 + 0] = 16.0f;
             row[7 * 4 + 3] = 16.0f;
+
+
+            if (pack == EShaderPack.CharacterGlass)
+            {
+
+                // Spec alpha
+                row[1 * 4 + 3] = 0;
+
+                // Emiss Alpha
+                row[2 * 4 + 3] = 1;
+
+                // Fresnel Terms
+                row[3 * 4 + 0] = 1;
+                row[3 * 4 + 1] = 0;
+                row[3 * 4 + 2] = 2.5f;
+
+                // Roughness
+                row[4 * 4 + 0] = 0.5f;
+                
+                // Wetness...? Some kind of reflection thing.
+                row[5 * 4 + 1] = 1f;
+
+                // Submat Unknown.
+                row[6 * 4 + 3] = 5;
+
+            }
+
             return row;
         }
 
@@ -1079,6 +1191,8 @@ namespace xivModdingFramework.Helpers
                         item = root.GetFirstItem();
                     }
 
+                    // Ensure none of the files have already been converted.
+                    var skip = false;
                     foreach (var tex in hKv.Value)
                     {
                         var newPath = tex.TexType == XivTexType.Normal ? normTex.Dx11Path : maskTex.Dx11Path;
@@ -1086,9 +1200,18 @@ namespace xivModdingFramework.Helpers
                         if (files.Contains(newPath))
                         {
                             // Already converted.
+                            skip = true;
                             continue;
                         }
+                    }
+                    if (skip)
+                    {
+                        continue;
+                    }
 
+                    foreach (var tex in hKv.Value)
+                    {
+                        var newPath = tex.TexType == XivTexType.Normal ? normTex.Dx11Path : maskTex.Dx11Path;
                         if (fileInfos != null)
                         {
                             var data = await ResolveFile(tex.Path, fileInfos, tx);
@@ -1101,6 +1224,7 @@ namespace xivModdingFramework.Helpers
 
                         files.Add(newPath);
                     }
+
 
                     try
                     {
@@ -1233,22 +1357,22 @@ namespace xivModdingFramework.Helpers
         /// <returns></returns>
         public static async Task UpgradeRemainingTextures(Dictionary<string, FileStorageInformation> files, Dictionary<string, UpgradeInfo> upgrades)
         {
-            foreach(var kv in upgrades)
+            foreach (var kv in upgrades)
             {
                 var upgrade = kv.Value;
 
-                if(upgrade.Usage == EUpgradeTextureUsage.IndexMaps)
+                if (upgrade.Usage == EUpgradeTextureUsage.IndexMaps)
                 {
                     if (files.ContainsKey(upgrade.Files["normal"]))
                     {
                         var res = await CreateIndexFromNormal(upgrade.Files["index"], upgrade.Files["normal"], null, files);
-                        if(res.data == null)
+                        if (res.data == null)
                         {
                             throw new InvalidDataException("Failed to create Normal map from Index file");
                         }
                         await WriteFile(res.data, res.indexFilePath, files, null);
                     }
-                } else if(upgrade.Usage == EUpgradeTextureUsage.HairMaps)
+                } else if (upgrade.Usage == EUpgradeTextureUsage.HairMaps)
                 {
                     if (files.ContainsKey(upgrade.Files["normal"])
                         && files.ContainsKey(upgrade.Files["mask"]))
@@ -1256,14 +1380,22 @@ namespace xivModdingFramework.Helpers
 
                         await UpdateEndwalkerHairTextures(upgrade.Files["normal"], upgrade.Files["mask"], "Unused", null, null, files);
 
-                    } else if(files.ContainsKey(upgrade.Files["normal"])
+                    } else if (files.ContainsKey(upgrade.Files["normal"])
                         || files.ContainsKey(upgrade.Files["mask"]))
                     {
                         // One but not both.
-                        throw new FileNotFoundException("Unable to upgrade Hair Normal/Mask - Normal and Mask do not exist in the same file set/modpack option.\n" + upgrade.Files["normal"] +"\n" + upgrade.Files["mask"]);
+                        throw new FileNotFoundException("Unable to upgrade Hair Normal/Mask - Normal and Mask do not exist in the same file set/modpack option.\n" + upgrade.Files["normal"] + "\n" + upgrade.Files["mask"]);
                     }
                 }
+                else if (upgrade.Usage == EUpgradeTextureUsage.GearMask)
+                {
+                    if (files.ContainsKey(upgrade.Files["mask"])){
 
+                        var data = await ResolveFile(upgrade.Files["mask"], files, null);
+                        data = await UpgradeMaskTex(data);
+                        await WriteFile(data, upgrade.Files["mask"], files, null);
+                    }
+                }
             }
         }
 
@@ -1453,6 +1585,19 @@ namespace xivModdingFramework.Helpers
             // Write the updated material and texture.
             await WriteFile(maskData, newTexPath, files, tx, source);
             _ConvertedTextures.Add(maskPath);
+        }
+
+
+        public static async Task<byte[]> UpgradeMaskTex(byte[] uncompMaskTex)
+        {
+            var tex = XivTex.FromUncompressedTex(uncompMaskTex);
+            var pixData = await tex.GetRawPixels();
+
+            await TextureHelpers.UpgradeGearMask(pixData, tex.Width, tex.Height);
+            var data = await Tex.ConvertToDDS(pixData, XivCache.FrameworkSettings.DefaultTextureFormat, true, tex.Width, tex.Height, true);
+            data = Tex.DDSToUncompressedTex(data);
+
+            return data;
         }
 
     }

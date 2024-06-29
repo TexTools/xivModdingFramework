@@ -741,7 +741,7 @@ namespace xivModdingFramework.Mods
                         {
                             _ACTIVE_TX_BLOCKED = true;
                             wasBlocked = true;
-                            ActiveTransactionBlocked.Invoke(null);
+                            ActiveTransactionBlocked?.Invoke(null);
                         }
 
                         if(_CANCEL_BLOCKED_TX)

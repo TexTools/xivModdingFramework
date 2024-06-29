@@ -287,6 +287,28 @@ namespace xivModdingFramework.Textures
 
             }, width, height);
         }
+        public static async Task UpgradeGearMask(byte[] maskPixelData, int width, int height)
+        {
+            await ModifyPixels((int offset) =>
+            {
+                // Take the old gloss/metalness value and invert it.
+                var newRoughness = (byte)(255 - maskPixelData[offset + 2]);
+
+                // Output is RGBA
+
+                var spec = maskPixelData[offset + 1];
+
+                // Mask Blue - Diffuse
+                maskPixelData[offset + 2] = maskPixelData[offset + 0];
+
+                // Mask Red - Specular
+                maskPixelData[offset + 0] = spec;
+
+                // Mask Green - Roughness
+                maskPixelData[offset + 1] = newRoughness;
+
+            }, width, height);
+        }
 
         /// <summary>
         /// Resizes two textures to the sum largest size between them, using ImageSharp to do the processing.

@@ -97,7 +97,13 @@ namespace xivModdingFramework.HUD.FileTypes
                 }
             }));
 
-            return uldStringList.ToList();
+            try
+            {
+                return uldStringList.ToList();
+            } catch(Exception ex)
+            {
+                throw new Exception("ULD ToList() Error while rebuilding the Item List.  Please restart TT to fix the issue. (Ree)");
+            }
         }
     }
 }
