@@ -697,7 +697,9 @@ namespace xivModdingFramework.Models.ModelTextures
 
                                 diffuseMask = multi.Red;
                                 specMask = multi.Green;
-                                roughness = 1 - multi.Blue;
+                                roughness = 0.5f;
+                                metalness = 1 - multi.Blue;
+
                             }
                             else
                             {
@@ -755,23 +757,29 @@ namespace xivModdingFramework.Models.ModelTextures
 
                             metalness = row[18];
                             //var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
-
-
-
-                            if (!settings.GeneratePbrMaps)
-                            {
-                                // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
-                                specular *= _MetalFloor + (metalness * _MetalMultiplier);
-
-                                // As metalness rises, the diffuse/specular colors merge.
-                                diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
-                                specPixel = Color4.Lerp(specPixel, diffusePixel * specPixel, metalness);
-                            }
                         }
                         else
                         {
                             // Arbitrary estimation for SE-gloss to inverse roughness.
                             roughness *= (1 - row[3] / 16);
+                        }
+
+                        if (!settings.GeneratePbrMaps)
+                        {
+                            // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
+                            specular *= _MetalFloor + (metalness * _MetalMultiplier);
+
+                            if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
+                            {
+                                // As metalness rises, the diffuse becomes specular.
+                                diffusePixel = Color4.Lerp(diffusePixel, specPixel, metalness);
+                            }
+                            else
+                            {
+                                // As metalness rises, the diffuse/specular colors merge.
+                                diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
+                                specPixel = Color4.Lerp(specPixel, diffusePixel * specPixel, metalness);
+                            }
                         }
 
                         diffuse *= diffusePixel;

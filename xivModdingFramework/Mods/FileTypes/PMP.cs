@@ -934,6 +934,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 if (!includeData)
                 {
+                    if (ret.ContainsKey(src))
+                    {
+                        continue;
+                    }
                     ret.Add(src, new FileStorageInformation());
                     continue;
                 }

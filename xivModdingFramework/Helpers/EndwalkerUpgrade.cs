@@ -436,7 +436,7 @@ namespace xivModdingFramework.Helpers
             i = 0;
             foreach (var mtrl in materials)
             {
-                progress?.Report((i, total, "Updating Endwalker Materials..."));
+                progress?.Report((i, total, "Updating Endwalker Textures..."));
                 try
                 {
                     var missingFiles = await UpdateEndwalkerMaterial(mtrl, source, true, tx, _ConvertedTextures, files);
@@ -515,6 +515,7 @@ namespace xivModdingFramework.Helpers
             {
                 return ret;
             }
+
             if (files == null)
             {
                 var boiler = await TxBoiler.BeginWrite(tx);
@@ -556,52 +557,29 @@ namespace xivModdingFramework.Helpers
             {
                 var texInfo = await UpdateEndwalkerColorset(mtrl, source, tx, files);
 
-                var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
-                var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
 
-                if(idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]))
+                if (files == null)
                 {
-                    (string indexFilePath, byte[] data) data = (null, null);
-                    try
-                    {
-                        data = await CreateIndexFromNormal(idInfo.Value.Files["index"], idInfo.Value.Files["normal"], tx, files);
-                    }
-                    catch
-                    {
-                        // No-Op, Typically a texture sizing error.
-                    }
+                    var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
+                    var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
 
-                    if (files == null)
+                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]))
                     {
-                        if (data.data != null)
+                        (string indexFilePath, byte[] data) data = (null, null);
+                        try
                         {
-                            await WriteFile(data.data, data.indexFilePath, files, tx, source);
+                            data = await CreateIndexFromNormal(idInfo.Value.Files["index"], idInfo.Value.Files["normal"], tx, files);
                         }
-                        else
+                        catch
                         {
-                            // Resave the material with texture validation to create dummy textures if none exist.
-                            await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                            // No-Op, Typically a texture sizing error.
                         }
-                    }
-                    _ConvertedTextures.Add(idInfo.Value.Files["normal"]);
-                }
 
-
-                if (maskInfo.Key != null && !_ConvertedTextures.Contains(maskInfo.Value.Files["mask_old"]))
-                {
-                    var maskPathOld = maskInfo.Value.Files["mask_old"];
-                    var maskPathNew = maskInfo.Value.Files["mask_new"];
-
-                    if (await Exists(maskPathOld, files, tx))
-                    {
-                        var data = await ResolveFile(maskPathOld, files, tx);
                         if (files == null)
                         {
-                            if (data != null)
+                            if (data.data != null)
                             {
-
-                                data = await UpgradeMaskTex(data);
-                                await WriteFile(data, maskPathNew, files, tx, source);
+                                await WriteFile(data.data, data.indexFilePath, files, tx, source);
                             }
                             else
                             {
@@ -609,8 +587,40 @@ namespace xivModdingFramework.Helpers
                                 await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
                             }
                         }
-                        _ConvertedTextures.Add(maskPathNew);
+                        _ConvertedTextures.Add(idInfo.Value.Files["normal"]);
                     }
+
+
+                    if (maskInfo.Key != null && !_ConvertedTextures.Contains(maskInfo.Value.Files["mask_old"]))
+                    {
+                        var maskPathOld = maskInfo.Value.Files["mask_old"];
+                        var maskPathNew = maskInfo.Value.Files["mask_new"];
+
+                        if (await Exists(maskPathOld, files, tx))
+                        {
+                            var data = await ResolveFile(maskPathOld, files, tx);
+                            if (files == null)
+                            {
+                                if (data != null)
+                                {
+
+                                    data = await UpgradeMaskTex(data);
+                                    await WriteFile(data, maskPathNew, files, tx, source);
+                                }
+                                else
+                                {
+                                    // Resave the material with texture validation to create dummy textures if none exist.
+                                    await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                                }
+                            }
+                            _ConvertedTextures.Add(maskPathNew);
+                        }
+                    }
+                }
+
+                foreach(var kv in texInfo)
+                {
+                    ret.Add(kv.Key, kv.Value);
                 }
 
             }
@@ -648,6 +658,7 @@ namespace xivModdingFramework.Helpers
                 // Don't need to change the shaderpack for anything else here.
             }
 
+            mtrl.AdditionalData = new byte[] { 0x34, 0x05, 0, 0, };
             if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
             {
                 var samplePath = "chara/equipment/e5001/material/v0001/mt_c0101e5001_met_b.mtrl";
@@ -778,7 +789,6 @@ namespace xivModdingFramework.Helpers
                 mtrl.ColorSetDyeData = newDyeData;
             }
 
-            mtrl.AdditionalData = new byte[] { 0x34, 0x05, 0, 0, };
 
 
             var normalTex = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
