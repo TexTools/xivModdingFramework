@@ -47,63 +47,63 @@ namespace xivModdingFramework.HUD.FileTypes
             var uldStringList = new HashSet<string>();
             var uldOffsetList = await Index.GetAllFileOffsetsInFolder(hashedFolder, XivDataFile._06_Ui, tx);
 
-            await Task.Run(() => Parallel.ForEach(uldOffsetList, async (offset) =>
+            var tasks = new List<Task>();
+            foreach(var offset in uldOffsetList)
             {
-                byte[] uldData;
-                var type = await tx.GetSqPackType(XivDataFile._06_Ui, offset, false);
-                if (type == 2)
+                tasks.Add(Task.Run (async () =>
                 {
-                    uldData = await tx.ReadFile(XivDataFile._06_Ui, offset);
-                }
-                else
-                {
-                    return;
-                }
-
-                if (uldData.Length < 10) return;
-
-                using (var br = new BinaryReader(new MemoryStream(uldData)))
-                {
-                    var signature = br.ReadInt32();
-
-                    if (signature != 1751411829) return;
-
-                    br.ReadBytes(56);
-
-                    int pathCount = br.ReadByte();
-
-                    br.ReadBytes(7);
-
-                    for (var i = 0; i < pathCount; i++)
+                    byte[] uldData;
+                    var type = await tx.GetSqPackType(XivDataFile._06_Ui, offset, false);
+                    if (type == 2)
                     {
-                        var pathNum = br.ReadInt32();
-                        while (pathNum != i + 1)
+                        uldData = await tx.ReadFile(XivDataFile._06_Ui, offset);
+                    }
+                    else
+                    {
+                        return;
+                    }
+
+                    if (uldData.Length < 10) return;
+
+                    using (var br = new BinaryReader(new MemoryStream(uldData)))
+                    {
+                        var signature = br.ReadInt32();
+
+                        if (signature != 1751411829) return;
+
+                        br.ReadBytes(56);
+
+                        int pathCount = br.ReadByte();
+
+                        br.ReadBytes(7);
+
+                        for (var i = 0; i < pathCount; i++)
                         {
-                            pathNum = br.ReadInt32();
-                        }
+                            var pathNum = br.ReadInt32();
+                            while (pathNum != i + 1)
+                            {
+                                pathNum = br.ReadInt32();
+                            }
 
-                        var path = Encoding.UTF8.GetString(br.ReadBytes(48)).Replace("\0", "");
-                        path = new string(path.Where(c => !char.IsControl(c)).ToArray());
+                            var path = Encoding.UTF8.GetString(br.ReadBytes(48)).Replace("\0", "");
+                            path = new string(path.Where(c => !char.IsControl(c)).ToArray());
 
-                        if (path.Length <= 2 || !path.Contains("uld")) continue;
+                            if (path.Length <= 2 || !path.Contains("uld")) continue;
 
-                        var uldPath = path.Substring(0, path.LastIndexOf(".", StringComparison.Ordinal) + 4);
+                            var uldPath = path.Substring(0, path.LastIndexOf(".", StringComparison.Ordinal) + 4);
 
-                        lock (uldLock)
-                        {
-                            uldStringList.Add(uldPath);
+                            lock (uldLock)
+                            {
+                                uldStringList.Add(uldPath);
+                            }
                         }
                     }
-                }
-            }));
-
-            try
-            {
-                return uldStringList.ToList();
-            } catch(Exception ex)
-            {
-                throw new Exception("ULD ToList() Error while rebuilding the Item List.  Please restart TT to fix the issue. (Ree)");
+                }));
             }
+
+            await Task.WhenAll(tasks);
+
+            return uldStringList.ToList();
         }
     }
 }
