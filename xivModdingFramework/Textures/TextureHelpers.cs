@@ -245,6 +245,9 @@ namespace xivModdingFramework.Textures
                 }
 
                 var newBlend = (byte)(255 - Math.Round((blendRem / 17.0f) * 255.0f));
+
+                // Slight add here to push the color deeper into the row to ensure BC5 compression doesn't
+                // cause any artifacting.
                 var newRow = (byte) (((originalRow / 2) * 17) + 4);
 
 
