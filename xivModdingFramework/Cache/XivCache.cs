@@ -475,14 +475,16 @@ namespace xivModdingFramework.Cache
             }
 
             // We intentionally don't delete the root cache here.
-            // That data is considere inviolate, and should never be changed
+            // That data is considered inviolate, and should never be changed
             // unless the user specifically requests to rebuild it, or
-            // manually replaces the roots DB.  (It takes an hour or more to build)
+            // manually replaces the roots DB.
             WaitForSqlCleanup();
 
             try
             {
                 File.Delete(_dbPath.FullName);
+                File.Delete(_dbPath.FullName + "-shm");
+                File.Delete(_dbPath.FullName + "-wal");
             } catch
             {
                 // In some select situations sometimes the DB can still be in use
@@ -493,6 +495,8 @@ namespace xivModdingFramework.Cache
                 // on the Cache to finish queueing entries into the DB. )
                 Thread.Sleep(1000);
                 File.Delete(_dbPath.FullName);
+                File.Delete(_dbPath.FullName + "-shm");
+                File.Delete(_dbPath.FullName + "-wal");
             }
 
 
