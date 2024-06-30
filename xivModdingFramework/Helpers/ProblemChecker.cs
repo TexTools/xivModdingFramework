@@ -181,12 +181,14 @@ namespace xivModdingFramework.Helpers
                     {
                         throw new Exception("Unable to open one or more index files for writing.  The files may currently be in use.");
                     }
+                    var hardReset = false;
 
                     progress?.Report("Restoring index file backups...");
                     try
                     {
                         // Try restoring the indexes FIRST.
                         RestoreIndexBackups(backupsDirectory.FullName);
+                        hardReset = true;
                     }
                     catch (Exception ex)
                     {
@@ -235,7 +237,7 @@ namespace xivModdingFramework.Helpers
                     // Delete mod list
                     File.Delete(modListDirectory.FullName);
 
-                    Modding.CreateModlist();
+                    Modding.CreateModlist(hardReset);
 
                     progress?.Report("Rebuilding Cache...");
 

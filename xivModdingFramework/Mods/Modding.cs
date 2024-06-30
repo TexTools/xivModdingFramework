@@ -80,8 +80,18 @@ namespace xivModdingFramework.Mods
         /// <summary>
         /// Creates a blank ModList file if one does not already exist.
         /// </summary>
-        internal static void CreateModlist()
+        internal static void CreateModlist(bool reset = false)
         {
+            if (reset)
+            {
+                var ml = new ModList(true)
+                {
+                    Version = _modlistVersion.ToString(),
+                };
+
+                File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            }
+
             if (File.Exists(ModListDirectory))
             {
                 // Try to parse it.
