@@ -454,23 +454,37 @@ namespace xivModdingFramework.Mods
             try
             {
                 var ml = await tx.GetModList();
-                var mp = ml.GetModPack(modPackName);
-                if(mp == null)
+                if (string.IsNullOrWhiteSpace(modPackName))
                 {
-                    return;
+                    // Special case, this is altering all mods without a modpack association.
+                    var mods = ml.GetMods(x => string.IsNullOrWhiteSpace(x.ModPack)).ToList();
+
+                    foreach(var mod in mods)
+                    {
+                        await SetModState(state, mod, tx);
+                    }
+
                 }
-
-                var pack = mp.Value;
-                var mods = pack.Mods;
-
-                foreach(var mod in mods)
+                else
                 {
-                    await SetModState(state, mod, tx);
-                }
+                    var mp = ml.GetModPack(modPackName);
+                    if (mp == null)
+                    {
+                        return;
+                    }
 
-                if(state == EModState.UnModded)
-                {
-                    ml.RemoveModpack(pack);
+                    var pack = mp.Value;
+                    var mods = pack.Mods;
+
+                    foreach (var mod in mods)
+                    {
+                        await SetModState(state, mod, tx);
+                    }
+
+                    if (state == EModState.UnModded)
+                    {
+                        ml.RemoveModpack(pack);
+                    }
                 }
 
                 await boiler.Commit();
