@@ -142,7 +142,13 @@ namespace xivModdingFramework.Mods.FileTypes
             // Swap EST pointers.
             foreach (var entry in EstEntries)
             {
-                entry.Value.SetId = (ushort)newRoot.Info.PrimaryId;
+                if (newRoot.Info.SecondaryId == null)
+                {
+                    entry.Value.SetId = (ushort)newRoot.Info.PrimaryId;
+                } else
+                {
+                    entry.Value.SetId = (ushort)newRoot.Info.SecondaryId;
+                }
             }
         }
 
