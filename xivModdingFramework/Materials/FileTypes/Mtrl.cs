@@ -555,6 +555,11 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new mtrl file byte data</returns>
         public static byte[] XivMtrlToUncompressedMtrl(XivMtrl xivMtrl)
         {
+            foreach(var tex in xivMtrl.Textures)
+            {
+                tex.TexturePath = tex.TexturePath.ToLower();
+            }
+
             var mtrlBytes = new List<byte>();
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
