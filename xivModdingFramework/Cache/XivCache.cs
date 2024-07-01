@@ -2310,6 +2310,7 @@ namespace xivModdingFramework.Cache
                         position = reader.GetInt32("position");
                     }
                 }
+                db.Close();
             }
             return file;
         }
@@ -2328,6 +2329,7 @@ namespace xivModdingFramework.Cache
                     deleteCmd.ExecuteScalar();
                 }
             }
+            db.Close();
         }
 
         private static string PopParentQueue()
@@ -2354,6 +2356,7 @@ namespace xivModdingFramework.Cache
                         position = reader.GetInt32("position");
                     }
                 }
+                db.Close();
             }
             return file;
         }
@@ -2371,6 +2374,7 @@ namespace xivModdingFramework.Cache
                     deleteCmd.Parameters.AddWithValue("file", file);
                     deleteCmd.ExecuteScalar();
                 }
+                db.Close();
             }
         }
 
