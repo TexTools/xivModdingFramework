@@ -1008,6 +1008,9 @@ namespace xivModdingFramework.Models.FileTypes
                             if (!indexMeshNum.ContainsKey(indexDataOffset))
                             {
                                 indexMeshNum.Add(indexDataOffset, i);
+                            } else
+                            {
+                                indexMeshNum[indexDataOffset] = i;
                             }
                         }
 
