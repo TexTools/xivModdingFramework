@@ -42,6 +42,7 @@ using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
@@ -1402,16 +1403,13 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var data = await TransactionDataHandler.GetUncompressedFile(info);
 
-            using(var ms = new MemoryStream(data)) {
-                using (var br = new BinaryReader(ms))
-                {
-                    var header = Tex.TexHeader.ReadTexHeader(br);
-                    if ((!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height)) && header.MipCount > 1)
-                    {
-                        throw new InvalidDataException("Texture dimensions must be a power of two. (Ex. 256, 512, 1024, ...)");
-                    }
-                }
+            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+            if(resized != null)
+            {
+                data = resized;
             }
+
+
 
             var recomp = await Tex.CompressTexFile(data);
 

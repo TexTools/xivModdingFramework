@@ -24,9 +24,7 @@ namespace xivModdingFramework.Cache
 
     public class CacheException : Exception
     {
-        new public Exception InnerException;
-        public CacheException(Exception ex) {
-            InnerException = ex;
+        public CacheException(Exception ex) : base(ex.Message, ex) {
         }
 
     }
@@ -503,6 +501,7 @@ namespace xivModdingFramework.Cache
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -514,6 +513,7 @@ namespace xivModdingFramework.Cache
                 {
                     cmd.ExecuteScalar();
                 }
+                db.Close();
             }
 
             var backupFile = Path.Combine(cwd, "Resources", "DB", rootCacheFileName);
@@ -537,6 +537,7 @@ namespace xivModdingFramework.Cache
                     // roots from the item list as a partial list.
                     using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
+                        db.BusyTimeout = 3;
                         db.Open();
 
                         SetPragmas(db);
@@ -608,6 +609,7 @@ namespace xivModdingFramework.Cache
                     list.AddRange(t.Result);
                 }
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -665,6 +667,7 @@ namespace xivModdingFramework.Cache
                 var _housing = new Housing();
                 var list = await _housing.GetUncachedFurnitureList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -720,6 +723,7 @@ namespace xivModdingFramework.Cache
                     list.AddRange(await _companions.GetUncachedOrnamentList(tx));
                 }
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -776,6 +780,7 @@ namespace xivModdingFramework.Cache
                 var _companions = new Companions();
                 var list = await _companions.GetUncachedPetList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -833,6 +838,7 @@ namespace xivModdingFramework.Cache
                 var _companions = new Companions();
                 var list = await _companions.GetUncachedMinionList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -882,6 +888,7 @@ namespace xivModdingFramework.Cache
             var items = await _character.GetUnCachedCharacterList(tx);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -940,6 +947,7 @@ namespace xivModdingFramework.Cache
                 gear = new Gear();
                 var items = await gear.GetUnCachedGearList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -1423,6 +1431,7 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -1461,9 +1470,8 @@ namespace xivModdingFramework.Cache
             string val = null;
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
-
-                SetPragmas(db);
 
                 var query = "select value from meta where key = $key";
 
@@ -1567,9 +1575,9 @@ namespace xivModdingFramework.Cache
                 {
                     // Time to go root hunting.
                     var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
+                    db.BusyTimeout = 3;
                     db.Open();
 
-                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1605,9 +1613,9 @@ namespace xivModdingFramework.Cache
                 {
                     // Gotta do this for all the supporting types...
                     var query = "select root from items";
+                    db.BusyTimeout = 3;
                     db.Open();
 
-                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1757,6 +1765,7 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -1777,7 +1786,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="root"></param>
         /// <param name="hash"></param>
-        public static void CacheRoot(XivDependencyRootInfo root, SQLiteConnection sqlConnection, SQLiteCommand cmd)
+        public static void CacheRoot(XivDependencyRootInfo root, SQLiteCommand cmd)
         {
             cmd.Parameters.AddWithValue("primary_type", root.PrimaryType.ToString());
             cmd.Parameters.AddWithValue("primary_id", root.PrimaryId);
@@ -1856,9 +1865,9 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 using (var cmd = new SQLiteCommand(query, db))
                 {
@@ -1981,9 +1990,9 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 using (var transaction = db.BeginTransaction())
                 {
@@ -2101,9 +2110,9 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 using (var transaction = db.BeginTransaction())
                 {
@@ -2182,8 +2191,6 @@ namespace xivModdingFramework.Cache
                     db.BusyTimeout = 3;
                     db.Open();
 
-                    SetPragmas(db);
-
                     using (var transaction = db.BeginTransaction())
                     {
                         foreach (var file in files)
@@ -2252,14 +2259,17 @@ namespace xivModdingFramework.Cache
                         }
                         transaction.Commit();
                     }
+
+                    // Couldn't hurt.
+                    db.Close();
                 }
 
                 // Now connect to the root cache and inject our roots.
                 using (var db = new SQLiteConnection(RootsCacheConnectionString))
                 {
+                    db.BusyTimeout = 3;
                     db.Open();
 
-                    SetPragmas(db);
 
                     using (var transaction = db.BeginTransaction())
                     {
@@ -2282,11 +2292,12 @@ namespace xivModdingFramework.Cache
                                     continue;
 
                                 roots.Add(root);
-                                XivCache.CacheRoot(root, db, cmd);
+                                XivCache.CacheRoot(root, cmd);
                             }
                         }
                         transaction.Commit();
                     }
+                    db.Close();
                 }
             } catch(Exception ex)
             {
@@ -2300,9 +2311,9 @@ namespace xivModdingFramework.Cache
             int position = -1;
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 var query = "select position, file from dependencies_children_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2319,6 +2330,7 @@ namespace xivModdingFramework.Cache
                         position = reader.GetInt32("position");
                     }
                 }
+                db.Close();
             }
             return file;
         }
@@ -2327,9 +2339,8 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
-
-                SetPragmas(db);
 
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_children_queue where file = $file";
@@ -2338,6 +2349,7 @@ namespace xivModdingFramework.Cache
                     deleteCmd.Parameters.AddWithValue("file", file);
                     deleteCmd.ExecuteScalar();
                 }
+                db.Close();
             }
         }
 
@@ -2347,9 +2359,9 @@ namespace xivModdingFramework.Cache
             int position = -1;
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 var query = "select position, file from dependencies_parents_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2366,6 +2378,7 @@ namespace xivModdingFramework.Cache
                         position = reader.GetInt32("position");
                     }
                 }
+                db.Close();
             }
             return file;
         }
@@ -2373,9 +2386,9 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_parents_queue where file = $file";
@@ -2384,6 +2397,7 @@ namespace xivModdingFramework.Cache
                     deleteCmd.Parameters.AddWithValue("file", file);
                     deleteCmd.ExecuteScalar();
                 }
+                db.Close();
             }
         }
 
@@ -2552,9 +2566,9 @@ namespace xivModdingFramework.Cache
             {
                 using (var db = new SQLiteConnection((string)XivCache.CacheConnectionString))
                 {
+                    db.BusyTimeout = 3;
                     db.Open();
 
-                    SetPragmas(db);
 
                     var query = "select count(file) as cnt from dependencies_parents_queue";
                     using (var selectCmd = new SQLiteCommand(query, db))
@@ -2604,7 +2618,6 @@ namespace xivModdingFramework.Cache
                 db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 list = BuildListFromTable<T>(db, table, where, func);
                 db.Close();

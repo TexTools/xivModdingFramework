@@ -1610,5 +1610,44 @@ namespace xivModdingFramework.Helpers
             return data;
         }
 
+
+        public static async Task<byte[]> ValidateTextureSizes(byte[] uncompressedTex)
+        {
+            using (var ms = new MemoryStream(uncompressedTex))
+            {
+                using (var br = new BinaryReader(ms))
+                {
+                    var header = Tex.TexHeader.ReadTexHeader(br);
+                    if ((!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height)) && header.MipCount > 1)
+                    {
+                        var tex = XivTex.FromUncompressedTex(uncompressedTex);
+                        await Tex.ResizeXivTx(tex, IOUtil.RoundToPowerOfTwo(header.Width), IOUtil.RoundToPowerOfTwo(header.Width), false);
+
+                        return tex.ToUncompressedTex();
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static async Task<FileStorageInformation> ValidateTextureSizes(FileStorageInformation info)
+        {
+            var data = await TransactionDataHandler.GetUncompressedFile(info);
+            var resized = await ValidateTextureSizes(data);
+
+            if(resized != null)
+            {
+                var file = IOUtil.GetFrameworkTempFile();
+                info.RealPath = file;
+                info.RealOffset = 0;
+                info.StorageType = EFileStorageType.UncompressedIndividual;
+                info.FileSize = data.Length;
+
+                File.WriteAllBytes(file, resized);
+            }
+
+            return info;
+        }
+
     }
 }
