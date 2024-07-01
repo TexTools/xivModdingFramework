@@ -33,6 +33,7 @@ using System.Security.Cryptography;
 using JsonSubTypes;
 using SharpDX.Win32;
 using static HelixToolkit.SharpDX.Core.Model.Metadata;
+using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -460,6 +461,26 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     // Import the file...
 
                     var data = File.ReadAllBytes(externalPath);
+
+                    if (internalPath.EndsWith(".tex"))
+                    {
+                        try
+                        {
+                            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+                            if(resized != null)
+                            {
+                                data = resized;
+                            }
+                        }
+                        catch
+                        {
+                            // Something invalid enough to break here shouldn't be imported.
+                            notImported.Add(file.Key);
+                            i++;
+                            continue;
+                        }
+                    }
+
                     await Dat.WriteModFile(data, internalPath, _Source, null, tx, false);
                     XivCache.QueueDependencyUpdate(internalPath);
                     i++;

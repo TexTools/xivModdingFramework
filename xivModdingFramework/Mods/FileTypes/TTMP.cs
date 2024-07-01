@@ -1403,18 +1403,10 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var data = await TransactionDataHandler.GetUncompressedFile(info);
 
-            using (var ms = new MemoryStream(data)) {
-                using (var br = new BinaryReader(ms))
-                {
-                    var header = Tex.TexHeader.ReadTexHeader(br);
-                    if ((!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height)) && header.MipCount > 1)
-                    {
-                        var tex = XivTex.FromUncompressedTex(data);
-                        await Tex.ResizeXivTx(tex, IOUtil.RoundToPowerOfTwo(header.Width), IOUtil.RoundToPowerOfTwo(header.Width), false);
-
-                        data = tex.ToUncompressedTex();
-                    }
-                }
+            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+            if(resized != null)
+            {
+                data = resized;
             }
 
 
