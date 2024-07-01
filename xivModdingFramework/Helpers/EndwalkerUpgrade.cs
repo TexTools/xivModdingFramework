@@ -473,22 +473,6 @@ namespace xivModdingFramework.Helpers
                 return true;
             }
 
-            // OLD
-
-            if (mtrl.ShaderPack == EShaderPack.Skin)
-            {
-                // NEW
-                var sheenRate = 0x800EE35F;
-                var SSAOMask = 0xB7FA33E2;
-
-
-                if (mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant1)
-                    && mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant2))
-                {
-                    return true;
-                }
-            }
-
             if (mtrl.ShaderPack == EShaderPack.Hair)
             {
                 if (mtrl.ShaderConstants.Any(x => x.ConstantId == _OldShaderConstant1)
