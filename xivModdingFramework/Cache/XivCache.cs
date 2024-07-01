@@ -1461,8 +1461,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
-
                 var query = "select value from meta where key = $key";
 
                 // Double Using statements are important here to ensure
@@ -1567,7 +1565,6 @@ namespace xivModdingFramework.Cache
                     var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
                     db.Open();
 
-                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1605,7 +1602,6 @@ namespace xivModdingFramework.Cache
                     var query = "select root from items";
                     db.Open();
 
-                    SetPragmas(db);
 
                     using (var cmd = new SQLiteCommand(query, db))
                     {
@@ -1856,7 +1852,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
 
                 using (var cmd = new SQLiteCommand(query, db))
                 {
@@ -1981,7 +1976,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
 
                 using (var transaction = db.BeginTransaction())
                 {
@@ -2101,7 +2095,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
 
                 using (var transaction = db.BeginTransaction())
                 {
@@ -2179,8 +2172,6 @@ namespace xivModdingFramework.Cache
                 {
                     db.BusyTimeout = 3;
                     db.Open();
-
-                    SetPragmas(db);
 
                     using (var transaction = db.BeginTransaction())
                     {
@@ -2260,7 +2251,6 @@ namespace xivModdingFramework.Cache
                 {
                     db.Open();
 
-                    SetPragmas(db);
 
                     using (var transaction = db.BeginTransaction())
                     {
@@ -2304,7 +2294,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
 
                 var query = "select position, file from dependencies_children_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2331,8 +2320,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
-
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_children_queue where file = $file";
                 using (var deleteCmd = new SQLiteCommand(query, db))
@@ -2351,7 +2338,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
 
                 var query = "select position, file from dependencies_parents_queue";
                 using (var selectCmd = new SQLiteCommand(query, db))
@@ -2377,7 +2363,6 @@ namespace xivModdingFramework.Cache
             {
                 db.Open();
 
-                SetPragmas(db);
 
                 // Delete the row we took and all others that match the filename.
                 var query = "delete from dependencies_parents_queue where file = $file";
@@ -2556,7 +2541,6 @@ namespace xivModdingFramework.Cache
                 {
                     db.Open();
 
-                    SetPragmas(db);
 
                     var query = "select count(file) as cnt from dependencies_parents_queue";
                     using (var selectCmd = new SQLiteCommand(query, db))
@@ -2606,7 +2590,6 @@ namespace xivModdingFramework.Cache
                 db.BusyTimeout = 3;
                 db.Open();
 
-                SetPragmas(db);
 
                 list = BuildListFromTable<T>(db, table, where, func);
                 db.Close();
