@@ -1485,6 +1485,9 @@ namespace xivModdingFramework.Cache
                         // Meta Table doesn't exist.
                     }
                 }
+
+                // Can't hurt to explicitly close it.
+                db.Close();
             }
 
             return val?.ToString();
