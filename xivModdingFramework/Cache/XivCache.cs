@@ -501,6 +501,7 @@ namespace xivModdingFramework.Cache
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -535,6 +536,7 @@ namespace xivModdingFramework.Cache
                     // roots from the item list as a partial list.
                     using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
+                        db.BusyTimeout = 3;
                         db.Open();
 
                         SetPragmas(db);
@@ -606,6 +608,7 @@ namespace xivModdingFramework.Cache
                     list.AddRange(t.Result);
                 }
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -663,6 +666,7 @@ namespace xivModdingFramework.Cache
                 var _housing = new Housing();
                 var list = await _housing.GetUncachedFurnitureList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -718,6 +722,7 @@ namespace xivModdingFramework.Cache
                     list.AddRange(await _companions.GetUncachedOrnamentList(tx));
                 }
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -774,6 +779,7 @@ namespace xivModdingFramework.Cache
                 var _companions = new Companions();
                 var list = await _companions.GetUncachedPetList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -831,6 +837,7 @@ namespace xivModdingFramework.Cache
                 var _companions = new Companions();
                 var list = await _companions.GetUncachedMinionList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -880,6 +887,7 @@ namespace xivModdingFramework.Cache
             var items = await _character.GetUnCachedCharacterList(tx);
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -938,6 +946,7 @@ namespace xivModdingFramework.Cache
                 gear = new Gear();
                 var items = await gear.GetUnCachedGearList(tx);
 
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -1421,6 +1430,7 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -1459,6 +1469,7 @@ namespace xivModdingFramework.Cache
             string val = null;
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 var query = "select value from meta where key = $key";
@@ -1563,6 +1574,7 @@ namespace xivModdingFramework.Cache
                 {
                     // Time to go root hunting.
                     var query = "select * from roots order by primary_type, primary_id, secondary_type, secondary_id";
+                    db.BusyTimeout = 3;
                     db.Open();
 
 
@@ -1600,6 +1612,7 @@ namespace xivModdingFramework.Cache
                 {
                     // Gotta do this for all the supporting types...
                     var query = "select root from items";
+                    db.BusyTimeout = 3;
                     db.Open();
 
 
@@ -1751,6 +1764,7 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(RootsCacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 SetPragmas(db);
@@ -1850,6 +1864,7 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
 
@@ -1974,6 +1989,7 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
 
@@ -2093,6 +2109,7 @@ namespace xivModdingFramework.Cache
 
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
 
@@ -2249,6 +2266,7 @@ namespace xivModdingFramework.Cache
                 // Now connect to the root cache and inject our roots.
                 using (var db = new SQLiteConnection(RootsCacheConnectionString))
                 {
+                    db.BusyTimeout = 3;
                     db.Open();
 
 
@@ -2292,6 +2310,7 @@ namespace xivModdingFramework.Cache
             int position = -1;
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
 
@@ -2319,6 +2338,7 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
                 // Delete the row we took and all others that match the filename.
@@ -2338,6 +2358,7 @@ namespace xivModdingFramework.Cache
             int position = -1;
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
 
@@ -2364,6 +2385,7 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(CacheConnectionString))
             {
+                db.BusyTimeout = 3;
                 db.Open();
 
 
@@ -2543,6 +2565,7 @@ namespace xivModdingFramework.Cache
             {
                 using (var db = new SQLiteConnection((string)XivCache.CacheConnectionString))
                 {
+                    db.BusyTimeout = 3;
                     db.Open();
 
 

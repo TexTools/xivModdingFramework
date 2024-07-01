@@ -176,6 +176,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     // Spawn a DB connection to do the raw queries.
                     using (var db = new SQLiteConnection(connectionString))
                     {
+                        db.BusyTimeout = 3000;
                         db.Open();
                         // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
 
