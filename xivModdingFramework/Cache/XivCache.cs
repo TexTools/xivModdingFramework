@@ -513,6 +513,7 @@ namespace xivModdingFramework.Cache
                 {
                     cmd.ExecuteScalar();
                 }
+                db.Close();
             }
 
             var backupFile = Path.Combine(cwd, "Resources", "DB", rootCacheFileName);
