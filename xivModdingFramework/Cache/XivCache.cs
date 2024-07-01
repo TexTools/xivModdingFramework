@@ -166,6 +166,7 @@ namespace xivModdingFramework.Cache
                 if (value && _cacheWorker == null)
                 {
 
+                    _CacheWorkerStartupComplete = false;
                     _cacheWorker = new BackgroundWorker
                     {
                         WorkerReportsProgress = true,
@@ -190,14 +191,18 @@ namespace xivModdingFramework.Cache
 
         public static async Task SetCacheWorkerState(bool state)
         {
-            Trace.WriteLine("Setting Cache Worker State: " + (state ? "On" : "Off"));
-            Trace.Write(_cacheWorker);
             CacheWorkerEnabled = state;
             if(state == false)
             {
                 while(_cacheWorker != null)
                 {
                     _cacheWorker.CancelAsync();
+                    await Task.Delay(10);
+                }
+            } else
+            {
+                while (_CacheWorkerStartupComplete == false)
+                {
                     await Task.Delay(10);
                 }
             }
@@ -217,6 +222,7 @@ namespace xivModdingFramework.Cache
 
         public static event EventHandler<CacheRebuildReason> CacheRebuilding;
 
+        private static bool _CacheWorkerStartupComplete;
         private static BackgroundWorker _cacheWorker;
 
 
@@ -2421,6 +2427,7 @@ namespace xivModdingFramework.Cache
 
             // This will be executed on another thread.
             BackgroundWorker worker = (BackgroundWorker)sender;
+            _CacheWorkerStartupComplete = true;
             while (!worker.CancellationPending)
             {
                 var file = "";

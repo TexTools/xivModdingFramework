@@ -350,7 +350,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Retreives the base texture directory this material references.
         /// </summary>
         /// <returns></returns>
-        public string GetTextureRootDirectoy()
+        public string GetTextureRootDirectory()
         {
             string root = "";
             if(MTRLPath == null)
@@ -449,27 +449,29 @@ namespace xivModdingFramework.Materials.DataContainers
                 ret += "_" + identifier;
             }
 
-            
 
+
+            var isLegacy = ShaderPack == EShaderPack.CharacterLegacy 
+                || ShaderPack == EShaderPack.Bg
+                || ShaderPack == EShaderPack.BgColorChange;
             if(texType == XivTexType.Normal)
             {
-                ret += MTRLPath.Contains("chara/human/c") ? "_n" : "_norm";
+                ret += isLegacy ? "_n" : "_norm";
             } else if(texType == XivTexType.Specular)
             {
-                ret += MTRLPath.Contains("chara/human/c") ? "_s" : "_spec";
+                ret += isLegacy ? "_s" : "_spec";
             }
             else if (texType == XivTexType.Mask)
             {
-                // Not a Typo.  SE is dumb.
-                ret += MTRLPath.Contains("chara/human/c") ? "_s" : "_mask";
+                ret += isLegacy ? "_m" : "_mask";
             }
             else if (texType == XivTexType.Diffuse)
             {
-                ret += MTRLPath.Contains("chara/human/c") ? "_d" : "_diff";
+                ret += isLegacy ? "_d" : "_base";
             }
             else if (texType == XivTexType.Index)
             {
-                ret += MTRLPath.Contains("chara/human/c") ? "_id" : "_id";
+                ret += isLegacy ? "_id" : "_id";
             }
             else
             {
@@ -541,7 +543,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public string TokenizePath(string path, XivTexType usage)
         {
-            path = path.Replace(GetTextureRootDirectoy(), XivMtrl.ItemPathToken);
+            path = path.Replace(GetTextureRootDirectory(), XivMtrl.ItemPathToken);
 
             var commonPath = XivMtrl.GetCommonTextureDirectory();
             path = path.Replace(commonPath, XivMtrl.CommonPathToken);
@@ -566,7 +568,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public string DetokenizePath(string path, MtrlTexture texture)
         {
-            var rootPath = GetTextureRootDirectoy();
+            var rootPath = GetTextureRootDirectory();
 
             // No path, assign it by default.
             if (path == "")
