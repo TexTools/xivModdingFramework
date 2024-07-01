@@ -77,11 +77,40 @@ namespace xivModdingFramework.Mods
             CreateModlist();
         }
 
+        public static bool ValidateModlist(string ffxivDirectory = null)
+        {
+            var dir = string.IsNullOrEmpty(ffxivDirectory) ? XivCache.GameInfo.GameDirectory.FullName : ffxivDirectory;
+            dir = new DirectoryInfo(dir).Parent.Parent.FullName;
+
+            dir = Path.Combine(dir, XivStrings.ModlistFilePath);
+            if (File.Exists(dir))
+            {
+                // Try to parse it.
+                try
+                {
+                    var modlistText = File.ReadAllText(dir);
+                    var res = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    if (res != null)
+                    {
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Broken.
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /// <summary>
         /// Creates a blank ModList file if one does not already exist.
         /// </summary>
         internal static void CreateModlist(bool reset = false)
         {
+            if (XivCache.GameInfo == null) return;
+
             if (reset)
             {
                 var ml = new ModList(true)
@@ -116,6 +145,7 @@ namespace xivModdingFramework.Mods
             };
 
             File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            return;
         }
 
         /// <summary>

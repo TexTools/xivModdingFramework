@@ -219,7 +219,7 @@ namespace xivModdingFramework.Helpers
                     // Delete modded dat files
                     foreach (var xivDataFile in (XivDataFile[])Enum.GetValues(typeof(XivDataFile)))
                     {
-                        var datFiles = Dat.GetModdedDatList(xivDataFile);
+                        var datFiles = Dat.GetModdedDatList(xivDataFile, true);
 
                         foreach (var datFile in datFiles)
                         {
