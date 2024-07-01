@@ -24,9 +24,7 @@ namespace xivModdingFramework.Cache
 
     public class CacheException : Exception
     {
-        new public Exception InnerException;
-        public CacheException(Exception ex) {
-            InnerException = ex;
+        public CacheException(Exception ex) : base(ex.Message, ex) {
         }
 
     }
@@ -1777,7 +1775,7 @@ namespace xivModdingFramework.Cache
         /// </summary>
         /// <param name="root"></param>
         /// <param name="hash"></param>
-        public static void CacheRoot(XivDependencyRootInfo root, SQLiteConnection sqlConnection, SQLiteCommand cmd)
+        public static void CacheRoot(XivDependencyRootInfo root, SQLiteCommand cmd)
         {
             cmd.Parameters.AddWithValue("primary_type", root.PrimaryType.ToString());
             cmd.Parameters.AddWithValue("primary_id", root.PrimaryId);
@@ -2252,6 +2250,9 @@ namespace xivModdingFramework.Cache
                         }
                         transaction.Commit();
                     }
+
+                    // Couldn't hurt.
+                    db.Close();
                 }
 
                 // Now connect to the root cache and inject our roots.
@@ -2282,11 +2283,12 @@ namespace xivModdingFramework.Cache
                                     continue;
 
                                 roots.Add(root);
-                                XivCache.CacheRoot(root, db, cmd);
+                                XivCache.CacheRoot(root, cmd);
                             }
                         }
                         transaction.Commit();
                     }
+                    db.Close();
                 }
             } catch(Exception ex)
             {

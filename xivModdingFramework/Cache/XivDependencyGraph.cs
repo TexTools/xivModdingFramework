@@ -1112,7 +1112,7 @@ namespace xivModdingFramework.Cache
                         {
                             foreach (var root in allRoots)
                             {
-                                XivCache.CacheRoot(root, db, cmd);
+                                XivCache.CacheRoot(root, cmd);
                             }
                         }
                         transaction.Commit();
