@@ -797,5 +797,32 @@ namespace xivModdingFramework.Helpers
             return (x != 0) && ((x & (x - 1)) == 0);
         }
 
+        public static int RoundToPowerOfTwo(int x)
+        {
+            var min = FloorPower2(x);
+            var max = CeilPower2(x);
+
+
+            return max - x < x - min ? max : min;
+        }
+
+        private static int CeilPower2(int x)
+        {
+            if (x < 2)
+            {
+                return 1;
+            }
+            return (int)Math.Pow(2, (int)Math.Log(x - 1, 2) + 1);
+        }
+
+        private static int FloorPower2(int x)
+        {
+            if (x < 1)
+            {
+                return 1;
+            }
+            return (int)Math.Pow(2, (int)Math.Log(x, 2));
+        }
+
     }
 }
