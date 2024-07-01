@@ -2328,8 +2328,8 @@ namespace xivModdingFramework.Cache
                     deleteCmd.Parameters.AddWithValue("file", file);
                     deleteCmd.ExecuteScalar();
                 }
+                db.Close();
             }
-            db.Close();
         }
 
         private static string PopParentQueue()
