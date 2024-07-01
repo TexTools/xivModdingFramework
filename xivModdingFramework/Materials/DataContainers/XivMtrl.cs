@@ -350,7 +350,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// Retreives the base texture directory this material references.
         /// </summary>
         /// <returns></returns>
-        public string GetTextureRootDirectoy()
+        public string GetTextureRootDirectory()
         {
             string root = "";
             if(MTRLPath == null)
@@ -543,7 +543,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public string TokenizePath(string path, XivTexType usage)
         {
-            path = path.Replace(GetTextureRootDirectoy(), XivMtrl.ItemPathToken);
+            path = path.Replace(GetTextureRootDirectory(), XivMtrl.ItemPathToken);
 
             var commonPath = XivMtrl.GetCommonTextureDirectory();
             path = path.Replace(commonPath, XivMtrl.CommonPathToken);
@@ -568,7 +568,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <returns></returns>
         public string DetokenizePath(string path, MtrlTexture texture)
         {
-            var rootPath = GetTextureRootDirectoy();
+            var rootPath = GetTextureRootDirectory();
 
             // No path, assign it by default.
             if (path == "")
