@@ -322,6 +322,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 entry.MaterialId = imc.MaterialSet;
                 entry.DecalId = imc.Decal;
                 entry.VfxId = imc.Vfx;
+                entry.AttributeAndSound = imc.Mask;
                 return entry;
             }
         }
@@ -364,7 +365,9 @@ namespace xivModdingFramework.Mods.FileTypes
             imc.Decal = Entry.DecalId;
             imc.Animation = Entry.MaterialAnimationId;
             imc.MaterialSet = Entry.MaterialId;
-            imc.Mask = Entry.AttributeAndSound;
+            imc.AttributeMask = Entry.AttributeMask;
+            imc.Vfx = Entry.VfxId;
+            imc.SoundId = Entry.SoundId;
         }
         public static PMPImcManipulationJson FromImcEntry(XivImc entry, int variant, XivDependencyRootInfo root)
         {
