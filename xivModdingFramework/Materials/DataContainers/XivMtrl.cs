@@ -451,7 +451,9 @@ namespace xivModdingFramework.Materials.DataContainers
 
 
 
-            var isLegacy = ShaderPack == EShaderPack.CharacterLegacy;
+            var isLegacy = ShaderPack == EShaderPack.CharacterLegacy 
+                || ShaderPack == EShaderPack.Bg
+                || ShaderPack == EShaderPack.BgColorChange;
             if(texType == XivTexType.Normal)
             {
                 ret += isLegacy ? "_n" : "_norm";
