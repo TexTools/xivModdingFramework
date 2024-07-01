@@ -519,17 +519,26 @@ namespace xivModdingFramework.Helpers
             return Directory.GetFiles(path, format, SearchOption.AllDirectories);
         }
 
+
+        private static Regex _InvalidRegex = new Regex("[^a-z0-9\\.\\/\\-_]");
         public static bool IsFFXIVInternalPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
 
-            foreach(XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+
+            if (_InvalidRegex.IsMatch(path))
+            {
+                return false;
+            }
+
+            foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
             {
                 if (path.StartsWith(df.GetFolderKey()))
                 {
                     return true;
                 }
             }
+
             return false;
         }
 
