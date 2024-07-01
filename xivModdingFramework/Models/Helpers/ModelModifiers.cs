@@ -715,11 +715,20 @@ namespace xivModdingFramework.Models.Helpers
                                 // Now, scan through the data and build our new fully qualified shape vertices.
                                 Dictionary<int, TTVertex> vertices = new Dictionary<int, TTVertex>();
                                 Dictionary<int, int> vertexReplacements = new Dictionary<int, int>();
+                                var badPart = false;
+
                                 foreach (var d in data)
                                 {
                                     var vId = d.ShapeVertex;
                                     if (vertices.ContainsKey(vId)) continue;
 
+                                    var prev = 0;
+                                    if (d.BaseIndex >= ogGroup.VertexData.Indices.Count)
+                                    {
+                                        badPart = true;
+                                        break;
+                                    }
+                                        
                                     vertexReplacements.Add(ogGroup.VertexData.Indices[d.BaseIndex], vId);
 
                                     var vert = new TTVertex();
@@ -767,6 +776,10 @@ namespace xivModdingFramework.Models.Helpers
                                     vertices.Add(vId, vert);
                                 }
 
+                                if(badPart)
+                                {
+                                    continue;
+                                }
 
                                 // Now we need to go through and create the shape part objects for each part.
                                 Dictionary<int, TTShapePart> shapeParts = new Dictionary<int, TTShapePart>();
@@ -816,7 +829,7 @@ namespace xivModdingFramework.Models.Helpers
             }
             catch (Exception ex)
             {
-                throw ex;
+                throw;
             }
         }
 

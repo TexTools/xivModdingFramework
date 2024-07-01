@@ -225,11 +225,6 @@ namespace xivModdingFramework.Textures
             {
                 var originalCset = normalPixelData[offset + 3];
 
-                if (originalCset > 15 && originalCset < 25)
-                {
-                    var a = "A";
-                }
-
                 // We could try to run a blend on this to add more degrees of gradient potentially?
                 var blendRem = originalCset % 34;
                 var originalRow = originalCset / 17;
@@ -250,7 +245,10 @@ namespace xivModdingFramework.Textures
                 }
 
                 var newBlend = (byte)(255 - Math.Round((blendRem / 17.0f) * 255.0f));
-                var newRow = (byte) (((originalRow / 2) * 17) + 8);
+
+                // Slight add here to push the color deeper into the row to ensure BC5 compression doesn't
+                // cause any artifacting.
+                var newRow = (byte) (((originalRow / 2) * 17) + 4);
 
 
                 // RGBA format output.

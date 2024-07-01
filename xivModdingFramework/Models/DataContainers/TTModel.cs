@@ -1544,7 +1544,6 @@ namespace xivModdingFramework.Models.DataContainers
             // Try to make sure the DB is properly unlocked.'
 
             XivCache.WaitForSqlCleanup();
-            File.Delete(filePath);
 
             if (settings != null && settings.ShiftImportUV)
             {
