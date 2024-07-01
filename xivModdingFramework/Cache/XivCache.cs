@@ -177,6 +177,7 @@ namespace xivModdingFramework.Cache
                 else if (value == false && _cacheWorker != null)
                 {
                     // Sleep until the cache worker actually stops.
+                    Trace.WriteLine("Cache Worker CancelAsync() Called");
                     _cacheWorker.CancelAsync();
                 }
             }
@@ -189,11 +190,14 @@ namespace xivModdingFramework.Cache
 
         public static async Task SetCacheWorkerState(bool state)
         {
+            Trace.WriteLine("Setting Cache Worker State: " + (state ? "On" : "Off"));
+            Trace.Write(_cacheWorker);
             CacheWorkerEnabled = state;
             if(state == false)
             {
                 while(_cacheWorker != null)
                 {
+                    _cacheWorker.CancelAsync();
                     await Task.Delay(10);
                 }
             }

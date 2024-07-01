@@ -62,6 +62,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             Unmodified = 0,
             ModifiedFull = 1337,
             ModifiedPartial = 6969,
+            ModifiedOldTT = 9999,
         }
 
         /// <summary>
@@ -236,7 +237,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Detection for old TexTools DATs.
                     if (IsOldTTDat(binaryReader))
                     {
-                        return DatType.ModifiedFull;
+                        return DatType.ModifiedOldTT;
                     }
 
                     return DatType.Unmodified;
@@ -260,27 +261,14 @@ namespace xivModdingFramework.SqPack.FileTypes
             var _DataSizeOffset = 1024 + 12;
             br.BaseStream.Seek(_DataSizeOffset, SeekOrigin.Begin);
 
-            var dataSize = br.ReadInt32();
-            if(dataSize != 2048)
-            {
-                // Old TexTools dats always set a Data Size of 2048
-                return false;
-            }
-
-            var datNumber = br.ReadInt32();
-            if (datNumber != 2)
-            {
-                // Old TexTools dats always set a DAT # of 2.
-                return false;
-            }
-
             var _DataHashOffset = 1024 + 32;
             br.BaseStream.Seek(_DataHashOffset, SeekOrigin.Begin);
             var bytes = br.ReadBytes(64);
 
             if(bytes.Any(x => x != 0))
             {
-                // Old TexTools dats never wrote a data hash.
+                // No edition of TexTools anywhere writes this hash.
+                // This is our safest check.
                 return false;
             }
 
@@ -316,7 +304,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        internal static List<string> GetModdedDatList(XivDataFile dataFile)
+        internal static List<string> GetModdedDatList(XivDataFile dataFile, bool includeOldTT = false)
         {
             var datList = new List<string>();
             for (var i = 0; i < 8; i++)
@@ -324,7 +312,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var datFilePath = Dat.GetDatPath(dataFile, i);
                 if (File.Exists(datFilePath))
                 {
-                    if (!IsOriginalDat(dataFile, i))
+                    var type = GetDatType(dataFile, i);
+                    if(type == DatType.ModifiedFull || type == DatType.ModifiedPartial)
+                    { 
+                        datList.Add(datFilePath);
+                    } else if(type == DatType.ModifiedOldTT && includeOldTT)
                     {
                         datList.Add(datFilePath);
                     }
@@ -1209,6 +1201,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null, bool compressed = true)
         {
+            Trace.WriteLine("Writing mod file: " + internalFilePath);
 
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
 
@@ -1412,6 +1405,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         internal static async Task<long> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, Dictionary<long, uint> openSlots)
         {
+
+            Trace.WriteLine("Performing actual DAT file write...");
+
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
             {
