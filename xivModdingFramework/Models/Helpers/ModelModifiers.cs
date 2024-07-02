@@ -2035,9 +2035,9 @@ namespace xivModdingFramework.Models.Helpers
                     }
                 }
 
-                if (hairFix && HairMaterialRegex.IsMatch(m.Material))
+                if (hairFix)
                 {
-                    m.Material = m.Material.Replace(modelRoot.GetBaseFileName(), hairInfo.GetBaseFileName());
+                    m.Material = m.Material.Replace(modelRoot.GetBaseFileName(false), hairInfo.GetBaseFileName(false));
                 }
 
             }
