@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -58,6 +59,42 @@ namespace xivModdingFramework.Items.Categories
             return await XivCache.GetCachedGearList(substring);
         }
 
+        public async Task GetGlasses(ModTransaction tx = null)
+        {
+
+            var ex = new Ex();
+            var glasses = await ex.ReadExData(XivEx.glasses, tx);
+            var ex2 = new Ex();
+            var gstyles = await ex2.ReadExData(XivEx.glassesstyle, tx);
+            var ex3 = new Ex();
+            var itemDictionary = await ex3.ReadExData(XivEx.item, tx);
+
+            await Task.Run(() => Parallel.ForEach(glasses, (item) =>
+            {
+                var cols = new List<object>();
+
+                for(int i = 0; i < item.Value.Columns.Count; i++)
+                {
+                    cols.Add(item.Value.GetColumn(i));
+                }
+
+
+                Trace.WriteLine(cols);
+
+            }));
+            await Task.Run(() => Parallel.ForEach(gstyles, (item) =>
+            {
+                var cols = new List<object>();
+
+                for (int i = 0; i < item.Value.Columns.Count; i++)
+                {
+                    cols.Add(item.Value.GetColumn(i));
+                }
+
+                Trace.WriteLine(cols);
+
+            }));
+        }
 
         /// <summary>
         /// A getter for available gear in the Item exd files
@@ -317,93 +354,5 @@ namespace xivModdingFramework.Items.Categories
             {22, XivStrings.Body_Hands }
         };
 
-        /// <summary>
-        /// A dictionary containing race data in the format [Race ID, XivRace]
-        /// </summary>
-        private static readonly Dictionary<string, XivRace> IDRaceDictionary = new Dictionary<string, XivRace>
-        {
-            {"0101", XivRace.Hyur_Midlander_Male},
-            {"0104", XivRace.Hyur_Midlander_Male_NPC},
-            {"0201", XivRace.Hyur_Midlander_Female},
-            {"0204", XivRace.Hyur_Midlander_Female_NPC},
-            {"0301", XivRace.Hyur_Highlander_Male},
-            {"0304", XivRace.Hyur_Highlander_Male_NPC},
-            {"0401", XivRace.Hyur_Highlander_Female},
-            {"0404", XivRace.Hyur_Highlander_Female_NPC},
-            {"0501", XivRace.Elezen_Male},
-            {"0504", XivRace.Elezen_Male_NPC},
-            {"0601", XivRace.Elezen_Female},
-            {"0604", XivRace.Elezen_Female_NPC},
-            {"0701", XivRace.Miqote_Male},
-            {"0704", XivRace.Miqote_Male_NPC},
-            {"0801", XivRace.Miqote_Female},
-            {"0804", XivRace.Miqote_Female_NPC},
-            {"0901", XivRace.Roegadyn_Male},
-            {"0904", XivRace.Roegadyn_Male_NPC},
-            {"1001", XivRace.Roegadyn_Female},
-            {"1004", XivRace.Roegadyn_Female_NPC},
-            {"1101", XivRace.Lalafell_Male},
-            {"1104", XivRace.Lalafell_Male_NPC},
-            {"1201", XivRace.Lalafell_Female},
-            {"1204", XivRace.Lalafell_Female_NPC},
-            {"1301", XivRace.AuRa_Male},
-            {"1304", XivRace.AuRa_Male_NPC},
-            {"1401", XivRace.AuRa_Female},
-            {"1404", XivRace.AuRa_Female_NPC},
-            {"1501", XivRace.Hrothgar_Male},
-            {"1504", XivRace.Hrothgar_Male_NPC},
-            {"1601", XivRace.Hrothgar_Female},
-            {"1604", XivRace.Hrothgar_Female_NPC},
-            {"1701", XivRace.Viera_Male},
-            {"1704", XivRace.Viera_Male_NPC},
-            {"1801", XivRace.Viera_Female},
-            {"1804", XivRace.Viera_Female_NPC},
-            {"9104", XivRace.NPC_Male},
-            {"9204", XivRace.NPC_Female}
-        };
-
-        /// <summary>
-        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
-        /// </summary>
-        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
-        {
-            {XivStrings.Head, "met"},
-            {XivStrings.Hands, "glv"},
-            {XivStrings.Legs, "dwn"},
-            {XivStrings.Feet, "sho"},
-            {XivStrings.Body, "top"},
-            {XivStrings.Earring, "ear"},
-            {XivStrings.Neck, "nek"},
-            {XivStrings.Rings, "rir"},
-            {XivStrings.Wrists, "wrs"},
-            {XivStrings.Head_Body, "top"},
-            {XivStrings.Body_Hands, "top"},
-            {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "top"},
-            {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "dwn"},
-            {XivStrings.All, "top"},
-            {XivStrings.Face, "fac"},
-            {XivStrings.Iris, "iri"},
-            {XivStrings.Etc, "etc"},
-            {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
-        };
-
-        /// <summary>
-        /// A dictionary containing slot data in the format [Slot abbreviation, Slot Name]
-        /// </summary>
-        private static readonly Dictionary<string, string> AbbreviationSlotDictionary = new Dictionary<string, string>
-        {
-            {"met", XivStrings.Head},
-            {"glv", XivStrings.Hands},
-            {"dwn", XivStrings.Legs},
-            {"sho", XivStrings.Feet},
-            {"top", XivStrings.Body},
-            {"ear", XivStrings.Earring},
-            {"nek", XivStrings.Neck},
-            {"rir", XivStrings.Rings},
-            {"wrs", XivStrings.Wrists},
-        };
     }
 }

@@ -671,6 +671,9 @@ namespace xivModdingFramework.Exd.Enums
         xpvpgroupactivity,
         ykw,
         zonesharedgroup,
-        zonetimeline
+        zonetimeline,
+        glasses,
+        glassesstyle,
+
     }
 }
