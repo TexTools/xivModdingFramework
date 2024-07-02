@@ -1383,11 +1383,11 @@ namespace xivModdingFramework.Helpers
                 }
                 else if (upgrade.Usage == EUpgradeTextureUsage.GearMask)
                 {
-                    if (files.ContainsKey(upgrade.Files["mask"])){
+                    if (files.ContainsKey(upgrade.Files["mask_old"])){
 
-                        var data = await ResolveFile(upgrade.Files["mask"], files, null);
+                        var data = await ResolveFile(upgrade.Files["mask_old"], files, null);
                         data = await UpgradeMaskTex(data);
-                        await WriteFile(data, upgrade.Files["mask"], files, null);
+                        await WriteFile(data, upgrade.Files["mask_new"], files, null);
                     }
                 }
             }

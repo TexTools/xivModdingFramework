@@ -535,7 +535,14 @@ namespace xivModdingFramework.Mods.FileTypes
                     var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.EndsWith(".jpg") || x.FileName.EndsWith(".bmp") || x.FileName.EndsWith(".jpeg") || x.FileName.EndsWith(".gif") || x.FileName.StartsWith("images/"));
                     foreach(var image in images)
                     {
-                        image.Extract(tempFolder);
+                        try
+                        {
+                            image.Extract(tempFolder);
+                        }
+                        catch
+                        {
+                            // No-Op.
+                        }
                     }
                 }
 
