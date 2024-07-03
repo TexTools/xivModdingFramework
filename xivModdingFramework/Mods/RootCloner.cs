@@ -1,6 +1,7 @@
 ﻿using SharpDX.Win32;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -843,10 +844,11 @@ namespace xivModdingFramework.Mods
                     {
                         // If we got here, we have mods that weren't in the original modpack import, that got included in the root clone.
                         // This should never happen if the modpack includes the entire subset of files necessary to properly fill out its item root.
-                        
+
                         // If it /does/ happen, it means we just copied some unknown (possibly orphaned) files into the destination item directory.
                         // Which isn't necessarily dangerous, but isn't correct, either.
-                        throw new Exception("Root CloneAndReset wanted to copy more files than were provided by the modpack import.");
+                        //throw new Exception("Root CloneAndReset wanted to copy more files than were provided by the modpack import.");
+                        Trace.WriteLine("Root CloneAndReset wanted to copy more files than were provided by the modpack import: " + file);
                     }
                 }
                 clearedFiles.UnionWith(filesToReset);
