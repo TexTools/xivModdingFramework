@@ -31,6 +31,8 @@ namespace xivModdingFramework.Models.FileTypes
         public const string EquipmentDeformerParameterRootPath = "chara/xls/charadb/equipmentdeformerparameter/";
         public const string AccessoryDeformerParameterRootPath = "chara/xls/charadb/accessorydeformerparameter/";
 
+        public const string DawntrailTestFile = "chara/xls/charadb/equipmentdeformerparameter/c1601.eqdp";
+
         public static int _EQP_GAP_1_END = -1;
         public static int _EQP_GAP_2_END = -1;
 
