@@ -98,6 +98,11 @@ namespace xivModdingFramework.Cache
                 var sameMaterialItems = new List<IItemModel>();
 
                 var originalInfo = await Imc.GetImcInfo(item, false, tx);
+                if(originalInfo == null)
+                {
+                    return sameModelItems;
+                }
+
                 foreach (var i in sameModelItems)
                 {
                     var info = await Imc.GetImcInfo(i, false, tx);
@@ -106,7 +111,6 @@ namespace xivModdingFramework.Cache
                         sameMaterialItems.Add(i);
                     }
                 }
-
                 sameMaterialItems = sameMaterialItems.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
                 return sameMaterialItems;
             } catch
