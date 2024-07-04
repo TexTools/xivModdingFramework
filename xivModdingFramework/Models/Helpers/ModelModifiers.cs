@@ -1241,11 +1241,61 @@ namespace xivModdingFramework.Models.Helpers
                         }
                         else
                         {
-                            // Bone doesn't exist in the skel, can't deform it.
-                            def.Deformations[bone] = Matrix.Identity;
-                            def.InvertedDeformations[bone] = Matrix.Identity;
-                            def.NormalDeformations[bone] = Matrix.Identity;
-                            def.InvertedNormalDeformations[bone] = Matrix.Identity;
+                            var rex = new Regex("_ex_([a-z])[0-9]+_");
+                            var rex2 = new Regex("_ex_top_");
+
+                            var match1 = rex.Match(bone);
+                            var match2 = rex2.Match(bone);
+                            if (match1.Success || match2.Success)
+                            {
+                                // We can typically guess the parent on these.
+                                var parent = "";
+
+                                // This stuff isn't 100% correct, as technically
+                                // you should resolve the original EX Skeleton and 
+                                // pull the base bone.  But these are acceptable enough to work for now.
+                                if (match1.Success)
+                                {
+                                    var prefix = rex.Match(bone).Groups[1].Value;
+                                    if (prefix == "h")
+                                    {
+                                        parent = "j_kao";
+                                    }
+                                    else if (prefix == "f")
+                                    {
+                                        parent = "j_kao";
+                                    }
+                                } else if (match2.Success)
+                                {
+                                    parent = "j_sebo_b";
+                                }
+
+                                var skelParent = dict.FirstOrDefault(x => x.Key == parent).Value;
+
+                                if (skelParent == null)
+                                {
+                                    // Unknown handling
+                                    def.Deformations[bone] = Matrix.Identity;
+                                    def.InvertedDeformations[bone] = Matrix.Identity;
+                                    def.NormalDeformations[bone] = Matrix.Identity;
+                                    def.InvertedNormalDeformations[bone] = Matrix.Identity;
+                                } else
+                                {
+                                    // Found a parent? use that bone's deforms.
+                                    def.Deformations[bone] = def.Deformations[skelParent.BoneName];
+                                    def.InvertedDeformations[bone] = def.InvertedDeformations[skelParent.BoneName];
+                                    def.NormalDeformations[bone] = def.NormalDeformations[skelParent.BoneName];
+                                    def.InvertedNormalDeformations[bone] = def.InvertedNormalDeformations[skelParent.BoneName];
+                                }
+                            }
+                            else
+                            {
+                                // Bone doesn't exist in the skel, can't deform it.
+                                def.Deformations[bone] = Matrix.Identity;
+                                def.InvertedDeformations[bone] = Matrix.Identity;
+                                def.NormalDeformations[bone] = Matrix.Identity;
+                                def.InvertedNormalDeformations[bone] = Matrix.Identity;
+                            }
                         }
                     }
                 }
