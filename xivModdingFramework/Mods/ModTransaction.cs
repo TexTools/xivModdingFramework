@@ -19,6 +19,7 @@ using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using static xivModdingFramework.Cache.FrameworkExceptions;
 
 namespace xivModdingFramework.Mods
 {
@@ -1908,7 +1909,25 @@ namespace xivModdingFramework.Mods
         {
             if (state.OriginalOffset_Set)
             {
-                await Set8xDataOffset(state.Path, state.OriginalOffset);
+                try
+                {
+                    await Set8xDataOffset(state.Path, state.OriginalOffset);
+                } catch(HashCollisionException e)
+                {
+                    // If we're hitting a hash collision here, it means
+                    // we're restoring for the same reason, which means
+                    // we don't actually have to do anything index-wise.
+                    Trace.WriteLine("Rollback on hash collision for file: " + state.Path);
+
+                    var dataFile = IOUtil.GetDataFileFromPath(state.Path);
+
+
+                    // Scrub all references to the hash-colliding file.
+                    foreach(var entry in _TemporaryOffsetMapping[dataFile])
+                    {
+                        entry.Value.Remove(state.Path);
+                    }
+                }
             }
 
             if (state.OriginalMod_Set)
