@@ -447,7 +447,7 @@ namespace xivModdingFramework.Mods
 
                 if (ProgressReporter != null)
                 {
-                    ProgressReporter.Report("Filling in missing material sets...");
+                    ProgressReporter.Report("Filling in missing material versions...");
                 }
 
                 // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
