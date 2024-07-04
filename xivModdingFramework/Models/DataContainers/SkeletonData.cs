@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using System;
+
 namespace xivModdingFramework.Models.DataContainers
 {
     /// <summary>
@@ -23,7 +25,7 @@ namespace xivModdingFramework.Models.DataContainers
     /// The model skeleton is kept separate from the mdl file and is usually in
     /// the chara/human/[raceID]/skeleton/base/[bodyID] folder, it is a Havok file.
     /// </remarks>
-    public class SkeletonData
+    public class SkeletonData : ICloneable
     {
         /// <summary>
         /// The Name of the bone
@@ -52,5 +54,14 @@ namespace xivModdingFramework.Models.DataContainers
         /// The Inverse Pose Matrix for the bone
         /// </summary>
         public float[] InversePoseMatrix { get; set; }
+
+        public object Clone()
+        {
+            var c = (SkeletonData) MemberwiseClone();
+
+            c.PoseMatrix = (float[]) PoseMatrix.Clone();
+            c.InversePoseMatrix = (float[])InversePoseMatrix.Clone();
+            return c;
+        }
     }
 }
