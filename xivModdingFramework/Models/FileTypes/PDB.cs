@@ -240,24 +240,75 @@ namespace xivModdingFramework.Models.FileTypes
 
             var skeletonData = File.ReadAllLines(skeletonFile);
             var FullSkel = new Dictionary<string, SkeletonData>();
-            var FullSkelNum = new Dictionary<int, SkeletonData>();
 
-            // Deserializes the json skeleton file and makes 2 dictionaries with names and numbers as keys
             foreach (var b in skeletonData)
             {
                 if (b == "") continue;
                 var j = JsonConvert.DeserializeObject<SkeletonData>(b);
 
                 FullSkel.Add(j.BoneName, j);
-                FullSkelNum.Add(j.BoneNumber, j);
+            }
+
+            // Scan the midlander skel and snap in any missing bones.
+            // Their matrices don't matter, only their inheritance.
+            var mSkel = GetMidlanderSkeleton();
+            foreach(var b in mSkel)
+            {
+                if (!FullSkel.ContainsKey(b.Key))
+                {
+                    var p = mSkel.FirstOrDefault(x => x.Value.BoneNumber == b.Value.BoneParent);
+                    if(p.Key != null)
+                    {
+                        var parent = p.Value.BoneName;
+                        var toAdd = b;
+
+                        var newParent = FullSkel.FirstOrDefault(x => x.Value.BoneName == parent);
+                        if(newParent.Key != null)
+                        {
+                            var bc = (SkeletonData)b.Value.Clone();
+                            bc.BoneParent = newParent.Value.BoneNumber;
+                            FullSkel.Add(bc.BoneName, bc);
+                        }
+                    }
+                }
             }
 
             var root = FullSkel["n_root"];
+
 
             BuildNewTransfromMatrices(root, FullSkel, ret);
             return ret;
         }
 
+        private static Dictionary<string, SkeletonData> GetMidlanderSkeleton()
+        {
+
+            var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+            var midSkel = cwd + "/Skeletons/c0101b0001.skel";
+            if (!File.Exists(midSkel))
+            {
+                // Need to extract the Skel file real quick like.
+                var tempRoot = new XivDependencyRootInfo();
+                tempRoot.PrimaryType = XivItemType.equipment;
+                tempRoot.PrimaryId = 0;
+                tempRoot.Slot = "top";
+                Task.Run(async () =>
+                {
+                    await Sklb.GetBaseSkeletonFile(tempRoot, XivRace.Hyur_Midlander_Male);
+                }).Wait();
+            }
+
+            var midSkelData = File.ReadAllLines(midSkel);
+            var skel = new Dictionary<string, SkeletonData>();
+            foreach (var b in midSkelData)
+            {
+                if (b == "") continue;
+                var j = JsonConvert.DeserializeObject<SkeletonData>(b);
+                skel.Add(j.BoneName, j);
+            }
+
+            return skel;
+        }
 
         /// <summary>
         /// Builds the full set of forward/backwards and normalmodifier matrices from the original deformation matrices.

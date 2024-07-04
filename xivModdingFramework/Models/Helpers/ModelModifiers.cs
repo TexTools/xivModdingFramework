@@ -1148,7 +1148,7 @@ namespace xivModdingFramework.Models.Helpers
                 // Show a warning that deforms are missing for the target race
                 // This mostly happens with Face, Hair, Tails, Ears, and Female > Male deforms
                 // The model is still added but no deforms are applied
-                if (loggingFunction == null)
+                if (loggingFunction != null)
                 {
                     loggingFunction(true, "Unable to convert racial model.");
                 } else
@@ -1175,7 +1175,15 @@ namespace xivModdingFramework.Models.Helpers
 
                 loggingFunction(false, "Attempting to deform model...");
 
-                var def = await PDB.GetDeformationMatrices(targetRace, tx);
+                PDB.DeformationCollection def;
+                try
+                {
+                    def = await PDB.GetDeformationMatrices(targetRace, tx);
+                }
+                catch
+                {
+                    throw new Exception("Unable to retrieve PDB information for race: " + targetRace.ToString());
+                }
 
 
 
