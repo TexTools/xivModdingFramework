@@ -733,7 +733,8 @@ namespace xivModdingFramework.Models.ModelTextures
                         specular = new Color4(1.0f);
                         diffuse = new Color4(1.0f);
                     }
-                        
+
+                    var alpha = normal.Blue;
                     var emissive = new Color4(0, 0, 0, 1.0f);
                     if (useColorset)
                     {
@@ -792,8 +793,13 @@ namespace xivModdingFramework.Models.ModelTextures
                         specular *= invRough;
                     }
 
-                    var alpha = normal.Blue * alphaMultiplier;
+                    alpha *= alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    if(highlightRow >= 0)
+                    {
+                        alpha = 1.0f;
+                    }
 
                     return new ShaderMapperResult()
                     {

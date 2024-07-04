@@ -520,7 +520,7 @@ namespace xivModdingFramework.Helpers
         }
 
 
-        private static Regex _InvalidRegex = new Regex("[^a-z0-9\\.\\/\\-_]");
+        private static Regex _InvalidRegex = new Regex("[^a-z0-9\\.\\/\\-_{}]");
         public static bool IsFFXIVInternalPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;

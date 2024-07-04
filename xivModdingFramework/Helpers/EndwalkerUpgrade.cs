@@ -656,6 +656,7 @@ namespace xivModdingFramework.Helpers
                 mtrl.AdditionalData = sample.AdditionalData;
                 mtrl.MaterialFlags &= ~EMaterialFlags1.Unknown0004;
                 mtrl.MaterialFlags &= ~EMaterialFlags1.Unknown0008;
+
             }
 
             if (mtrl.ColorSetData == null)
@@ -681,20 +682,10 @@ namespace xivModdingFramework.Helpers
 
                 // Diffuse Pixel
 
-                if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
-                {
-                    // Not sure what this is exactly used for on glass but it's not proper diffuse.
-                    // Screen multiply it to be lighter, as very dark values cause it to become fully opaque.
-                    newData[offset + 0] = 1 - ((1 - mtrl.ColorSetData[pixel + 0]) * 0.5f);
-                    newData[offset + 1] = 1 - ((1 - mtrl.ColorSetData[pixel + 1]) * 0.5f);
-                    newData[offset + 2] = 1 - ((1 - mtrl.ColorSetData[pixel + 2]) * 0.5f);
-                }
-                else
-                {
-                    newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
-                    newData[offset + 1] = (mtrl.ColorSetData[pixel + 1]);
-                    newData[offset + 2] = (mtrl.ColorSetData[pixel + 2]);
-                }
+                newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
+                newData[offset + 1] = (mtrl.ColorSetData[pixel + 1]);
+                newData[offset + 2] = (mtrl.ColorSetData[pixel + 2]);
+
                 if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
                 {
                     newData[offset + 3] = mtrl.ColorSetData[pixel + 7];  // SE flipped Specular Power and Gloss values for some reason.
@@ -703,10 +694,22 @@ namespace xivModdingFramework.Helpers
                 pixel += 4;
                 offset += 4;
 
-                // Specular Pixel
-                newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
-                newData[offset + 1] = mtrl.ColorSetData[pixel + 1];
-                newData[offset + 2] = mtrl.ColorSetData[pixel + 2];
+                if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
+                {
+                    newData[offset + 0] = 0.8100586f;
+                    newData[offset + 1] = 0.8100586f;
+                    newData[offset + 2] = 0.8100586f;
+                }
+                else
+                {
+                    // Specular Pixel
+                    newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
+                    newData[offset + 1] = mtrl.ColorSetData[pixel + 1];
+                    newData[offset + 2] = mtrl.ColorSetData[pixel + 2];
+                }
+
+
+
                 if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
                 {
                     newData[offset + 3] = mtrl.ColorSetData[pixel - 1];  // SE flipped Specular Power and Gloss values for some reason.
@@ -746,29 +749,30 @@ namespace xivModdingFramework.Helpers
             {
                 // Update Dye information.
                 var newDyeData = new byte[128];
-
-                if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
+                // Update old dye information
+                for (int i = 0; i < 16; i++)
                 {
-                    // Update old dye information
-                    for (int i = 0; i < 16; i++)
+                    var oldOffset = i * 2;
+                    var newOffset = i * 4;
+
+                    var newDyeBlock = (uint)0;
+                    var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
+
+                    // Old dye bitmask was 5 bits long.
+                    uint dyeBits = (uint)(oldDyeBlock & 0x1F);
+                    uint oldTemplate = (uint)(oldDyeBlock >> 5);
+
+                    if(mtrl.ShaderPack != EShaderPack.CharacterLegacy)
                     {
-                        var oldOffset = i * 2;
-                        var newOffset = i * 4;
-
-                        var newDyeBlock = (uint)0;
-                        var oldDyeBlock = BitConverter.ToUInt16(mtrl.ColorSetDyeData, oldOffset);
-
-                        // Old dye bitmask was 5 bits long.
-                        uint dyeBits = (uint)(oldDyeBlock & 0x1F);
-                        uint oldTemplate = (uint)(oldDyeBlock >> 5);
-
-                        newDyeBlock |= (oldTemplate << 16);
-                        newDyeBlock |= dyeBits;
-
-                        var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
-
-                        Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
+                        oldTemplate += 1000;
                     }
+
+                    newDyeBlock |= (oldTemplate << 16);
+                    newDyeBlock |= dyeBits;
+
+                    var newDyeBytes = BitConverter.GetBytes(newDyeBlock);
+
+                    Array.Copy(newDyeBytes, 0, newDyeData, newOffset, newDyeBytes.Length);
                 }
                 mtrl.ColorSetDyeData = newDyeData;
             }
@@ -969,7 +973,7 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        private static Half[] GetDefaultColorsetRow(EShaderPack pack)
+        public static Half[] GetDefaultColorsetRow(EShaderPack pack)
         {
             var row = new Half[32];
 
