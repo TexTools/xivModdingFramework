@@ -133,7 +133,11 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 case EShaderPack.Character:
                 case EShaderPack.CharacterLegacy:
-                case EShaderPack.BgColorChange:
+                case EShaderPack.CharacterGlass:
+                case EShaderPack.CharacterInc:
+                case EShaderPack.CharacterStockings:
+                case EShaderPack.CharacterScroll:
+                case EShaderPack.CharacterReflection:
                     return true;
                 default:
                     return false;

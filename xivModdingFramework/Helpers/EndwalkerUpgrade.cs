@@ -969,7 +969,7 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        private static Half[] GetDefaultColorsetRow(EShaderPack pack)
+        public static Half[] GetDefaultColorsetRow(EShaderPack pack)
         {
             var row = new Half[32];
 
