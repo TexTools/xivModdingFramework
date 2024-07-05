@@ -37,6 +37,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using System.Diagnostics;
 using System.Threading;
 using xivModdingFramework.Cache;
+using System.Management;
 
 namespace xivModdingFramework.Helpers
 {
@@ -777,6 +778,7 @@ namespace xivModdingFramework.Helpers
         {
             var path = GetFrameworkTempFolder();
             DeleteTempDirectory(path);
+            Directory.CreateDirectory(path);
         }
 
         public static string GetParentIfExists(string path, string target, bool caseSensitive = true)
@@ -833,5 +835,26 @@ namespace xivModdingFramework.Helpers
             return (int)Math.Pow(2, (int)Math.Log(x, 2));
         }
 
+        public static void CompressWindowsDirectory(string dir)
+        {
+            try
+            {
+                DirectoryInfo directoryInfo = new DirectoryInfo(dir);
+                if ((directoryInfo.Attributes & FileAttributes.Compressed) != FileAttributes.Compressed)
+                {
+                    string objPath = "Win32_Directory.Name=" + "'" + directoryInfo.FullName.Replace("\\", @"\\").Replace("\'", "\\'").TrimEnd('\\') + "'";
+                    using (ManagementObject mo = new ManagementObject(objPath))
+                    {
+                        ManagementBaseObject outParams = mo.InvokeMethod("Compress", null, null);
+                        uint ret = (uint)(outParams.Properties["ReturnValue"].Value);
+                        Trace.WriteLine("Compress Return Code: " + ret);
+                    }
+                }
+            }
+            catch
+            {
+                // No-Op, if this fails, it fails.
+            }
+        }
     }
 }

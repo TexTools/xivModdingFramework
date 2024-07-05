@@ -1534,7 +1534,13 @@ namespace xivModdingFramework.Helpers
 
             if(files != null && files.ContainsKey(path))
             {
-                return await TransactionDataHandler.GetUncompressedFile(files[path]);
+                try
+                {
+                    return await TransactionDataHandler.GetUncompressedFile(files[path]);
+                } catch
+                {
+                    return null;
+                }
             }
 
             if(tx != null && await tx.FileExists(path))
