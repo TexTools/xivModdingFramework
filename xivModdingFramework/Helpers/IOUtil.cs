@@ -38,6 +38,8 @@ using System.Diagnostics;
 using System.Threading;
 using xivModdingFramework.Cache;
 using System.Management;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace xivModdingFramework.Helpers
 {
@@ -884,6 +886,26 @@ namespace xivModdingFramework.Helpers
             {
                 // No-Op, if this fails, it fails.
                 Trace.WriteLine(ex);
+            }
+        }
+
+        public static string GetPenumbraDirectory()
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "Penumbra.json");
+            if (!File.Exists(path))
+            {
+                return "";
+            }
+
+            try
+            {
+                var obj = JObject.Parse(File.ReadAllText(path));
+                var st = (string) obj["ModDirectory"];
+                return st;
+            }
+            catch(Exception ex)
+            {
+                return "";
             }
         }
     }
