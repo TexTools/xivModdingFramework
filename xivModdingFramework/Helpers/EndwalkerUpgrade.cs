@@ -833,6 +833,13 @@ namespace xivModdingFramework.Helpers
                     SamplerSettingsRaw = 0x000F8340,
                     SamplerIdRaw = 1449103320,
                 };
+
+                if (normalTex.Sampler != null)
+                {
+                    tex.Sampler.UTilingMode = normalTex.Sampler.UTilingMode;
+                    tex.Sampler.VTilingMode = normalTex.Sampler.VTilingMode;
+                }
+
                 mtrl.Textures.Add(tex);
 
                 ret.Add(normalPath, idInfo);
