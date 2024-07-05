@@ -835,25 +835,55 @@ namespace xivModdingFramework.Helpers
             return (int)Math.Pow(2, (int)Math.Log(x, 2));
         }
 
-        public static void CompressWindowsDirectory(string dir)
+        public static async Task CompressWindowsDirectory(string dir)
         {
             try
             {
-                DirectoryInfo directoryInfo = new DirectoryInfo(dir);
-                if ((directoryInfo.Attributes & FileAttributes.Compressed) != FileAttributes.Compressed)
+                var wrappedDir = Regex.Replace(dir, @"(\\*)" + "\"", @"$1$1\" + "\"");
+                var args = "/c /EXE XPRESS8K /s /f *";
+                var proc = new Process
                 {
-                    string objPath = "Win32_Directory.Name=" + "'" + directoryInfo.FullName.Replace("\\", @"\\").Replace("\'", "\\'").TrimEnd('\\') + "'";
-                    using (ManagementObject mo = new ManagementObject(objPath))
+                    StartInfo = new ProcessStartInfo
                     {
-                        ManagementBaseObject outParams = mo.InvokeMethod("Compress", null, null);
-                        uint ret = (uint)(outParams.Properties["ReturnValue"].Value);
-                        Trace.WriteLine("Compress Return Code: " + ret);
+                        FileName = "compact.exe",
+                        Arguments = args,
+                        WorkingDirectory = dir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
                     }
-                }
+                };
+
+                proc.EnableRaisingEvents = true;
+
+                proc.Start();
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                int? code = null;
+
+                proc.Exited += (object sender, EventArgs e) =>
+                {
+                    code = proc.ExitCode;
+                };
+
+                await Task.Run(async () =>
+                {
+                    while (code == null)
+                    {
+                        await Task.Delay(10);
+                    }
+
+                    if (code != 0)
+                    {
+                        throw new Exception("Compress.exe threw code: " + code);
+                    }
+                });
             }
-            catch
+            catch(Exception ex)
             {
                 // No-Op, if this fails, it fails.
+                Trace.WriteLine(ex);
             }
         }
     }

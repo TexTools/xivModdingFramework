@@ -112,7 +112,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             foreach (var file in files)
             {
-                if (Path.GetFileName(file).StartsWith("group_"))
+                if (Path.GetFileName(file).StartsWith("group_") && Path.GetFileName(file).ToLower().EndsWith(".json"))
                 {
                     groups.Add(JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file)));
                 }

@@ -331,10 +331,6 @@ namespace xivModdingFramework.Materials.FileTypes
                 var idx = 0;
                 foreach (var arr in halfData)
                 {
-                    if(x > 2 && arr.Length > 1)
-                    {
-                        Trace.WriteLine("asdf");
-                    }
                     Entries[x].Add(arr);
                     idx++;
                 }
