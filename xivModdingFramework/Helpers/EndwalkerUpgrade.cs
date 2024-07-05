@@ -547,7 +547,7 @@ namespace xivModdingFramework.Helpers
                     var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
                     var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
 
-                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]))
+                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]) && await Exists(idInfo.Value.Files["normal"], files, tx, true))
                     {
                         (string indexFilePath, byte[] data) data = (null, null);
                         try
@@ -784,12 +784,42 @@ namespace xivModdingFramework.Helpers
             string idPath = null;
             string normalPath = null;
 
+            idPath = normalTex.Dx11Path.Replace(".tex", "_id.tex");
 
-            // If we don't have an ID Texture, and we have a colorset + normal map, create one.
-            if (normalTex != null && idTex == null)
+            var rtx = ModTransaction.BeginReadonlyTransaction();
+
+            if (await rtx.FileExists(mtrl.MTRLPath, true))
             {
-                idPath = normalTex.Dx11Path.Replace(".tex", "_id.tex");
+                var original = await Mtrl.GetXivMtrl(mtrl.MTRLPath, true, rtx);
+                // Material is a default MTRL, steal the index path if it exists.
+                var idSamp = original.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Index);
+
+                if (idSamp != null && !string.IsNullOrWhiteSpace(idSamp.Dx11Path))
+                {
+                    idPath = idSamp.Dx11Path;
+                }
+            }
+
+
+            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
+            if (specTex != null)
+            {
+                specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
+            }
+
+            // Create Id Texture reference if we have a normal map. (If we don't, idk wtf is going on here).
+            if (normalTex != null)
+            {
                 normalPath = normalTex.Dx11Path;
+                var idInfo = new UpgradeInfo()
+                {
+                    Usage = EUpgradeTextureUsage.IndexMaps,
+                    Files = new Dictionary<string, string>()
+                      {
+                          { "normal", normalPath },
+                          { "index", idPath }
+                      },
+                };
 
                 var tex = new MtrlTexture();
                 tex.TexturePath = idPath;
@@ -799,27 +829,11 @@ namespace xivModdingFramework.Helpers
                     SamplerIdRaw = 1449103320,
                 };
                 mtrl.Textures.Add(tex);
+
+                ret.Add(normalPath, idInfo);
             }
 
-            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
-            if (specTex != null)
-            {
-                specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
-            }
-
-            var idInfo = new UpgradeInfo()
-            {
-                Usage = EUpgradeTextureUsage.IndexMaps,
-                Files = new Dictionary<string, string>()
-                      {
-                          { "normal", normalPath },
-                          { "index", idPath }
-                      },
-            };
-
-            ret.Add(normalPath, idInfo);
-
-            if(mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
             {
                 var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
                 if (maskSamp != null)
