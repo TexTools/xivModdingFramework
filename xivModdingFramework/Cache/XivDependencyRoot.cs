@@ -920,7 +920,7 @@ namespace xivModdingFramework.Cache
             // Add orphaned modded materials into the root.
             var rootFolder = Info.GetRootFolder();
             var variantRep = "v" + materialVersion.ToString().PadLeft(4, '0');
-            var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl"));
+            var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl")).ToList();
             foreach (var mod in mods)
             {
                 var state = await mod.GetState(tx);

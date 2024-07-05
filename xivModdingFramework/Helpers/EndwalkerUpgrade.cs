@@ -547,7 +547,8 @@ namespace xivModdingFramework.Helpers
                     var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
                     var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
 
-                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]))
+                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]) &&
+                        (await Exists(idInfo.Value.Files["normal"], files, tx, true) || !await Exists(idInfo.Value.Files["index"], files, tx) ))
                     {
                         (string indexFilePath, byte[] data) data = (null, null);
                         try
@@ -784,12 +785,46 @@ namespace xivModdingFramework.Helpers
             string idPath = null;
             string normalPath = null;
 
-
-            // If we don't have an ID Texture, and we have a colorset + normal map, create one.
-            if (normalTex != null && idTex == null)
+            idPath = normalTex.Dx11Path.Replace(".tex", "_id.tex");
+            if (normalTex.Dx11Path.Contains("_n.tex"))
             {
-                idPath = normalTex.Dx11Path.Replace(".tex", "_id.tex");
+                idPath = normalTex.Dx11Path.Replace("_n.tex", "_id.tex");
+            }
+
+            var rtx = ModTransaction.BeginReadonlyTransaction();
+
+            if (await rtx.FileExists(mtrl.MTRLPath, true))
+            {
+                var original = await Mtrl.GetXivMtrl(mtrl.MTRLPath, true, rtx);
+                // Material is a default MTRL, steal the index path if it exists.
+                var idSamp = original.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Index);
+
+                if (idSamp != null && !string.IsNullOrWhiteSpace(idSamp.Dx11Path))
+                {
+                    idPath = idSamp.Dx11Path;
+                }
+            }
+
+
+            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
+            if (specTex != null)
+            {
+                specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
+            }
+
+            // Create Id Texture reference if we have a normal map. (If we don't, idk wtf is going on here).
+            if (normalTex != null)
+            {
                 normalPath = normalTex.Dx11Path;
+                var idInfo = new UpgradeInfo()
+                {
+                    Usage = EUpgradeTextureUsage.IndexMaps,
+                    Files = new Dictionary<string, string>()
+                      {
+                          { "normal", normalPath },
+                          { "index", idPath }
+                      },
+                };
 
                 var tex = new MtrlTexture();
                 tex.TexturePath = idPath;
@@ -799,27 +834,11 @@ namespace xivModdingFramework.Helpers
                     SamplerIdRaw = 1449103320,
                 };
                 mtrl.Textures.Add(tex);
+
+                ret.Add(normalPath, idInfo);
             }
 
-            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
-            if (specTex != null)
-            {
-                specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
-            }
-
-            var idInfo = new UpgradeInfo()
-            {
-                Usage = EUpgradeTextureUsage.IndexMaps,
-                Files = new Dictionary<string, string>()
-                      {
-                          { "normal", normalPath },
-                          { "index", idPath }
-                      },
-            };
-
-            ret.Add(normalPath, idInfo);
-
-            if(mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
             {
                 var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
                 if (maskSamp != null)
@@ -1051,6 +1070,7 @@ namespace xivModdingFramework.Helpers
             MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/tail\\/t[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})t([0-9]{4})_a\\.mtrl"),
             MaterialFormat = "chara/human/c{0}/obj/tail/t{1}/material/v0001/mt_c{0}t{1}_a.mtrl",
         };
+
         private static HairRegexSet EarRegexes = new HairRegexSet()
         {
             OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/zear\\/z[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})z([0-9]{4})_etc_([ns])\\.tex"),
@@ -1059,11 +1079,21 @@ namespace xivModdingFramework.Helpers
         };
 
 
+        private static HairRegexSet AccessoryRegexes = new HairRegexSet()
+        {
+            OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})h([0-9]{4})_acc_([dns])\\.tex"),
+            MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})h([0-9]{4})_acc_b\\.mtrl"),
+            MaterialFormat = "chara/human/c{0}/obj/hair/h{1}/material/v0001/mt_c{0}h{1}_acc_b.mtrl",
+        };
+
+
         public static async Task UpdateUnclaimedHairTextures(List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
         {
             await UpdateUnclaimedHairTextures(HairRegexes, files, source, tx, _ConvertedTextures, fileInfos);
             await UpdateUnclaimedHairTextures(TailRegexes, files, source, tx, _ConvertedTextures, fileInfos);
             await UpdateUnclaimedHairTextures(EarRegexes, files, source, tx, _ConvertedTextures, fileInfos);
+            
+            await UpdateUnclaimedHairAccessory(AccessoryRegexes, files, source, tx, _ConvertedTextures, fileInfos);
         }
 
         /// <summary>
@@ -1245,6 +1275,203 @@ namespace xivModdingFramework.Helpers
 
                         var data = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
                         await WriteFile(data, mtrl.MTRLPath, fileInfos, tx, source);
+                    }
+                }
+            }
+        }
+
+
+        private static async Task UpdateUnclaimedHairAccessory(HairRegexSet hairset, List<string> files, string source, ModTransaction tx, HashSet<string> _ConvertedTextures, Dictionary<string, FileStorageInformation> fileInfos = null)
+        {
+            var results = new Dictionary<int, Dictionary<int, List<(string Path, XivTexType TexType)>>>();
+
+            var materials = new List<(int Race, int Hair)>();
+            foreach (var file in files)
+            {
+                var matMatch = hairset.MaterialRegex.Match(file);
+                if (matMatch.Success)
+                {
+                    var rid = Int32.Parse(matMatch.Groups[1].Value);
+                    var hid = Int32.Parse(matMatch.Groups[2].Value);
+                    materials.Add((rid, hid));
+                    continue;
+                }
+
+                var match = hairset.OldTextureRegex.Match(file);
+                if (!match.Success) continue;
+
+                var raceId = Int32.Parse(match.Groups[1].Value);
+                var hairId = Int32.Parse(match.Groups[2].Value);
+                var tex = match.Groups[3].Value;
+                if (!results.ContainsKey(raceId))
+                {
+                    results.Add(raceId, new Dictionary<int, List<(string Path, XivTexType TexType)>>());
+                }
+
+                if (!results[raceId].ContainsKey(hairId))
+                {
+                    results[raceId].Add(hairId, new List<(string Path, XivTexType TexType)>());
+                }
+
+                XivTexType tt;
+                if(tex == "n")
+                {
+                    tt = XivTexType.Normal;
+                } else if(tex == "s")
+                {
+                    tt = XivTexType.Specular;
+                } else if(tex == "d")
+                {
+                    tt = XivTexType.Diffuse;
+                } else
+                {
+                    continue;
+                }
+
+                if (results[raceId][hairId].Any(x => x.TexType == tt))
+                {
+                    var prev = results[raceId][hairId].First(x => x.TexType == tt);
+                    if (prev.Path.Contains("--"))
+                    {
+                        // Dx11 wins out.
+                        continue;
+                    }
+                    else
+                    {
+                        results[raceId][hairId].RemoveAll(x => x.TexType == tt);
+                    }
+                }
+                results[raceId][hairId].Add((file, tt));
+            }
+
+            // Winnow the list to only entries without their associated material.
+            var races = results.Keys.ToList();
+            foreach (var r in races)
+            {
+                var hairs = results[r].Keys.ToList();
+                foreach (var h in hairs)
+                {
+                    if (materials.Any(x => x.Hair == h && x.Race == r))
+                    {
+                        results[r].Remove(h);
+                    }
+                }
+
+                if (results[r].Count == 0)
+                {
+                    results.Remove(r);
+                }
+            }
+
+            if (results.Count == 0) return;
+
+            var rtx = ModTransaction.BeginReadonlyTransaction();
+            foreach (var rKv in results)
+            {
+                var race = rKv.Key.ToString("D4");
+                foreach (var hKv in rKv.Value)
+                {
+                    var hair = hKv.Key.ToString("D4");
+                    var matPath = string.Format(hairset.MaterialFormat, race, hair);
+
+                    if (!await rtx.FileExists(matPath, true))
+                    {
+                        // Invalid path or non-existent in DT or some other shenanigans.
+                        continue;
+                    }
+
+                    var mtrl = await Mtrl.GetXivMtrl(matPath, true, rtx);
+
+                    if (mtrl.ShaderPack != EShaderPack.Character && mtrl.ShaderPack != EShaderPack.CharacterLegacy)
+                    {
+                        // Some kind of shenanigans going on here where this is not a proper accessory.
+                        continue;
+                    }
+
+                    var normTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerNormal);
+                    var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
+                    var diffuseTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerDiffuse);
+
+                    if (normTex == null)
+                    {
+                        // If we couldn't resolve normal, we're in trouble.
+                        continue;
+                    }
+
+                    var root = await XivCache.GetFirstRoot(matPath);
+                    IItem item = null;
+                    if (root != null)
+                    {
+                        item = root.GetFirstItem();
+                    }
+
+                    // Ensure none of the files have already been converted.
+                    var skip = false;
+                    foreach (var tex in hKv.Value)
+                    {
+                        var newPath = "";
+                        if (tex.TexType == XivTexType.Normal)
+                        {
+                            newPath = normTex.Dx11Path;    
+                        } else if (tex.TexType == XivTexType.Specular)
+                        {
+                            if (specTex == null)
+                            {
+                                skip = true;
+                                break;
+                            }
+                            newPath = specTex.Dx11Path;
+                        } else if(tex.TexType == XivTexType.Diffuse)
+                        {
+                            if(diffuseTex == null)
+                            {
+                                skip = true;
+                                break;
+                            }
+                            newPath = diffuseTex.Dx11Path;
+                        }
+
+                        if (files.Contains(newPath))
+                        {
+                            // Already converted.
+                            skip = true;
+                            continue;
+                        }
+                    }
+
+                    if (skip)
+                    {
+                        continue;
+                    }
+
+                    foreach (var tex in hKv.Value)
+                    {
+                        var newPath = "";
+                        if (tex.TexType == XivTexType.Normal)
+                        {
+                            newPath = normTex.Dx11Path;
+                        }
+                        else if (tex.TexType == XivTexType.Specular)
+                        {
+                            newPath = specTex.Dx11Path;
+                        }
+                        else if (tex.TexType == XivTexType.Diffuse)
+                        {
+                            newPath = diffuseTex.Dx11Path;
+                        }
+
+                        // Copy files to new destinations.
+                        if (fileInfos != null)
+                        {
+                            var data = await ResolveFile(tex.Path, fileInfos, tx);
+                            await WriteFile(data, newPath, fileInfos, tx, source);
+                        }
+                        else
+                        {
+                            await Dat.CopyFile(tex.Path, newPath, source, true, item, tx);
+                        }
+
+                        files.Add(newPath);
                     }
                 }
             }
