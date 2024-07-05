@@ -893,6 +893,11 @@ namespace xivModdingFramework.Helpers
 
             // Read normal file.
             var normalTex = XivTex.FromUncompressedTex(data);
+
+            if(!IOUtil.IsPowerOfTwo(normalTex.Width) || !IOUtil.IsPowerOfTwo(normalTex.Height))
+            {
+                await Tex.ResizeXivTx(normalTex, IOUtil.RoundToPowerOfTwo(normalTex.Width), IOUtil.RoundToPowerOfTwo(normalTex.Height));
+            }
             var normalData = await normalTex.GetRawPixels();
 
             var indexData = new byte[normalTex.Width * normalTex.Height * 4];
