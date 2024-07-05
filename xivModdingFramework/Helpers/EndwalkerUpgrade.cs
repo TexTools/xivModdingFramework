@@ -547,7 +547,8 @@ namespace xivModdingFramework.Helpers
                     var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
                     var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
 
-                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]) && await Exists(idInfo.Value.Files["normal"], files, tx, true))
+                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]) &&
+                        (await Exists(idInfo.Value.Files["normal"], files, tx, true) || !await Exists(idInfo.Value.Files["index"], files, tx) ))
                     {
                         (string indexFilePath, byte[] data) data = (null, null);
                         try
@@ -785,6 +786,10 @@ namespace xivModdingFramework.Helpers
             string normalPath = null;
 
             idPath = normalTex.Dx11Path.Replace(".tex", "_id.tex");
+            if (normalTex.Dx11Path.Contains("_n.tex"))
+            {
+                idPath = normalTex.Dx11Path.Replace("_n.tex", "_id.tex");
+            }
 
             var rtx = ModTransaction.BeginReadonlyTransaction();
 
