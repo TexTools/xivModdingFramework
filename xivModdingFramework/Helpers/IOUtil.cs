@@ -37,6 +37,9 @@ using xivModdingFramework.SqPack.FileTypes;
 using System.Diagnostics;
 using System.Threading;
 using xivModdingFramework.Cache;
+using System.Management;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace xivModdingFramework.Helpers
 {
@@ -777,6 +780,7 @@ namespace xivModdingFramework.Helpers
         {
             var path = GetFrameworkTempFolder();
             DeleteTempDirectory(path);
+            Directory.CreateDirectory(path);
         }
 
         public static string GetParentIfExists(string path, string target, bool caseSensitive = true)
@@ -833,5 +837,76 @@ namespace xivModdingFramework.Helpers
             return (int)Math.Pow(2, (int)Math.Log(x, 2));
         }
 
+        public static async Task CompressWindowsDirectory(string dir)
+        {
+            try
+            {
+                var wrappedDir = Regex.Replace(dir, @"(\\*)" + "\"", @"$1$1\" + "\"");
+                var args = "/c /EXE XPRESS8K /s /f *";
+                var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "compact.exe",
+                        Arguments = args,
+                        WorkingDirectory = dir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                proc.EnableRaisingEvents = true;
+
+                proc.Start();
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                int? code = null;
+
+                proc.Exited += (object sender, EventArgs e) =>
+                {
+                    code = proc.ExitCode;
+                };
+
+                await Task.Run(async () =>
+                {
+                    while (code == null)
+                    {
+                        await Task.Delay(10);
+                    }
+
+                    if (code != 0)
+                    {
+                        throw new Exception("Compress.exe threw code: " + code);
+                    }
+                });
+            }
+            catch(Exception ex)
+            {
+                // No-Op, if this fails, it fails.
+                Trace.WriteLine(ex);
+            }
+        }
+
+        public static string GetPenumbraDirectory()
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "Penumbra.json");
+            if (!File.Exists(path))
+            {
+                return "";
+            }
+
+            try
+            {
+                var obj = JObject.Parse(File.ReadAllText(path));
+                var st = (string) obj["ModDirectory"];
+                return st;
+            }
+            catch(Exception ex)
+            {
+                return "";
+            }
+        }
     }
 }

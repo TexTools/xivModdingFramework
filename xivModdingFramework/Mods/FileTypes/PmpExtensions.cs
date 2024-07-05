@@ -479,7 +479,20 @@ namespace xivModdingFramework.Mods.FileTypes
             // Sha Key => Out File.
             var seenFiles = new Dictionary<TTMPWriter.SHA1HashKey, string>();
 
-            var useCompressed = defaultStorageType == EFileStorageType.CompressedIndividual || defaultStorageType == EFileStorageType.CompressedBlob;
+            int compCount = 0;
+            int uncompCount = 0;
+            foreach(var f in files)
+            {
+                if(f.Value.Info.StorageType == EFileStorageType.UncompressedIndividual || f.Value.Info.StorageType == EFileStorageType.UncompressedBlob)
+                {
+                    uncompCount++;
+                } else
+                {
+                    compCount++;
+                }
+            }
+
+            var useCompressed = compCount > uncompCount;
             var idx = 1;
             var tasks = new List<Task>();
             var _lock = new object();

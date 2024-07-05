@@ -833,6 +833,13 @@ namespace xivModdingFramework.Helpers
                     SamplerSettingsRaw = 0x000F8340,
                     SamplerIdRaw = 1449103320,
                 };
+
+                if (normalTex.Sampler != null)
+                {
+                    tex.Sampler.UTilingMode = normalTex.Sampler.UTilingMode;
+                    tex.Sampler.VTilingMode = normalTex.Sampler.VTilingMode;
+                }
+
                 mtrl.Textures.Add(tex);
 
                 ret.Add(normalPath, idInfo);
@@ -886,6 +893,11 @@ namespace xivModdingFramework.Helpers
 
             // Read normal file.
             var normalTex = XivTex.FromUncompressedTex(data);
+
+            if(!IOUtil.IsPowerOfTwo(normalTex.Width) || !IOUtil.IsPowerOfTwo(normalTex.Height))
+            {
+                await Tex.ResizeXivTx(normalTex, IOUtil.RoundToPowerOfTwo(normalTex.Width), IOUtil.RoundToPowerOfTwo(normalTex.Height));
+            }
             var normalData = await normalTex.GetRawPixels();
 
             var indexData = new byte[normalTex.Width * normalTex.Height * 4];
@@ -1522,7 +1534,13 @@ namespace xivModdingFramework.Helpers
 
             if(files != null && files.ContainsKey(path))
             {
-                return await TransactionDataHandler.GetUncompressedFile(files[path]);
+                try
+                {
+                    return await TransactionDataHandler.GetUncompressedFile(files[path]);
+                } catch
+                {
+                    return null;
+                }
             }
 
             if(tx != null && await tx.FileExists(path))
