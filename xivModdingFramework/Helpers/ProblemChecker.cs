@@ -417,95 +417,109 @@ namespace xivModdingFramework.Helpers
                     throw new Exception("Cannot use the game directory as backup directory.");
                 }
 
-                // Readonly TX to check stuff.
-                var rtx = ModTransaction.BeginReadonlyTransaction();
-                var ml = await rtx.GetModList();
-
-                List<Mod> enabledMods = new List<Mod>();
-                if (await Modding.AnyModsEnabled(rtx))
-                {
-                    // Have to use a real TX here, which also means we need write access.
-                    if (!Dat.AllowDatAlteration)
-                    {
-                        throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
-                    }
-
-                    using (var tx = await ModTransaction.BeginTransaction(true))
-                    {
-                        enabledMods = await Modding.GetActiveMods(tx);
-                        await Modding.SetAllModStates(EModState.Disabled, null, tx);
-                        await ModTransaction.CommitTransaction(tx);
-                    }
-                }
-
-                // Reset Index DAT counts to their default game state.
-                Index.UNSAFE_ResetAllIndexDatCounts();
+                var workerstate = XivCache.CacheWorkerEnabled;
+                await XivCache.SetCacheWorkerState(false);
+                var safeState = XivCache.GameWriteEnabled;
                 try
                 {
 
-                    // Validate that the indexes refer only to base game indexes.
+                    // Readonly TX to check stuff.
+                    var rtx = ModTransaction.BeginReadonlyTransaction();
+                    var ml = await rtx.GetModList();
+
+                    List<Mod> enabledMods = new List<Mod>();
+                    if (await Modding.AnyModsEnabled(rtx))
+                    {
+                        XivCache.GameWriteEnabled = true;
+                        // Have to use a real TX here, which also means we need write access.
+                        if (!Dat.AllowDatAlteration)
+                        {
+                            throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
+                        }
+
+                        using (var tx = await ModTransaction.BeginTransaction(true))
+                        {
+                            enabledMods = await Modding.GetActiveMods(tx);
+                            await Modding.SetAllModStates(EModState.Disabled, null, tx);
+                            await ModTransaction.CommitTransaction(tx);
+                        }
+                    }
+
                     try
                     {
-                        await AssertIndexIsClean(XivDataFile._04_Chara);
-                    }
-                    catch
-                    {
-                        throw new InvalidDataException("Cannot create index backups.  Indexes are unclean and still refer to modified dats even after disabling all mods.");
-                    }
 
+                        // Reset Index DAT counts to their default game state.
+                        Index.UNSAFE_ResetAllIndexDatCounts();
 
-
-                    ClearIndexBackups(backupDirectory);
-
-                    foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
-                    {
-                        var path = Path.Combine(backupDirectory, XivDataFiles.GetFilePath(df));
-                        var folder = new DirectoryInfo(path).Parent.FullName;
-
-                        Directory.CreateDirectory(folder);
-
-
-                        var index1path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
-                        var index2path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
-
-                        var index1backup = path + Index.IndexExtension;
-                        var index2backup = path + Index.Index2Extension;
-
-                        if (File.Exists(index1path))
+                        // Validate that the indexes refer only to base game indexes.
+                        try
                         {
-                            File.Copy(index1path, index1backup);
+                            await AssertIndexIsClean(XivDataFile._04_Chara);
+                        }
+                        catch
+                        {
+                            throw new InvalidDataException("Cannot create index backups.  Indexes are unclean and still refer to modified dats even after disabling all mods.");
                         }
 
-                        if (File.Exists(index2path))
+
+
+                        ClearIndexBackups(backupDirectory);
+
+                        foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
                         {
-                            File.Copy(index2path, index2backup);
+                            var path = Path.Combine(backupDirectory, XivDataFiles.GetFilePath(df));
+                            var folder = new DirectoryInfo(path).Parent.FullName;
+
+                            Directory.CreateDirectory(folder);
+
+
+                            var index1path = XivDataFiles.GetFullPath(df, Index.IndexExtension);
+                            var index2path = XivDataFiles.GetFullPath(df, Index.Index2Extension);
+
+                            var index1backup = path + Index.IndexExtension;
+                            var index2backup = path + Index.Index2Extension;
+
+                            if (File.Exists(index1path))
+                            {
+                                File.Copy(index1path, index1backup);
+                            }
+
+                            if (File.Exists(index2path))
+                            {
+                                File.Copy(index2path, index2backup);
+                            }
+                        }
+
+
+                        var versionFile = XivCache.GameInfo.GameVersionFile;
+                        if (!string.IsNullOrWhiteSpace(versionFile))
+                        {
+                            var fName = Path.GetFileName(versionFile);
+                            var versionTarget = Path.Combine(backupDirectory, fName);
+                            File.Copy(versionFile, versionTarget);
                         }
                     }
-
-
-                    var versionFile = XivCache.GameInfo.GameVersionFile;
-                    if (!string.IsNullOrWhiteSpace(versionFile))
+                    finally
                     {
-                        var fName = Path.GetFileName(versionFile);
-                        var versionTarget = Path.Combine(backupDirectory, fName);
-                        File.Copy(versionFile, versionTarget);
+                        // Return DAT counts to normal.
+                        Index.UNSAFE_NormalizeAllIndexDatCounts();
+
+                        if (enabledMods.Count > 0)
+                        {
+                            // Re-Enable mods.
+                            using (var tx = await ModTransaction.BeginTransaction(true))
+                            {
+                                var paths = enabledMods.Select(x => x.FilePath);
+                                await Modding.SetModStates(EModState.Enabled, paths, null, tx);
+                                await ModTransaction.CommitTransaction(tx);
+                            }
+                        }
                     }
                 }
                 finally
                 {
-                    // Return DAT counts to normal.
-                    Index.UNSAFE_NormalizeAllIndexDatCounts();
-
-                    if (enabledMods.Count > 0)
-                    {
-                        // Re-Enable mods.
-                        using (var tx = await ModTransaction.BeginTransaction(true))
-                        {
-                            var paths = enabledMods.Select(x => x.FilePath);
-                            await Modding.SetModStates(EModState.Enabled, paths, null, tx);
-                            await ModTransaction.CommitTransaction(tx);
-                        }
-                    }
+                    XivCache.GameWriteEnabled = safeState;
+                    await XivCache.SetCacheWorkerState(workerstate);
                 }
             });
         }
