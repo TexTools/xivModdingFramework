@@ -1620,7 +1620,7 @@ namespace xivModdingFramework.Helpers
                         if (res.data == null)
                         {
                             // If the normal was not included, just skip it.
-                            return;
+                            continue;
                         }
                         await WriteFile(res.data, res.indexFilePath, files, null);
                     }
