@@ -322,7 +322,7 @@ namespace xivModdingFramework.Helpers
                     return file;
                 }
             }
-            throw new Exception("Could not resolve data file - Invalid internal FFXIV path.");
+            throw new Exception("Could not resolve data file - Invalid internal FFXIV path: " + path);
         }
 
         /// <summary>
