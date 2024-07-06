@@ -223,6 +223,10 @@ namespace xivModdingFramework.Helpers
         public static async Task UpdateEndwalkerModel(string path, string source, ModTransaction tx, Dictionary<string, FileStorageInformation> files = null)
         {
             var uncomp = await ResolveFile(path, files, tx);
+            if(uncomp == null)
+            {
+                return;
+            }
 
             using (var ms = new MemoryStream(uncomp))
             {
@@ -953,6 +957,10 @@ namespace xivModdingFramework.Helpers
                     // Use slower material import path here to do texture stubbing.
                     await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
                 }
+            } else
+            {
+                var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+                await WriteFile(mtrlData, mtrl.MTRLPath, files, tx, source);
             }
 
             return ret;
@@ -1611,7 +1619,8 @@ namespace xivModdingFramework.Helpers
                         var res = await CreateIndexFromNormal(upgrade.Files["index"], upgrade.Files["normal"], null, files);
                         if (res.data == null)
                         {
-                            throw new InvalidDataException("Failed to create Normal map from Index file");
+                            // If the normal was not included, just skip it.
+                            continue;
                         }
                         await WriteFile(res.data, res.indexFilePath, files, null);
                     }
