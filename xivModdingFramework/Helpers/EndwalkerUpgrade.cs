@@ -987,6 +987,15 @@ namespace xivModdingFramework.Helpers
             var normalTex = XivTex.FromUncompressedTex(oldNormData);
             var maskTex = XivTex.FromUncompressedTex(oldMaskData);
 
+            if(!IOUtil.IsPowerOfTwo(normalTex.Width) || !IOUtil.IsPowerOfTwo(normalTex.Height))
+            {
+                await Tex.ResizeXivTx(normalTex, IOUtil.RoundToPowerOfTwo(normalTex.Width), IOUtil.RoundToPowerOfTwo(normalTex.Height));
+            }
+            if (!IOUtil.IsPowerOfTwo(maskTex.Width) || !IOUtil.IsPowerOfTwo(maskTex.Height))
+            {
+                await Tex.ResizeXivTx(maskTex, IOUtil.RoundToPowerOfTwo(maskTex.Width), IOUtil.RoundToPowerOfTwo(maskTex.Height));
+            }
+
             // Resize to be same size.
             var data = await TextureHelpers.ResizeImages(normalTex, maskTex);
 

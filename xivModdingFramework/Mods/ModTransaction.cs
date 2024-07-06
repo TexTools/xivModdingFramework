@@ -1502,7 +1502,7 @@ namespace xivModdingFramework.Mods
                     // Just add to the batching for later.
                     BatchedNotifications.Add(path, offset8x);
                 }
-                else
+                else if(BatchedNotifications == null)
                 {
                     // Notify the followers of /this/ TX that there was a change.
                     FileChanged?.Invoke(path, offset8x);
