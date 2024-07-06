@@ -558,6 +558,8 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Invalid Mod State.");
             }
 
+            var workerState = XivCache.CacheWorkerEnabled;
+            await XivCache.SetCacheWorkerState(false);
             var boiler = await TxBoiler.BeginWrite(tx);
             tx = boiler.Transaction;
             try
@@ -592,6 +594,10 @@ namespace xivModdingFramework.Mods
             {
                 await boiler.Catch();
                 throw;
+            }
+            finally
+            {
+                await XivCache.SetCacheWorkerState(workerState);
             }
         }
 

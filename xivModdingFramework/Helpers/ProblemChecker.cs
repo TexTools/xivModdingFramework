@@ -416,10 +416,10 @@ namespace xivModdingFramework.Helpers
                 {
                     throw new Exception("Cannot use the game directory as backup directory.");
                 }
+
                 var workerstate = XivCache.CacheWorkerEnabled;
                 await XivCache.SetCacheWorkerState(false);
                 var safeState = XivCache.GameWriteEnabled;
-                XivCache.GameWriteEnabled = true;
                 try
                 {
 
@@ -430,19 +430,19 @@ namespace xivModdingFramework.Helpers
                     List<Mod> enabledMods = new List<Mod>();
                     if (await Modding.AnyModsEnabled(rtx))
                     {
+                        XivCache.GameWriteEnabled = true;
+                        // Have to use a real TX here, which also means we need write access.
+                        if (!Dat.AllowDatAlteration)
+                        {
+                            throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
+                        }
 
-                            // Have to use a real TX here, which also means we need write access.
-                            if (!Dat.AllowDatAlteration)
-                            {
-                                throw new Exception("Cannot disable active mods to create Index Backups with DAT writing disabled.");
-                            }
-
-                            using (var tx = await ModTransaction.BeginTransaction(true))
-                            {
-                                enabledMods = await Modding.GetActiveMods(tx);
-                                await Modding.SetAllModStates(EModState.Disabled, null, tx);
-                                await ModTransaction.CommitTransaction(tx);
-                            }
+                        using (var tx = await ModTransaction.BeginTransaction(true))
+                        {
+                            enabledMods = await Modding.GetActiveMods(tx);
+                            await Modding.SetAllModStates(EModState.Disabled, null, tx);
+                            await ModTransaction.CommitTransaction(tx);
+                        }
                     }
 
                     try
