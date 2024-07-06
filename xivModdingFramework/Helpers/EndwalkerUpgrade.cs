@@ -223,6 +223,10 @@ namespace xivModdingFramework.Helpers
         public static async Task UpdateEndwalkerModel(string path, string source, ModTransaction tx, Dictionary<string, FileStorageInformation> files = null)
         {
             var uncomp = await ResolveFile(path, files, tx);
+            if(uncomp == null)
+            {
+                return;
+            }
 
             using (var ms = new MemoryStream(uncomp))
             {
