@@ -1619,7 +1619,8 @@ namespace xivModdingFramework.Helpers
                         var res = await CreateIndexFromNormal(upgrade.Files["index"], upgrade.Files["normal"], null, files);
                         if (res.data == null)
                         {
-                            throw new InvalidDataException("Failed to create Normal map from Index file");
+                            // If the normal was not included, just skip it.
+                            return;
                         }
                         await WriteFile(res.data, res.indexFilePath, files, null);
                     }
