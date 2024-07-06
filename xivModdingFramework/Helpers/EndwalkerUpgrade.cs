@@ -957,6 +957,10 @@ namespace xivModdingFramework.Helpers
                     // Use slower material import path here to do texture stubbing.
                     await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
                 }
+            } else
+            {
+                var mtrlData = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+                await WriteFile(mtrlData, mtrl.MTRLPath, files, tx, source);
             }
 
             return ret;
