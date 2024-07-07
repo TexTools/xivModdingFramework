@@ -30,8 +30,9 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Tga;
 using Point = SixLabors.ImageSharp.Point;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 
-namespace xivModdingFramework.Helpers
+namespace xivModdingFramework.Mods
 {
     public static class EndwalkerUpgrade
     {
