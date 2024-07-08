@@ -114,7 +114,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public static EModpackType GetModpackType(string path)
         {
-            if (path.EndsWith(".pmp") || path.EndsWith(".json"))
+            if (path.EndsWith(".pmp") || path.EndsWith(".json") || Directory.Exists(path))
             {
                 return EModpackType.Pmp;
             }
