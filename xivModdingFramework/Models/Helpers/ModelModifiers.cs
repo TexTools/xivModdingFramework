@@ -2105,7 +2105,14 @@ namespace xivModdingFramework.Models.Helpers
         }
         public static void FixUpSkinReferences(string modelPath, List<string> materials)
         {
-            var skinRace = XivRaceTree.GetSkinRace(IOUtil.GetRaceFromPath(modelPath));
+            var r = IOUtil.GetRaceFromPath(modelPath);
+            if((int) r <= 100)
+            {
+                // Non-Racial.
+                return;
+            }
+
+            var skinRace = XivRaceTree.GetSkinRace(r);
             var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
 
             var raceRegex = new Regex("(c[0-9]{4})");
