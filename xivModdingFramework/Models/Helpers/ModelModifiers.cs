@@ -40,6 +40,7 @@ namespace xivModdingFramework.Models.Helpers
         public bool ClearVColor { get; set; }
         public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
+        public bool UseImportedTangents { get; set; }
         public XivRace SourceRace { get; set; }
         public XivRace TargetRace { get; set; }
 
@@ -71,6 +72,7 @@ namespace xivModdingFramework.Models.Helpers
             CopyAttributes = true;
             CopyMaterials = true;
             UseOriginalShapeData = false;
+            UseImportedTangents = false;
             ShiftImportUV = true;
             ClearUV2 = false;
             CloneUV2 = false;

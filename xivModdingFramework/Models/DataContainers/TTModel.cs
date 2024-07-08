@@ -1444,6 +1444,19 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.Normal.Y = reader.GetFloat("normal_y");
                             vertex.Normal.Z = reader.GetFloat("normal_z");
 
+                            if (settings.UseImportedTangents)
+                            {
+                                // Binormal
+                                vertex.Binormal.X = reader.GetFloat("binormal_x");
+                                vertex.Binormal.Y = reader.GetFloat("binormal_y");
+                                vertex.Binormal.Z = reader.GetFloat("binormal_z");
+
+                                // Tangent
+                                vertex.Tangent.X = reader.GetFloat("tangent_x");
+                                vertex.Tangent.Y = reader.GetFloat("tangent_y");
+                                vertex.Tangent.Z = reader.GetFloat("tangent_z");
+                            }
+
                             // Vertex Colors - Vertex color is RGBA
                             vertex.VertexColor[0] = (byte)(Math.Round(reader.GetFloat("color_r") * 255));
                             vertex.VertexColor[1] = (byte)(Math.Round(reader.GetFloat("color_g") * 255));
@@ -1790,8 +1803,8 @@ namespace xivModdingFramework.Models.DataContainers
                                 var vIdx = 0;
                                 foreach (var v in p.Vertices)
                                 {
-                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,  color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
-                                                        values    ( $mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
+                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,  color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
+                                                        values    ( $mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b, $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
                                     using (var cmd = new SQLiteCommand(query, db))
                                     {
                                         cmd.Parameters.AddWithValue("part", partIdx);
@@ -1805,6 +1818,14 @@ namespace xivModdingFramework.Models.DataContainers
                                         cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
                                         cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
                                         cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
+
+                                        cmd.Parameters.AddWithValue("binormal_x", v.Binormal.X);
+                                        cmd.Parameters.AddWithValue("binormal_y", v.Binormal.Y);
+                                        cmd.Parameters.AddWithValue("binormal_z", v.Binormal.Z);
+
+                                        cmd.Parameters.AddWithValue("tangent_x", v.Tangent.X);
+                                        cmd.Parameters.AddWithValue("tangent_y", v.Tangent.Y);
+                                        cmd.Parameters.AddWithValue("tangent_z", v.Tangent.Z);
 
                                         cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
                                         cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
@@ -2255,8 +2276,8 @@ namespace xivModdingFramework.Models.DataContainers
                                     var vIdx = 0;
                                     foreach (var v in p.Vertices)
                                     {
-                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
-                                                        values         ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
+                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
+                                                        values         ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
                                         using (var cmd = new SQLiteCommand(query, db))
                                         {
                                             cmd.Parameters.AddWithValue("part", partIdx);
@@ -2270,6 +2291,14 @@ namespace xivModdingFramework.Models.DataContainers
                                             cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
                                             cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
                                             cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
+
+                                            cmd.Parameters.AddWithValue("binormal_x", v.Binormal.X);
+                                            cmd.Parameters.AddWithValue("binormal_y", v.Binormal.Y);
+                                            cmd.Parameters.AddWithValue("binormal_z", v.Binormal.Z);
+
+                                            cmd.Parameters.AddWithValue("tangent_x", v.Tangent.X);
+                                            cmd.Parameters.AddWithValue("tangent_y", v.Tangent.Y);
+                                            cmd.Parameters.AddWithValue("tangent_z", v.Tangent.Z);
 
                                             cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
                                             cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);

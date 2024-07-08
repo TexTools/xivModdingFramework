@@ -38,6 +38,16 @@ CREATE TABLE "vertices" (
 	"normal_x"	REAL NOT NULL,
 	"normal_y"  REAL NOT NULL,
 	"normal_z"	REAL NOT NULL,
+
+	-- Binormal
+	"binormal_x"	REAL,
+	"binormal_y"	REAL,
+	"binormal_z"	REAL,
+	
+	-- Tangent
+	"tangent_x"	REAL,
+	"tangent_y"	REAL,
+	"tangent_z"	REAL,
 	
 	-- Vertex Color
 	"color_r"	REAL NOT NULL,
