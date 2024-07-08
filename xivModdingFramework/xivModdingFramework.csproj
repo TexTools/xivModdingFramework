@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
@@ -7,6 +7,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>9.0</LangVersion>
     <Configurations>Debug;Release;Endwalker Debug;Endwalker Release</Configurations>
+    <OutputPath>..\\bin\\$(Configuration)</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -47,17 +49,10 @@
    <DefineConstants>$(DefineConstants);DAWNTRAIL</DefineConstants>
  </PropertyGroup>
 
- <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Endwalker Debug|AnyCPU'">
-   <DefineConstants>$(DefineConstants);ENDWALKER</DefineConstants>
- </PropertyGroup>
-
  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
    <DefineConstants>$(DefineConstants);DAWNTRAIL</DefineConstants>
  </PropertyGroup>
 
- <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Endwalker Release|AnyCPU'">
-   <DefineConstants>$(DefineConstants);ENDWALKER</DefineConstants>
- </PropertyGroup>
 
   <ItemGroup>
     <Compile Update="Resources\GeneralStrings.Designer.cs">

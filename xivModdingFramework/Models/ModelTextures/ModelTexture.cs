@@ -859,7 +859,8 @@ namespace xivModdingFramework.Models.ModelTextures
                             hairColor *= _BodyFurMultiplier;
 
                             // Blend in hair color/hroth fur
-                            diffuse = Color4.Lerp(diffuse, hairColor, bonusInfluence);
+                            var delta = Math.Min(Math.Max(bonusInfluence - skinInfluence, 0), 1.0f);
+                            diffuse = Color4.Lerp(diffuse, hairColor, delta);
 
                             // Arbitrary darkening to attempt to match hair better.
                         }

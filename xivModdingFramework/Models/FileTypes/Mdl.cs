@@ -1364,9 +1364,9 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var exporters = GetAvailableExporters();
-            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
+            var fileFormat = Path.GetExtension(outputFilePath).Substring(1).ToLower();
             fileFormat = fileFormat.ToLower();
-            if (!exporters.Contains(fileFormat))
+            if (!exporters.Contains(fileFormat) && fileFormat != "mdl")
             {
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
@@ -1396,19 +1396,11 @@ namespace xivModdingFramework.Models.FileTypes
                 return;
             }
 
-            if (!model.IsInternal)
-            {
-                // This isn't *really* true, but there's no case where we are re-exporting TTModel objects
-                // right now without them at least having an internal XIV path associated, so I don't see a need to fuss over this,
-                // since it would be complicated.
-                throw new NotSupportedException("Cannot export non-internal model - Skel data unidentifiable.");
-            }
-
             // The export process could really be sped up by forking threads to do
             // both the bone and material exports at the same time.
 
             // Pop the textures out so the exporters can reference them.
-            if (settings.IncludeTextures)
+            if (settings.IncludeTextures && model.IsInternal)
             {
                 // Fix up our skin references in the model before exporting, to ensure
                 // we supply the right material names to the exporters down-chain.
@@ -1419,8 +1411,15 @@ namespace xivModdingFramework.Models.FileTypes
                 await ExportMaterialsForModel(model, outputFilePath, settings.PbrTextures, mtrlVariant, XivRace.All_Races, tx);
             }
 
+            if(fileFormat == "mdl")
+            {
+                var data = MakeUncompressedMdlFile(model, await Mdl.GetXivMdl(model.Source));
+                File.WriteAllBytes(outputFilePath, data);
+                return;
+            }
 
-            if (settings.ShiftUVs)
+
+            if (settings.ShiftUVs && fileFormat != "mdl" && fileFormat != "db")
             {
                 // This is not a typo.  Because we haven't flipped the UV yet, we need to -1, not +1.
                 ModelModifiers.ShiftImportUV(model);
