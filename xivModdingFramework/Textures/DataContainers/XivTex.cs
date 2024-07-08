@@ -16,6 +16,12 @@
 
 using SharpDX.Direct2D1;
 using SharpDX.DXGI;
+using SharpDX.Toolkit.Graphics;
+using SixLabors.ImageSharp.Formats.Bmp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Formats.Tga;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -27,6 +33,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Textures.Enums;
 using xivModdingFramework.Textures.FileTypes;
 using static xivModdingFramework.Textures.FileTypes.Tex;
+using SixLabors.ImageSharp;
 
 namespace xivModdingFramework.Textures.DataContainers
 {
@@ -167,6 +174,57 @@ namespace xivModdingFramework.Textures.DataContainers
 
             return tex;
 
+        }
+
+        public async Task SaveAs(string externalFilePath)
+        {
+
+            var ext = Path.GetExtension(externalFilePath).ToLower();
+
+            if (ext == ".tex" || ext == ".atex")
+            {
+                File.WriteAllBytes(externalFilePath, ToUncompressedTex());
+                return;
+            }
+            else if (ext == ".dds")
+            {
+                Tex.SaveTexAsDDS(externalFilePath, this);
+                return;
+            }
+
+            IImageEncoder encoder;
+            if (ext == ".bmp")
+            {
+                encoder = new BmpEncoder()
+                {
+                    SupportTransparency = true,
+                    BitsPerPixel = BmpBitsPerPixel.Pixel32
+                };
+            }
+            else if (ext == ".png")
+            {
+                encoder = new PngEncoder()
+                {
+                    BitDepth = PngBitDepth.Bit16
+                };
+            }
+            else
+            {
+                encoder = new TgaEncoder()
+                {
+                    Compression = TgaCompression.None,
+                    BitsPerPixel = TgaBitsPerPixel.Pixel32,
+                };
+            };
+
+            var pixelData = await GetRawPixels();
+            using (var img = SixLabors.ImageSharp.Image.LoadPixelData<Rgba32>(pixelData, Width, Height))
+            {
+                using (var fs = File.OpenWrite(externalFilePath))
+                {
+                    img.Save(fs, encoder);
+                }
+            }
         }
     }
 }

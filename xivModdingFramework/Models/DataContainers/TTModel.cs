@@ -1586,9 +1586,22 @@ namespace xivModdingFramework.Models.DataContainers
                 var bones = useAllBones ? null : Bones;
 
                 var boneDict = new Dictionary<string, SkeletonData>();
-                if (Bones.Count > 0)
+                if (IsInternal && Bones.Count > 0)
                 {
                     boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
+                } else if(Bones.Count > 0)
+                {
+                    var i = 0;
+                    foreach(var bone in Bones)
+                    {
+                        boneDict.Add(bone, new SkeletonData()
+                        {
+                            BoneName = bone,
+                            BoneNumber = i,
+                            BoneParent = 0,
+                        });
+                        i++;
+                    }
                 }
 
                 const string creationScript = "CreateImportDB.sql";

@@ -75,6 +75,10 @@ namespace xivModdingFramework.Cache
         public static async Task InitCacheFromConfig(bool runWorker = false)
         {
             var c = Get();
+            if (string.IsNullOrWhiteSpace(c.XivPath))
+            {
+                throw new ArgumentException("Console Config file does not have a valid FFXIV File path configured.");
+            }
             await XivCache.SetGameInfo(new DirectoryInfo(c.XivPath), c.XivLanguage, runWorker);
         }
     }
