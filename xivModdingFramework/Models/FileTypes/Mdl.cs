@@ -1154,6 +1154,8 @@ namespace xivModdingFramework.Models.FileTypes
                 return materials;
             }
 
+            ModelModifiers.FixUpSkinReferences(mdlPath, materialNames);
+
             var root = await XivCache.GetFirstRoot(mdlPath);
 
             var materialSets = new HashSet<int>();

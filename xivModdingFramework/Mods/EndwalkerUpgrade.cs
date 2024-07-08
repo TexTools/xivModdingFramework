@@ -42,7 +42,8 @@ namespace xivModdingFramework.Mods
         public enum EUpgradeTextureUsage
         {
             IndexMaps,
-            GearMask,
+            GearMaskLegacy,
+            GearMaskNew,
             HairMaps,
         };
 
@@ -550,7 +551,8 @@ namespace xivModdingFramework.Mods
                 if (files == null)
                 {
                     var idInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.IndexMaps);
-                    var maskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMask);
+                    var newMaskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMaskNew);
+                    var legacyMaskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMaskLegacy);
 
                     if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]) &&
                         (await Exists(idInfo.Value.Files["normal"], files, tx, true) || !await Exists(idInfo.Value.Files["index"], files, tx) ))
@@ -581,10 +583,10 @@ namespace xivModdingFramework.Mods
                     }
 
 
-                    if (maskInfo.Key != null && !_ConvertedTextures.Contains(maskInfo.Value.Files["mask_old"]))
+                    if (newMaskInfo.Key != null && !_ConvertedTextures.Contains(newMaskInfo.Value.Files["mask_old"]))
                     {
-                        var maskPathOld = maskInfo.Value.Files["mask_old"];
-                        var maskPathNew = maskInfo.Value.Files["mask_new"];
+                        var maskPathOld = newMaskInfo.Value.Files["mask_old"];
+                        var maskPathNew = newMaskInfo.Value.Files["mask_new"];
 
                         if (await Exists(maskPathOld, files, tx))
                         {
@@ -595,6 +597,32 @@ namespace xivModdingFramework.Mods
                                 {
 
                                     data = await UpgradeMaskTex(data);
+                                    await WriteFile(data, maskPathNew, files, tx, source);
+                                }
+                                else
+                                {
+                                    // Resave the material with texture validation to create dummy textures if none exist.
+                                    await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
+                                }
+                            }
+                            _ConvertedTextures.Add(maskPathNew);
+                        }
+                    }
+
+                    if (legacyMaskInfo.Key != null && !_ConvertedTextures.Contains(legacyMaskInfo.Value.Files["mask_old"]))
+                    {
+                        var maskPathOld = legacyMaskInfo.Value.Files["mask_old"];
+                        var maskPathNew = legacyMaskInfo.Value.Files["mask_new"];
+
+                        if (await Exists(maskPathOld, files, tx))
+                        {
+                            var data = await ResolveFile(maskPathOld, files, tx);
+                            if (files == null)
+                            {
+                                if (data != null)
+                                {
+
+                                    data = await UpgradeMaskTex(data, true);
                                     await WriteFile(data, maskPathNew, files, tx, source);
                                 }
                                 else
@@ -850,24 +878,54 @@ namespace xivModdingFramework.Mods
                 ret.Add(normalPath, idInfo);
             }
 
-            if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
             {
                 var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
                 if (maskSamp != null)
                 {
+                    /*
                     var maskPath = maskSamp.Dx11Path;
-                    maskSamp.TexturePath = maskPath.Replace(".tex", "_dt_mask.tex");
+                    if (maskPath.Contains("_m.tex"))
+                    {
+                        maskPath = maskSamp.Dx11Path.Replace("_m.tex", "_mask.tex");
+                    } else if (maskPath.Contains("_s.tex"))
+                    {
+                        maskPath = maskSamp.Dx11Path.Replace("_s.tex", "_mask.tex");
+                    } else
+                    {
+                        maskPath = maskPath.Replace(".tex", "_dt_mask.tex"); ;
+                    }
+                    */
 
                     var maskInfo = new UpgradeInfo()
                     {
-                        Usage = EUpgradeTextureUsage.GearMask,
+                        Usage = EUpgradeTextureUsage.GearMaskLegacy,
                         Files = new Dictionary<string, string>()
                         {
-                            { "mask_old", maskPath },
-                            { "mask_new", maskPath.Replace(".tex", "_dt_mask.tex") }
+                            { "mask_old", maskSamp.Dx11Path },
+                            { "mask_new", maskSamp.Dx11Path }
                         },
                     };
-                    ret.Add(maskPath, maskInfo);
+                    maskSamp.TexturePath = maskSamp.Dx11Path;
+                    ret.Add(maskSamp.Dx11Path, maskInfo);
+                }
+            }
+            else if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            {
+                var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
+                if (maskSamp != null)
+                {
+                    var maskInfo = new UpgradeInfo()
+                    {
+                        Usage = EUpgradeTextureUsage.GearMaskNew,
+                        Files = new Dictionary<string, string>()
+                        {
+                            { "mask_old", maskSamp.Dx11Path },
+                            { "mask_new", maskSamp.Dx11Path }
+                        },
+                    };
+                    maskSamp.TexturePath = maskSamp.Dx11Path;
+                    ret.Add(maskSamp.Dx11Path, maskInfo);
                 }
             }
 
@@ -1649,12 +1707,22 @@ namespace xivModdingFramework.Mods
                         throw new FileNotFoundException("Unable to upgrade Hair Normal/Mask - Normal and Mask do not exist in the same file set/modpack option.\n" + upgrade.Files["normal"] + "\n" + upgrade.Files["mask"]);
                     }
                 }
-                else if (upgrade.Usage == EUpgradeTextureUsage.GearMask)
+                else if (upgrade.Usage == EUpgradeTextureUsage.GearMaskNew)
                 {
                     if (files.ContainsKey(upgrade.Files["mask_old"])){
 
                         var data = await ResolveFile(upgrade.Files["mask_old"], files, null);
                         data = await UpgradeMaskTex(data);
+                        await WriteFile(data, upgrade.Files["mask_new"], files, null);
+                    }
+                }
+                else if (upgrade.Usage == EUpgradeTextureUsage.GearMaskLegacy)
+                {
+                    if (files.ContainsKey(upgrade.Files["mask_old"]))
+                    {
+
+                        var data = await ResolveFile(upgrade.Files["mask_old"], files, null);
+                        data = await UpgradeMaskTex(data, true);
                         await WriteFile(data, upgrade.Files["mask_new"], files, null);
                     }
                 }
@@ -1850,12 +1918,12 @@ namespace xivModdingFramework.Mods
         }
 
 
-        public static async Task<byte[]> UpgradeMaskTex(byte[] uncompMaskTex)
+        public static async Task<byte[]> UpgradeMaskTex(byte[] uncompMaskTex, bool legacy = false)
         {
             var tex = XivTex.FromUncompressedTex(uncompMaskTex);
             var pixData = await tex.GetRawPixels();
 
-            await TextureHelpers.UpgradeGearMask(pixData, tex.Width, tex.Height);
+            await TextureHelpers.UpgradeGearMask(pixData, tex.Width, tex.Height, legacy);
             var data = await Tex.ConvertToDDS(pixData, XivCache.FrameworkSettings.DefaultTextureFormat, true, tex.Width, tex.Height, true);
             data = Tex.DDSToUncompressedTex(data);
 
