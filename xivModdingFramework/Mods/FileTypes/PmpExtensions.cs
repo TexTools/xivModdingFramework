@@ -303,7 +303,11 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             // We can get a little cheesy here.
             var rGenderSt = race.ToString() + gender.ToString();
-            var rGender = Enum.Parse(typeof(PMPGenderRace), rGenderSt);
+
+            if (race == PMPModelRace.Unknown || !Enum.TryParse<PMPGenderRace>(rGenderSt, out var rGender))
+            {
+                return XivRace.All_Races;
+            }
             var intVal = (int)((ushort)rGender);
 
             // Can just direct cast this now.
