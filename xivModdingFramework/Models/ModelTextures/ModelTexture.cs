@@ -770,12 +770,7 @@ namespace xivModdingFramework.Models.ModelTextures
                             // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
                             specular *= _MetalFloor + (metalness * _MetalMultiplier);
 
-                            if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
-                            {
-                                // As metalness rises, the diffuse becomes specular.
-                                diffusePixel = Color4.Lerp(diffusePixel, specPixel, metalness);
-                            }
-                            else
+                            if(mtrl.ShaderPack != EShaderPack.CharacterLegacy)
                             {
                                 // As metalness rises, the diffuse/specular colors merge.
                                 diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
@@ -785,6 +780,12 @@ namespace xivModdingFramework.Models.ModelTextures
 
                         diffuse *= diffusePixel;
                         specular *= specPixel;
+
+                        if (mtrl.ShaderPack == EShaderPack.CharacterLegacy && !settings.GeneratePbrMaps)
+                        {
+                            // As metalness rises, the diffuse becomes specular.
+                            diffuse = Color4.Lerp(diffuse, specular, metalness);
+                        }
                     }
 
                     if (!settings.GeneratePbrMaps)
