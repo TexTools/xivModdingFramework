@@ -827,7 +827,8 @@ namespace xivModdingFramework.Mods
 
             var rtx = ModTransaction.BeginReadonlyTransaction();
 
-            if (await rtx.FileExists(mtrl.MTRLPath, true))
+            // Only alter to base game path if this is an original material and the calculated path isn't a base game file.
+            if (await rtx.FileExists(mtrl.MTRLPath, true) && !await rtx.FileExists(idPath))
             {
                 var original = await Mtrl.GetXivMtrl(mtrl.MTRLPath, true, rtx);
                 // Material is a default MTRL, steal the index path if it exists.
