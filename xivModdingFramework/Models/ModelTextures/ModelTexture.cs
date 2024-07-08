@@ -673,7 +673,7 @@ namespace xivModdingFramework.Models.ModelTextures
                 // Default 1.0 emissive color for these, since it gets nuked by colorset typically.
                 emissiveColorMul = GetConstColor(mtrl, 0x38A64362, new Color4(1, 1, 1, 1.0f));
 
-                return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     Color4 specular = new Color4(1.0f);
                     var roughness = 0.0f;
                     var metalness = 0.0f;
@@ -695,17 +695,20 @@ namespace xivModdingFramework.Models.ModelTextures
                             {
                                 // Specular/Gloss flow
 
-                                diffuseMask = multi.Red;
-                                specMask = multi.Green;
-                                roughness = 0.5f;
-                                metalness = 1 - multi.Blue;
+                                diffuseMask = mask.Blue;
+                                specMask = mask.Red;
+                                roughness = 1 - mask.Green;
+
+                                // Kind of jank, but works.
+                                metalness = 1 - diffuseMask;
+                                //metalness = 1 - multi.Blue;
 
                             }
                             else
                             {
-                                diffuseMask = multi.Blue;
-                                specMask = multi.Red;
-                                roughness = multi.Green;
+                                diffuseMask = mask.Blue;
+                                specMask = mask.Red;
+                                roughness = mask.Green;
                             }
 
                             if (!settings.GeneratePbrMaps)
@@ -721,7 +724,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                         } else if(hasSpecular)
                         {
-                            specular = multi;
+                            specular = mask;
                         } else
                         {
                             // ???

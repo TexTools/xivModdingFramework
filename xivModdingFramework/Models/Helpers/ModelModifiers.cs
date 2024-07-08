@@ -2103,6 +2103,44 @@ namespace xivModdingFramework.Models.Helpers
             }
 
         }
+        public static void FixUpSkinReferences(string modelPath, List<string> materials)
+        {
+            var skinRace = XivRaceTree.GetSkinRace(IOUtil.GetRaceFromPath(modelPath));
+            var skinRaceString = "c" + XivRaces.GetRaceCode(skinRace);
+
+            var raceRegex = new Regex("(c[0-9]{4})");
+            var bodyRegex = new Regex("(b[0-9]{4})");
+
+            var modelRoot = XivCache.GetFileNameRootInfo(modelPath);
+            bool hairFix = false;
+            XivDependencyRootInfo hairInfo = new XivDependencyRootInfo();
+            if (modelRoot.IsValid() && modelRoot.SecondaryType == Items.Enums.XivItemType.hair)
+            {
+                hairFix = true;
+                hairInfo = Mtrl.GetHairMaterialRoot(modelRoot);
+            }
+
+
+            for(int i =0; i <materials.Count; i++) {
+                var mat = materials[i];
+                if (string.IsNullOrWhiteSpace(mat)) continue;
+
+                // Only fix up -skin- materials.
+                if (SkinMaterialRegex.IsMatch(mat))
+                {
+                    var mtrlMatch = raceRegex.Match(mat);
+                    if (mtrlMatch.Success && mtrlMatch.Groups[1].Value != skinRaceString)
+                    {
+                        materials[i] = mat.Replace(mtrlMatch.Groups[1].Value, skinRaceString);
+                    }
+                }
+
+                if (hairFix)
+                {
+                    materials[i] = mat.Replace(modelRoot.GetBaseFileName(false), hairInfo.GetBaseFileName(false));
+                }
+            }
+        }
 
         public static bool IsSkinMaterial(string path)
         {

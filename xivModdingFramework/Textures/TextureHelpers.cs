@@ -285,12 +285,16 @@ namespace xivModdingFramework.Textures
 
             }, width, height);
         }
-        public static async Task UpgradeGearMask(byte[] maskPixelData, int width, int height)
+        public static async Task UpgradeGearMask(byte[] maskPixelData, int width, int height, bool legacy = false)
         {
             await ModifyPixels((int offset) =>
             {
                 // Take the old gloss/metalness value and invert it.
                 var newRoughness = (byte)(255 - maskPixelData[offset + 2]);
+                if (legacy)
+                {
+                    newRoughness = maskPixelData[offset + 2];
+                }
 
                 // Output is RGBA
 
