@@ -172,6 +172,14 @@ namespace xivModdingFramework.Materials.DataContainers
                     }
                 }
 
+                foreach(EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+                {
+                    var fieldInfo = typeof(EShaderPack).GetField(shpk.ToString());
+                    var descriptionAttributes = (DescriptionAttribute[])fieldInfo.GetCustomAttributes(typeof(DescriptionAttribute), false);
+
+                    StringToShpk.Add(descriptionAttributes[0].Description, shpk);
+                }
+
                 try
                 {
                     const string _dbPath = "./Resources/DB/shader_info.db";
@@ -591,9 +599,17 @@ namespace xivModdingFramework.Materials.DataContainers
 
         };
 
+        private static Dictionary<string, EShaderPack> StringToShpk = new Dictionary<string, EShaderPack>();
+
         public static EShaderPack GetShpkFromString(string s)
         {
-            return GetValueFromDescription<EShaderPack>(s);
+            if(s == null) { return EShaderPack.Unknown; }
+            if(StringToShpk.ContainsKey(s))
+            {
+                return StringToShpk[s];
+            }
+
+            return EShaderPack.Unknown;
         }
 
         public static T GetValueFromDescription<T>(string description) where T : Enum

@@ -554,17 +554,18 @@ namespace xivModdingFramework.Mods
                     var newMaskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMaskNew);
                     var legacyMaskInfo = texInfo.FirstOrDefault(x => x.Value.Usage == EUpgradeTextureUsage.GearMaskLegacy);
 
-                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["normal"]) &&
-                        (await Exists(idInfo.Value.Files["normal"], files, tx, true) || !await Exists(idInfo.Value.Files["index"], files, tx) ))
+                    if (idInfo.Key != null && !_ConvertedTextures.Contains(idInfo.Value.Files["index"]) &&
+                        (await Exists(idInfo.Value.Files["normal"], files, tx, true)))
                     {
                         (string indexFilePath, byte[] data) data = (null, null);
                         try
                         {
                             data = await CreateIndexFromNormal(idInfo.Value.Files["index"], idInfo.Value.Files["normal"], tx, files);
                         }
-                        catch
+                        catch(Exception ex)
                         {
                             // No-Op, Typically a texture sizing error.
+                            Trace.WriteLine(ex);
                         }
 
                         if (files == null)
@@ -579,7 +580,7 @@ namespace xivModdingFramework.Mods
                                 await Mtrl.ImportMtrl(mtrl, null, source, true, tx);
                             }
                         }
-                        _ConvertedTextures.Add(idInfo.Value.Files["normal"]);
+                        _ConvertedTextures.Add(idInfo.Value.Files["index"]);
                     }
 
 
@@ -826,7 +827,8 @@ namespace xivModdingFramework.Mods
 
             var rtx = ModTransaction.BeginReadonlyTransaction();
 
-            if (await rtx.FileExists(mtrl.MTRLPath, true))
+            // Only alter to base game path if this is an original material and the calculated path isn't a base game file.
+            if (await rtx.FileExists(mtrl.MTRLPath, true) && !await rtx.FileExists(idPath))
             {
                 var original = await Mtrl.GetXivMtrl(mtrl.MTRLPath, true, rtx);
                 // Material is a default MTRL, steal the index path if it exists.
@@ -875,7 +877,7 @@ namespace xivModdingFramework.Mods
 
                 mtrl.Textures.Add(tex);
 
-                ret.Add(normalPath, idInfo);
+                ret.Add(idPath, idInfo);
             }
 
             if (mtrl.ShaderPack == EShaderPack.CharacterLegacy)
