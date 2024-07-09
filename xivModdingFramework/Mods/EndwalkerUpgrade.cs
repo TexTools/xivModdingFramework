@@ -992,7 +992,16 @@ namespace xivModdingFramework.Mods
 
             // Arbitrary base game hair file to use to replace our shader constants.
             var constantBase = await Mtrl.GetXivMtrl(_SampleHair, true, tx);
+            var originalConsts = mtrl.ShaderConstants;
             mtrl.ShaderConstants = constantBase.ShaderConstants;
+
+            // Copy the alpha threshold over since the functionality there is unchanged.
+            var alpha = originalConsts.FirstOrDefault(x => x.ConstantId == 0x29AC0223);
+            var alphaDest = mtrl.ShaderConstants.FirstOrDefault(x => x.ConstantId == 0x29AC0223);
+            if (alpha != null && alphaDest != null)
+            {
+                alphaDest.Values = alpha.Values.ToList();
+            }
 
             ret.Add(normalTexSampler.Dx11Path, new UpgradeInfo()
             {
