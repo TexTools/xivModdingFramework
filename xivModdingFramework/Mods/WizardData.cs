@@ -1203,12 +1203,12 @@ namespace xivModdingFramework.Mods
                 var groups = p.Groups.ToList();
                 foreach (var g in groups)
                 {
-                    g.FolderPath = null;
                     if (g == null || !g.HasData)
                     {
                         p.Groups.Remove(g);
                         continue;
                     }
+                    g.FolderPath = null;
 
                     var options = g.Options.ToList();
                     var firstEmpty = false;

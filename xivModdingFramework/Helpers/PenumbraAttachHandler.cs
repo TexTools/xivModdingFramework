@@ -100,7 +100,7 @@ namespace xivModdingFramework.Helpers
 
             if (files == null)
             {
-                throw new Exception("Folder was not a valid Penumbra Mod folder, or the mod had multiple options.");
+                throw new Exception("Folder was not a valid Penumbra Mod folder, or the mod had multiple options.\n\nTarget must be a Penumbra Mod with only one valid option.");
             }
             ModFolder = penumbraModFolder;
 
