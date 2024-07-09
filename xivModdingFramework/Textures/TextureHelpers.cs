@@ -289,25 +289,29 @@ namespace xivModdingFramework.Textures
         {
             await ModifyPixels((int offset) =>
             {
-                // Take the old gloss/metalness value and invert it.
-                var newRoughness = (byte)(255 - maskPixelData[offset + 2]);
-                if (legacy)
+                // Take the old gloss/metalness value and invert it. (GREEN)
+
+                var ao = maskPixelData[offset + 0];
+                var spec = maskPixelData[offset + 2];
+                var gloss = maskPixelData[offset + 1];
+
+                var rough = gloss;
+                if (!legacy)
                 {
-                    newRoughness = maskPixelData[offset + 2];
+                    rough= (byte)(255 - gloss);
                 }
 
                 // Output is RGBA
 
-                var spec = maskPixelData[offset + 1];
-
-                // Mask Blue - Diffuse
-                maskPixelData[offset + 2] = maskPixelData[offset + 0];
 
                 // Mask Red - Specular
                 maskPixelData[offset + 0] = spec;
 
                 // Mask Green - Roughness
-                maskPixelData[offset + 1] = newRoughness;
+                maskPixelData[offset + 1] = rough;
+
+                // Mask Blue - Diffuse
+                maskPixelData[offset + 2] = ao;
 
             }, width, height);
         }
