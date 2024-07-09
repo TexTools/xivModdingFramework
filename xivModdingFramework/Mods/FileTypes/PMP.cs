@@ -130,6 +130,27 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 image = Path.GetFullPath(Path.Combine(path, img));
             }
 
+            var allPmpFiles = new HashSet<string>();
+
+            foreach (var g in groups)
+            {
+                foreach(var o in g.Options)
+                {
+                    var op = o as PmpStandardOptionJson;
+                    if(op != null)
+                    {
+                        foreach(var kv in op.Files)
+                        {
+                            var zipPath = kv.Value;
+                            allPmpFiles.Add(zipPath);
+                        }
+                    }
+                }
+            }
+
+            // Log the unused files that were contained in the PMP.
+            var unusedFiles = IOUtil.GetFilesInFolder(path).Select(x => x.Substring(path.Length + 1).ToLower()).Where(x => !allPmpFiles.Contains(x) && !x.EndsWith(".json")).ToList();
+            pmp.ExtraFiles = new HashSet<string>(unusedFiles);
 
             if (includeImages && !alreadyUnzipped)
             {
@@ -1155,6 +1176,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public PMPMetaJson Meta { get; set; }
         public PMPOptionJson DefaultMod { get; set; }
         public List<PMPGroupJson> Groups { get; set; }
+
+        [JsonIgnore]
+        public HashSet<string> ExtraFiles { get; set; }
 
         public string GetHeaderImage()
         {

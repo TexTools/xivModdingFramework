@@ -123,6 +123,15 @@ namespace xivModdingFramework.Materials.DataContainers
         // Load our Shader Constants and Shader Keys from JSON.
         static ShaderHelpers()
         {
+            foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+            {
+                var fieldInfo = typeof(EShaderPack).GetField(shpk.ToString());
+                var descriptionAttributes = (DescriptionAttribute[])fieldInfo.GetCustomAttributes(typeof(DescriptionAttribute), false);
+
+                StringToShpk.Add(descriptionAttributes[0].Description, shpk);
+            }
+
+
             // Kick this off asynchronously so we don't block.
             Task.Run(LoadShaderInfo);
         }
@@ -170,14 +179,6 @@ namespace xivModdingFramework.Materials.DataContainers
                     {
                         ShaderKeys.Add(shpk, new Dictionary<uint, ShaderKeyInfo>());
                     }
-                }
-
-                foreach(EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
-                {
-                    var fieldInfo = typeof(EShaderPack).GetField(shpk.ToString());
-                    var descriptionAttributes = (DescriptionAttribute[])fieldInfo.GetCustomAttributes(typeof(DescriptionAttribute), false);
-
-                    StringToShpk.Add(descriptionAttributes[0].Description, shpk);
                 }
 
                 try
