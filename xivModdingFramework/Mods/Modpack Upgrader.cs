@@ -131,7 +131,7 @@ namespace xivModdingFramework.Mods
         {
             var data = await UpgradeModpack(path, includePartials);
 
-            await data.WriteModpack(newPath);
+            await data.WriteModpack(newPath, true);
         }
     }
 }

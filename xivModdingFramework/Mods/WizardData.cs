@@ -1033,6 +1033,7 @@ namespace xivModdingFramework.Mods
         public EModpackType ModpackType;
         public ModPack ModPack;
 
+        public Dictionary<string, string> ExtraFiles = new Dictionary<string, string>();
         public bool HasData
         {
             get
@@ -1053,6 +1054,11 @@ namespace xivModdingFramework.Mods
             data.MetaPage = WizardMetaEntry.FromPMP(pmp, unzipPath);
             data.DataPages = new List<WizardPageEntry>();
             data.ModpackType = EModpackType.Pmp;
+
+            foreach(var f in pmp.ExtraFiles)
+            {
+                data.ExtraFiles.Add(f, Path.GetFullPath(Path.Combine(unzipPath, f)));
+            }
 
             var mp = new ModPack(null);
             mp.Author = data.MetaPage.Author;
@@ -1218,11 +1224,11 @@ namespace xivModdingFramework.Mods
 
         }
 
-        public async Task WriteModpack(string targetPath)
+        public async Task WriteModpack(string targetPath, bool saveExtraFiles = false)
         {
             if (targetPath.ToLower().EndsWith(".pmp"))
             {
-                await WritePmp(targetPath);
+                await WritePmp(targetPath, true, saveExtraFiles);
             }
             else if (targetPath.ToLower().EndsWith(".ttmp2"))
             {
@@ -1231,7 +1237,7 @@ namespace xivModdingFramework.Mods
             else if (Directory.Exists(targetPath) || !Path.GetFileName(targetPath).Contains("."))
             {
                 Directory.CreateDirectory(targetPath);
-                await WritePmp(targetPath, false);
+                await WritePmp(targetPath, false, saveExtraFiles);
             }
             else
             {
@@ -1309,7 +1315,7 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        public async Task WritePmp(string targetPath, bool zip = true)
+        public async Task WritePmp(string targetPath, bool zip = true, bool saveExtraFiles = false)
         {
             ClearEmpties();
 
@@ -1326,6 +1332,19 @@ namespace xivModdingFramework.Mods
             {
                 Version.TryParse(MetaPage.Version, out var ver);
                 ver ??= new Version("1.0");
+
+                if (saveExtraFiles && ExtraFiles.Count > 0)
+                {
+                    foreach (var file in ExtraFiles)
+                    {
+                        if (File.Exists(file.Value))
+                        {
+                            var path = Path.GetFullPath(Path.Combine(tempFolder, file.Key));
+                            Directory.CreateDirectory(Path.GetDirectoryName(path));
+                            File.Copy(file.Value, path, true);
+                        }
+                    }
+                }
 
                 pmp.Meta.Name = MetaPage.Name;
                 pmp.Meta.Author = MetaPage.Author;
