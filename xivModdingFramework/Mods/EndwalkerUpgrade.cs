@@ -1932,6 +1932,12 @@ namespace xivModdingFramework.Mods
         public static async Task<byte[]> UpgradeMaskTex(byte[] uncompMaskTex, bool legacy = false)
         {
             var tex = XivTex.FromUncompressedTex(uncompMaskTex);
+
+            if(!IOUtil.IsPowerOfTwo(tex.Width) || !IOUtil.IsPowerOfTwo(tex.Height))
+            {
+                await Tex.ResizeXivTx(tex, IOUtil.RoundToPowerOfTwo(tex.Width), IOUtil.RoundToPowerOfTwo(tex.Height));
+            }
+
             var pixData = await tex.GetRawPixels();
 
             await TextureHelpers.UpgradeGearMask(pixData, tex.Width, tex.Height, legacy);
