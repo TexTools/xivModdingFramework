@@ -218,6 +218,7 @@ namespace xivModdingFramework.Mods
         public string Name { get; set; }
         public string Description { get; set; }
         public string Image { get; set; }
+        internal string FolderPath { get; set; }
 
         public string NoDataIndicator
         {
@@ -552,6 +553,8 @@ namespace xivModdingFramework.Mods
         public string Description;
         public string Image;
 
+        internal string FolderPath;
+
         // Int or Bitflag depending on OptionType.
         public int Selection
         {
@@ -861,7 +864,7 @@ namespace xivModdingFramework.Mods
             return mg;
         }
 
-        public async Task<PMPGroupJson> ToPmpGroup(string tempFolder, string groupPrefix, Dictionary<string, List<FileIdentifier>> identifiers, int page, bool oneOption = false)
+        public async Task<PMPGroupJson> ToPmpGroup(string tempFolder, Dictionary<string, List<FileIdentifier>> identifiers, int page, bool oneOption = false)
         {
             var pg = new PMPGroupJson();
 
@@ -893,7 +896,7 @@ namespace xivModdingFramework.Mods
             foreach (var option in Options)
             {
                 option.Name = option.Name.Trim();
-                var optionPrefix = WizardData.MakeOptionPrefix(groupPrefix, this, option);
+                var optionPrefix = WizardData.MakeOptionPrefix(this, option);
                 var imgName = optionPrefix;
                 if (imgName.Length > 0)
                 {
@@ -921,6 +924,8 @@ namespace xivModdingFramework.Mods
     {
         public string Name;
         public List<WizardGroupEntry> Groups = new List<WizardGroupEntry>();
+
+        public string FolderPath;
 
         public bool HasData
         {
@@ -1188,6 +1193,7 @@ namespace xivModdingFramework.Mods
             var pages = DataPages.ToList();
             foreach (var p in pages)
             {
+                p.FolderPath = null;
                 if (!p.HasData)
                 {
                     DataPages.Remove(p);
@@ -1197,6 +1203,7 @@ namespace xivModdingFramework.Mods
                 var groups = p.Groups.ToList();
                 foreach (var g in groups)
                 {
+                    g.FolderPath = null;
                     if (g == null || !g.HasData)
                     {
                         p.Groups.Remove(g);
@@ -1207,6 +1214,7 @@ namespace xivModdingFramework.Mods
                     var firstEmpty = false;
                     foreach (var o in options)
                     {
+                        o.FolderPath = null;
                         if (!o.HasData)
                         {
                             if (!firstEmpty && g.OptionType == EOptionType.Single)
@@ -1277,42 +1285,100 @@ namespace xivModdingFramework.Mods
 
         private string MakePagePrefix(WizardPageEntry page)
         {
+            if(page.FolderPath != null)
+            {
+                return page.FolderPath;
+            }
+
             var pagePrefix = "";
             if (DataPages.Count > 1)
             {
-                var pIdx = DataPages.IndexOf(page);
+                var pIdx = DataPages.IndexOf(page)+1;
                 pagePrefix = "p" + pIdx + "/";
             }
             else if (page.Groups.Count == 1)
             {
-                return "";
+                pagePrefix = "";
             }
-            return pagePrefix;
+
+            page.FolderPath = pagePrefix;
+            return page.FolderPath;
         }
         private string MakeGroupPrefix(WizardPageEntry page, WizardGroupEntry group)
         {
-            var pagePrefix = MakePagePrefix(page);
-            if (page.Groups.Count == 1)
+            if(group.FolderPath != null)
             {
-                return pagePrefix;
+                return group.FolderPath;
             }
-            var optionPrefix = pagePrefix + IOUtil.MakePathSafe(group.Name) + "/";
-            return optionPrefix;
+
+            var gName = IOUtil.MakePathSafe(group.Name);
+            if (string.IsNullOrWhiteSpace(gName))
+            {
+                gName = "Blank Group";
+            }
+
+            var pagePrefix = MakePagePrefix(page);
+            var prefix = pagePrefix;
+            if (page.Groups.Count > 0 )
+            {
+                prefix = pagePrefix + gName + "/";
+            }
+
+            var groupPrefix = prefix;
+            var i = 1;
+
+            while (page.Groups.Any(x => x.FolderPath == groupPrefix))
+            {
+                groupPrefix = pagePrefix + gName + " (" + i +")/";
+            }
+
+            group.FolderPath = groupPrefix;
+            return groupPrefix;
         }
         private string MakeOptionPrefix(WizardPageEntry page, WizardGroupEntry group, WizardOptionEntry option)
         {
-            return MakeOptionPrefix(MakeGroupPrefix(page, group), group, option);
+            MakeGroupPrefix(page, group);
+            return MakeOptionPrefix(group, option);
         }
-        internal static string MakeOptionPrefix(string groupPrefix, WizardGroupEntry group, WizardOptionEntry option)
+        internal static string MakeOptionPrefix(WizardGroupEntry group, WizardOptionEntry option)
         {
+            if(option.FolderPath != null)
+            {
+                return option.FolderPath;
+            }
+
+            if(group.FolderPath == null)
+            {
+                // Fallback catch for single option write.
+                group.FolderPath = "";
+            }
+
+            var oName = IOUtil.MakePathSafe(option.Name);
+            if (string.IsNullOrWhiteSpace(oName))
+            {
+                oName = "Blank Option";
+            }
+
+            var path = "";
             if (group.Options.Count > 1)
             {
-                return groupPrefix + IOUtil.MakePathSafe(option.Name) + "/";
+                path = group.FolderPath + oName + "/";
             }
             else
             {
-                return groupPrefix;
+                path = group.FolderPath;
             }
+
+            var i = 1;
+            while(group.Options.Any(x => x.FolderPath == path))
+            {
+                path = group.FolderPath + oName + " ("+i+")/";
+                i++;
+            }
+
+            option.FolderPath = path;
+
+            return option.FolderPath;
         }
 
         public async Task WritePmp(string targetPath, bool zip = true, bool saveExtraFiles = false)
@@ -1405,7 +1471,7 @@ namespace xivModdingFramework.Mods
 
                 if (optionCount == 1)
                 {
-                    pmp.DefaultMod = (await DataPages.First(x => x.Groups.Count > 0).Groups.First(x => x.Options.Count > 0).ToPmpGroup(tempFolder, "", identifiers, 0, true)).Options[0];
+                    pmp.DefaultMod = (await DataPages.First(x => x.Groups.Count > 0).Groups.First(x => x.Options.Count > 0).ToPmpGroup(tempFolder, identifiers, 0, true)).Options[0];
                 }
                 else
                 {
@@ -1417,7 +1483,7 @@ namespace xivModdingFramework.Mods
                         foreach (var g in p.Groups)
                         {
                             var gPrefix = MakeGroupPrefix(p, g);
-                            var pg = await g.ToPmpGroup(tempFolder, gPrefix, identifiers, page);
+                            var pg = await g.ToPmpGroup(tempFolder, identifiers, page);
                             pmp.Groups.Add(pg);
                         }
                         page++;

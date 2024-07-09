@@ -1433,9 +1433,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw new InvalidDataException("Cannot get hair material info for non-hair root.");
             }
 
-            if(root.PrimaryId == 1601)
+            if(root.PrimaryId == 1601 || root.PrimaryId == 1501)
             {
-                // Hrothgar F never share hair materials.
+                // Hrothgar never share hair materials.
                 return root;
             }
 
