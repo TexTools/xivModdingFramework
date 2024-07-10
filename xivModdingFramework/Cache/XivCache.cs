@@ -1003,7 +1003,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         private static async Task BuildModdedItemDependencies(ModTransaction tx = null)
         {
-            if(tx == null)
+            if (tx == null)
             {
                 tx = ModTransaction.BeginReadonlyTransaction();
             }
@@ -2274,41 +2274,49 @@ namespace xivModdingFramework.Cache
                     db.Close();
                 }
 
-                // Now connect to the root cache and inject our roots.
-                using (var db = new SQLiteConnection(RootsCacheConnectionString))
+                try
                 {
-                    db.BusyTimeout = 3;
-                    db.Open();
-
-
-                    using (var transaction = db.BeginTransaction())
+                    // Now connect to the root cache and inject our roots.
+                    using (var db = new SQLiteConnection(RootsCacheConnectionString))
                     {
-                        HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
-                        var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
-                        using (var cmd = new SQLiteCommand(query, db))
+                        db.BusyTimeout = 3;
+                        db.Open();
+
+
+                        using (var transaction = db.BeginTransaction())
                         {
-                            foreach (var file in files)
+                            HashSet<XivDependencyRootInfo> roots = new HashSet<XivDependencyRootInfo>();
+                            var query = "insert into roots (primary_type, primary_id, secondary_type, secondary_id, slot, root_path) values ($primary_type, $primary_id, $secondary_type, $secondary_id, $slot, $root_path) on conflict do nothing;";
+                            using (var cmd = new SQLiteCommand(query, db))
                             {
-                                var root = XivDependencyGraph.ExtractRootInfo(file);
-                                if (root == null || root.PrimaryId < 0)
+                                foreach (var file in files)
                                 {
-                                    continue;
+                                    var root = XivDependencyGraph.ExtractRootInfo(file);
+                                    if (root == null || root.PrimaryId < 0)
+                                    {
+                                        continue;
+                                    }
+                                    if (roots.Contains(root))
+                                        continue;
+
+                                    var fullRoot = XivDependencyGraph.CreateDependencyRoot(root);
+                                    if (fullRoot == null)
+                                        continue;
+
+                                    roots.Add(root);
+                                    XivCache.CacheRoot(root, cmd);
                                 }
-                                if (roots.Contains(root))
-                                    continue;
-
-                                var fullRoot = XivDependencyGraph.CreateDependencyRoot(root);
-                                if (fullRoot == null)
-                                    continue;
-
-                                roots.Add(root);
-                                XivCache.CacheRoot(root, cmd);
                             }
+                            transaction.Commit();
                         }
-                        transaction.Commit();
+                        db.Close();
                     }
-                    db.Close();
+                } catch(Exception ex)
+                {
+                    // This is a non-critical error.
+                    Trace.Write(ex);
                 }
+
             } catch(Exception ex)
             {
                 throw new CacheException(ex);
