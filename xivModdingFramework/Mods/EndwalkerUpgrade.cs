@@ -671,10 +671,27 @@ namespace xivModdingFramework.Mods
             if (mtrl.ShaderPack == EShaderPack.Character)
             {
                 mtrl.ShaderPack = EShaderPack.CharacterLegacy;
+
             }
             else
             {
                 // Don't need to change the shaderpack for anything else here.
+            }
+
+            foreach (var tex in mtrl.Textures)
+            {
+                if ((tex.Flags & 0x8000) != 0)
+                {
+                    var path = tex.Dx11Path;
+                    // DX9 textures are no longer used/supported in Endwalker,
+                    // And can sometimes cause issues here, so just turn the flag off.
+                    unchecked
+                    {
+                        tex.Flags &= (ushort)(~0x8000);
+                    }
+
+                    tex.TexturePath = path;
+                }
             }
 
             mtrl.AdditionalData = new byte[] { 0x34, 0x05, 0, 0, };
