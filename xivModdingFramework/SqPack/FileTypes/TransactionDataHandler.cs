@@ -735,7 +735,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Use the Transaction's current modpack settings if it has any set.
             Version.TryParse(tx.ModPack == null ? "1.0" : tx.ModPack.Value.Version, out var ver);
 
-            simplePack.Name = tx.ModPack == null ? "Transaction Modpack" : tx.ModPack.Value.Name;
+            simplePack.Name = tx.ModPack == null ? Path.GetFileNameWithoutExtension(settings.TargetPath) : tx.ModPack.Value.Name;
             simplePack.Author = tx.ModPack == null ? "Unknown" : tx.ModPack.Value.Author;
             simplePack.Version = ver == null ? new Version("1.0") : ver;
             simplePack.SimpleModDataList = new List<SimpleModData>();
