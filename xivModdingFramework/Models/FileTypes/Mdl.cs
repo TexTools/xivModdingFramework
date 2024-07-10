@@ -543,6 +543,11 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     var totalMeshCount = xivMdl.LoDList[i].TotalMeshCount;
 
+                    if(meshCount < totalMeshCount)
+                    {
+                        totalMeshCount = meshCount;
+                    }
+
 
                     for (var j = 0; j < totalMeshCount; j++)
                     {
@@ -674,11 +679,11 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.AttrDataBlock = attributeDataBlock;
 
                 // Terrain Shadow Meshes
-                var unkData1 = new UnknownData1
+                var shadowMeshData = new TerrainShadowMeshData
                 {
-                    //Unknown = br.ReadBytes(TerrainShadowMeshCount * 20)
+                    TerrainShadowMeshHeader = br.ReadBytes(xivMdl.LoDList[0].MeshTypes[EMeshType.TerrainShadow].Count * 20)
                 };
-                xivMdl.UnkData1 = unkData1;
+                xivMdl.UnkData1 = shadowMeshData;
                 #endregion
 
                 #region Mesh Part Headers
@@ -3089,7 +3094,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Unknown Data 1
                 #region Unknown Data Block 1
 
-                var unknownDataBlock1 = ogMdl.UnkData1.Unknown;
+                var unknownDataBlock1 = ogMdl.UnkData1.TerrainShadowMeshHeader;
 
                 #endregion
 

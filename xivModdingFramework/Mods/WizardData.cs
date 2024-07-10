@@ -1187,6 +1187,39 @@ namespace xivModdingFramework.Mods
             return data;
         }
 
+        public void ClearNulls()
+        {
+            var pages = DataPages.ToList();
+            foreach (var p in pages)
+            {
+                p.FolderPath = null;
+                if (!p.HasData)
+                {
+                    DataPages.Remove(p);
+                    continue;
+                }
+
+                var groups = p.Groups.ToList();
+                foreach (var g in groups)
+                {
+                    if (g == null || !g.HasData)
+                    {
+                        p.Groups.Remove(g);
+                        continue;
+                    }
+                    g.FolderPath = null;
+
+                    var options = g.Options.ToList();
+                    foreach (var o in options)
+                    {
+                        if (o == null)
+                        {
+                            g.Options.Remove(o);
+                        }
+                    }
+                }
+            }
+        }
 
         public void ClearEmpties()
         {
@@ -1254,6 +1287,7 @@ namespace xivModdingFramework.Mods
         }
         public async Task WriteWizardPack(string targetPath)
         {
+            ClearNulls();
             Version.TryParse(MetaPage.Version, out var ver);
 
             ver ??= new Version("1.0");
@@ -1381,6 +1415,7 @@ namespace xivModdingFramework.Mods
 
         public async Task WritePmp(string targetPath, bool zip = true, bool saveExtraFiles = false)
         {
+            ClearNulls();
             var pmp = new PMPJson()
             {
                 DefaultMod = new PMPOptionJson(),
@@ -1403,7 +1438,7 @@ namespace xivModdingFramework.Mods
                         {
                             var path = Path.GetFullPath(Path.Combine(tempFolder, file.Key));
                             Directory.CreateDirectory(Path.GetDirectoryName(path));
-                            File.Copy(file.Value, path, true);
+                            File.Copy(IOUtil.MakeLongPath(file.Value), IOUtil.MakeLongPath(path), true);
                         }
                     }
                 }

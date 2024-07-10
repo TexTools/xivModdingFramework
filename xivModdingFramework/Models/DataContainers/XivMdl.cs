@@ -63,7 +63,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Currently unknown data
         /// </summary>
-        public UnknownData1 UnkData1 { get; set; }
+        public TerrainShadowMeshData UnkData1 { get; set; }
 
         /// <summary>
         /// Currently unknown data

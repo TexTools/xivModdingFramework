@@ -30,7 +30,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshTypes.Sum(x => x.Value.Count);
+                return MeshTypes.Sum(x => x.Key == EMeshType.TerrainShadow ? 0 :  x.Value.Count);
             }
         }
 

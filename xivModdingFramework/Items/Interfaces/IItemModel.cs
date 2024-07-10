@@ -15,8 +15,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
+using System.IO;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Resources;
 
@@ -33,6 +36,83 @@ namespace xivModdingFramework.Items.Interfaces
         public XivModelInfo ModelInfo { get; set; }
 
         public uint IconId { get; set; }
+    }
+
+    public class SimpleItemModel : IItemModel, ICloneable
+    {
+        public SimpleItemModel(string path) : base() {
+            ModelPath = path;
+            ModelInfo = new XivModelInfo();
+        }
+
+        public XivModelInfo ModelInfo { get; set; }
+        public uint IconId { get; set; }
+        public string Name
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(ModelPath))
+                {
+                    return "Unknown";
+
+                }
+                return Path.GetFileName(ModelPath);
+            }
+            set
+            {
+                // No-Op.
+            }
+        }
+        public string PrimaryCategory { get; set; } = "Unknown";
+        public string SecondaryCategory
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(ModelPath))
+                {
+                    return "Unknown";
+
+                }
+                return Path.GetFileName(ModelPath);
+            } 
+            set
+            {
+                // No-Op.
+            }
+        }
+        public string TertiaryCategory { get; set; }
+        public XivDataFile DataFile {
+            get {
+                return IOUtil.GetDataFileFromPath(ModelPath);
+            }
+        }
+
+
+        public string ModelPath { get; set; }
+
+        public object Clone()
+        {
+            var im = (SimpleItemModel)MemberwiseClone();
+            im.ModelInfo = (XivModelInfo) ModelInfo.Clone();
+            return im;
+        }
+
+        public int CompareTo(object obj)
+        {
+            var sm = obj as SimpleItemModel;
+            if (sm == null) return -1;
+            return ModelPath.CompareTo(sm.ModelPath);
+        }
+
+        public string GetModlistItemCategory()
+        {
+            return PrimaryCategory;
+        }
+
+        public string GetModlistItemName()
+        {
+            return SecondaryCategory;
+        }
     }
 
     public static class IItemModelExtensions
