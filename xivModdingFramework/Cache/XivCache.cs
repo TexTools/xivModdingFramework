@@ -75,7 +75,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.3.0");
+        public static readonly Version CacheVersion = new Version("1.0.3.1");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -744,8 +744,8 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root) 
-                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root)
+                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root,  icon) 
+                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root, $icon)
                             on conflict do nothing";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
@@ -757,6 +757,7 @@ namespace xivModdingFramework.Cache
                                 cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
                                 cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                                 cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
+                                cmd.Parameters.AddWithValue("icon", item.IconId);
                                 cmd.Parameters.AddWithValue("model_type", ((XivMonsterModelInfo)item.ModelInfo).ModelType.ToString());
                                 if (root.IsValid())
                                 {
@@ -801,8 +802,8 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root) 
-                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root)
+                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root,  icon) 
+                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root, $icon)
                             on conflict do nothing";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
@@ -814,6 +815,7 @@ namespace xivModdingFramework.Cache
                                 cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
                                 cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                                 cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
+                                cmd.Parameters.AddWithValue("icon", item.IconId);
                                 cmd.Parameters.AddWithValue("model_type", ((XivMonsterModelInfo)item.ModelInfo).ModelType.ToString());
                                 if (root.IsValid())
                                 {
@@ -859,8 +861,8 @@ namespace xivModdingFramework.Cache
                     {
 
                         var query = @"
-                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root) 
-                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root)
+                            insert into monsters ( name,  category,  primary_id,  secondary_id,  imc_variant,  model_type,  root,  icon) 
+                                           values($name, $category, $primary_id, $secondary_id, $imc_variant, $model_type, $root, $icon)
                             on conflict do nothing";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
@@ -871,6 +873,7 @@ namespace xivModdingFramework.Cache
                                 cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
                                 cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
                                 cmd.Parameters.AddWithValue("category", item.SecondaryCategory);
+                                cmd.Parameters.AddWithValue("icon", item.IconId);
                                 cmd.Parameters.AddWithValue("model_type", ((XivMonsterModelInfo)item.ModelInfo).ModelType.ToString());
                                 if (root.IsValid())
                                 {
@@ -1272,6 +1275,7 @@ namespace xivModdingFramework.Cache
                     PrimaryCategory = XivStrings.Companions,
                     SecondaryCategory = reader.GetString("category"),
                     Name = reader.GetString("name"),
+                    IconId = (uint) reader.GetInt32("icon"),
                     ModelInfo = new XivMonsterModelInfo
                     {
                         ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
@@ -1306,6 +1310,7 @@ namespace xivModdingFramework.Cache
                     PrimaryCategory = XivStrings.Companions,
                     SecondaryCategory = reader.GetString("category"),
                     Name = reader.GetString("name"),
+                    IconId = (uint)reader.GetInt32("icon"),
                     ModelInfo = new XivMonsterModelInfo
                     {
                         ModelType = (XivItemType)Enum.Parse(typeof(XivItemType), reader.GetString("model_type")),
