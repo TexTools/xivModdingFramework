@@ -16,7 +16,7 @@
 
 namespace xivModdingFramework.Models.DataContainers
 {
-    public class UnknownData1
+    public class TerrainShadowMeshData
     {
         /// <summary>
         /// This data block is currently unknown
@@ -24,6 +24,6 @@ namespace xivModdingFramework.Models.DataContainers
         /// <remarks>
         /// The size of this unknown data block is [ MdlModelData.Unknown3 * 20 ]
         /// </remarks>
-        public byte[] Unknown { get; set; }
+        public byte[] TerrainShadowMeshHeader { get; set; }
     }
 }
