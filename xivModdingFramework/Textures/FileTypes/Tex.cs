@@ -251,15 +251,14 @@ namespace xivModdingFramework.Textures.FileTypes
                 return new List<string>();
             }
 
-            var iconString = iconId.ToString();
+            var baseNum = (iconId / 1000) * 1000;
+            var iconString = baseNum.ToString();
 
             var ttpList = new List<string>();
 
-
-            var iconBaseNum = iconString.Substring(0, 2).PadRight(iconString.Length, '0');
-            var iconFolder = $"ui/icon/{iconBaseNum.PadLeft(6, '0')}";
+            var iconFolder = $"ui/icon/{baseNum.ToString("D6")}";
             var iconHQFolder = $"{iconFolder}/hq";
-            var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
+            var iconFile = $"{iconId.ToString("D6")}.tex";
 
             var path = iconFolder + "/" + iconFile;
             if (await tx.FileExists(path))
@@ -1155,7 +1154,15 @@ namespace xivModdingFramework.Textures.FileTypes
                 Mode = ResizeMode.Stretch,
             };
 
-            if (externalFile.ToLower().EndsWith(".dds"))
+            if (externalFile.ToLower().EndsWith(".tex"))
+            {
+                var data = File.ReadAllBytes(externalFile);
+                var tex = XivTex.FromUncompressedTex(data);
+                var pix = await tex.GetRawPixels();
+
+                return (pix, tex.Width, tex.Height);
+            }
+            else if (externalFile.ToLower().EndsWith(".dds"))
             {
 
                 // We could have functions somewhere to just raw read the DDS tex data, but this is a 
