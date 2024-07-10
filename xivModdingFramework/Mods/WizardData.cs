@@ -1403,7 +1403,7 @@ namespace xivModdingFramework.Mods
                         {
                             var path = Path.GetFullPath(Path.Combine(tempFolder, file.Key));
                             Directory.CreateDirectory(Path.GetDirectoryName(path));
-                            File.Copy(file.Value, path, true);
+                            File.Copy(IOUtil.MakeLongPath(file.Value), IOUtil.MakeLongPath(path), true);
                         }
                     }
                 }

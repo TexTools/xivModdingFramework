@@ -704,19 +704,33 @@ namespace xivModdingFramework.Helpers
         }
         public static void CopyFolder(string sourcePath, string targetPath)
         {
+            sourcePath = MakeLongPath(sourcePath);
+            targetPath = MakeLongPath(targetPath);
+
             Directory.CreateDirectory(targetPath);
 
             //Now Create all of the directories
             foreach (string dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
             {
-                Directory.CreateDirectory(dirPath.Replace(sourcePath, targetPath));
+                var dir = MakeLongPath(dirPath);
+                Directory.CreateDirectory(dir.Replace(sourcePath, targetPath));
             }
 
             //Copy all the files & Replaces any files with the same name
             foreach (string newPath in Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories))
             {
-                File.Copy(newPath, newPath.Replace(sourcePath, targetPath), true);
+                var path = MakeLongPath(newPath);
+                File.Copy(path, newPath.Replace(sourcePath, targetPath), true);
             }
+        }
+
+        public static string MakeLongPath(string path)
+        {
+            if (!path.StartsWith("\\\\?\\"))
+            {
+                path = "\\\\?\\" + path;
+            }
+            return path;
         }
 
         public static byte[] GetImageSharpPixels(Image<Bgra32> img)
