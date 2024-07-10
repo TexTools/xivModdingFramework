@@ -298,7 +298,13 @@ namespace xivModdingFramework.Textures
                 var rough = gloss;
                 if (!legacy)
                 {
-                    rough= (byte)(255 - gloss);
+                    rough = (byte)(255 - gloss);
+
+                    // Game does not like Roughness 0.
+                    if(rough == 0)
+                    {
+                        rough = 1;
+                    }
                 }
 
                 // Output is RGBA

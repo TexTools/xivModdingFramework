@@ -1254,8 +1254,6 @@ namespace xivModdingFramework.Mods
         }
         public async Task WriteWizardPack(string targetPath)
         {
-            ClearEmpties();
-
             Version.TryParse(MetaPage.Version, out var ver);
 
             ver ??= new Version("1.0");
@@ -1383,8 +1381,6 @@ namespace xivModdingFramework.Mods
 
         public async Task WritePmp(string targetPath, bool zip = true, bool saveExtraFiles = false)
         {
-            ClearEmpties();
-
             var pmp = new PMPJson()
             {
                 DefaultMod = new PMPOptionJson(),
