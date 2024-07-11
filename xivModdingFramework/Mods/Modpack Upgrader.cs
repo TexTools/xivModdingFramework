@@ -218,10 +218,13 @@ namespace xivModdingFramework.Mods
             // Get all texture pairs.
             foreach (var p in data.DataPages)
             {
+                if (p == null) continue;
                 foreach (var g in p.Groups)
                 {
+                    if (g == null) continue;
                     foreach (var o in g.Options)
                     {
+                        if (o == null) continue;
                         if (o.StandardData == null) continue;
 
                         foreach (var f in o.StandardData.Files)
@@ -238,10 +241,13 @@ namespace xivModdingFramework.Mods
             // Get all texture pairs.
             foreach (var p in data.DataPages)
             {
+                if (p == null) continue;
                 foreach (var g in p.Groups)
                 {
+                    if (g == null) continue;
                     foreach (var o in g.Options)
                     {
+                        if (o == null) continue;
                         if (o.StandardData == null) continue;
                         await act(o.StandardData);
                     }
