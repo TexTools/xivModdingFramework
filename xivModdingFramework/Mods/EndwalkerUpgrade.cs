@@ -429,13 +429,20 @@ namespace xivModdingFramework.Mods
                     continue;
                 }
 
-                var mtrl = Mtrl.GetXivMtrl(file, path);
-                if (!DoesMtrlNeedDawntrailUpdate(mtrl))
+                try
+                {
+                    var mtrl = Mtrl.GetXivMtrl(file, path);
+                    if (!DoesMtrlNeedDawntrailUpdate(mtrl))
+                    {
+                        continue;
+                    }
+
+                    materials.Add(mtrl);
+                }
+                catch
                 {
                     continue;
                 }
-
-                materials.Add(mtrl);
             }
 
             total = materials.Count;
