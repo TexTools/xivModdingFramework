@@ -51,6 +51,8 @@ namespace xivModdingFramework.Models.Helpers
 
         public string SourceApplication { get; set; }
 
+        public bool ClearEmptyMeshData { get; set; }
+
         /// <summary>
         /// Logging output function.
         /// </summary>
@@ -86,6 +88,7 @@ namespace xivModdingFramework.Models.Helpers
             IntermediaryFunction = null;
             SourceApplication = "Unknown";
             ReferenceItem = null;
+            ClearEmptyMeshData = false;
         }
 
 
@@ -195,6 +198,22 @@ namespace xivModdingFramework.Models.Helpers
 
                 var oldModel = TTModel.FromRaw(originalMdl);
                 ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, LoggingFunction);
+            }
+
+            if (ClearEmptyMeshData)
+            {
+                var firstMesh = ttModel.MeshGroups.FirstOrDefault(x => x.GetVertexCount() > 0);
+                if (firstMesh != null)
+                {
+                    var firstMat = firstMesh.Material;
+                    foreach (var m in ttModel.MeshGroups)
+                    {
+                        if(m.VertexCount == 0)
+                        {
+                            m.Material = firstMat;
+                        }
+                    }
+                }
             }
 
             // Ensure shape data is updated with our various changes.
