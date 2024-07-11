@@ -11,6 +11,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Materials.DataContainers;
 using static xivModdingFramework.Mods.EndwalkerUpgrade;
+using System.Text.RegularExpressions;
 
 namespace xivModdingFramework.Mods
 {
@@ -354,26 +355,30 @@ namespace xivModdingFramework.Mods
 
         private static async Task RepathHairMashups(WizardData data)
         {
-            await RepathHairMashups(data, EndwalkerUpgrade.HairRegexes);
-            await RepathHairMashups(data, EndwalkerUpgrade.TailRegexes);
-            await RepathHairMashups(data, EndwalkerUpgrade.EarRegexes);
-            await RepathHairMashups(data, EndwalkerUpgrade.AccessoryRegexes);
+            await RepathHairMashups(data, new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair.*\\.mtrl"));
+            await RepathHairMashups(data, new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/zear.*\\.mtrl"));
+            await RepathHairMashups(data, new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/tail.*\\.mtrl"));
         }
-        private static async Task RepathHairMashups(WizardData data, HairRegexSet set)
+        private static async Task RepathHairMashups(WizardData data, Regex mtrlRegex)
         {
             // Need this for validating paths.
             var rtx = ModTransaction.BeginReadonlyTransaction();
 
             await ForAllOptions(data, async (o) =>
             {
-
-                foreach(var f in o.Files)
+                var files = new Dictionary<string, FileStorageInformation>(o.Files);
+                foreach(var f in files)
                 {
-                    if (!set.MaterialRegex.IsMatch(f.Key)) continue;
+                    if (!mtrlRegex.IsMatch(f.Key)) continue;
 
                     var m = f.Key;
-                    var data = await TransactionDataHandler.GetUncompressedFile(o.Files[m]);
+                    var data = await TransactionDataHandler.GetUncompressedFile(files[m]);
                     var mtrl = Mtrl.GetXivMtrl(data, m);
+
+                    if(mtrl.ShaderPack != ShaderHelpers.EShaderPack.Hair && mtrl.ShaderPack != ShaderHelpers.EShaderPack.Character)
+                    {
+                        continue;
+                    }
 
                     var norm = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ShaderHelpers.ESamplerId.g_SamplerNormal);
                     var mask = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ShaderHelpers.ESamplerId.g_SamplerMask);
@@ -381,45 +386,45 @@ namespace xivModdingFramework.Mods
 
                     if (norm == null || mask == null) continue;
                     var nPath = norm.Dx11Path;
-                    var mPath = norm.Dx11Path;
+                    var mPath = mask.Dx11Path;
 
                     if (!await rtx.FileExists(nPath, true))
                     {
-                        var newPath = nPath.Replace("_n.tex", "_norm.tex");
+                        var newPath = nPath.Replace("_n.tex", "_norm.tex").Replace("--","");
                         if(await rtx.FileExists(newPath, true))
                         {
-                            norm.TexturePath = norm.TexturePath.Replace("_n.tex", "_norm.tex");
+                            norm.TexturePath = norm.TexturePath.Replace("_n.tex", "_norm.tex").Replace("--", "");
                         }
                     }
 
                     if (!await rtx.FileExists(mPath, true))
                     {
-                        var newPath = mPath.Replace("_m.tex", "_mask.tex");
+                        var newPath = mPath.Replace("_m.tex", "_mask.tex").Replace("--", "");
                         var found = false;
                         if (await rtx.FileExists(newPath, true) && !found)
                         {
-                            mask.TexturePath = mask.TexturePath.Replace("_m.tex", "_mask.tex");
+                            mask.TexturePath = mask.TexturePath.Replace("_m.tex", "_mask.tex").Replace("--", "");
                             found = true;
                         }
 
-                        newPath = mPath.Replace("_m.tex", "_mult.tex");
+                        newPath = mPath.Replace("_m.tex", "_mult.tex").Replace("--", "");
                         if (await rtx.FileExists(newPath, true) && !found)
                         {
-                            mask.TexturePath = mask.TexturePath.Replace("_m.tex", "_mult.tex");
+                            mask.TexturePath = mask.TexturePath.Replace("_m.tex", "_mult.tex").Replace("--", "");
                             found = true;
                         }
 
-                        newPath = mPath.Replace("_s.tex", "_mask.tex");
+                        newPath = mPath.Replace("_s.tex", "_mask.tex").Replace("--", "");
                         if (await rtx.FileExists(newPath, true) && !found)
                         {
-                            mask.TexturePath = mask.TexturePath.Replace("_s.tex", "_mask.tex");
+                            mask.TexturePath = mask.TexturePath.Replace("_s.tex", "_mask.tex").Replace("--", "");
                             found = true;
                         }
 
-                        newPath = mPath.Replace("_s.tex", "_mult.tex");
+                        newPath = mPath.Replace("_s.tex", "_mult.tex").Replace("--", "");
                         if (await rtx.FileExists(newPath, true) && !found)
                         {
-                            mask.TexturePath = mask.TexturePath.Replace("_s.tex", "_mult.tex");
+                            mask.TexturePath = mask.TexturePath.Replace("_s.tex", "_mult.tex").Replace("--", "");
                             found = true;
                         }
                     }
@@ -427,13 +432,28 @@ namespace xivModdingFramework.Mods
                     if(diff != null && !await rtx.FileExists(diff.Dx11Path))
                     {
                         var dPath = diff.Dx11Path;
-                        var newPath = dPath.Replace("_d.tex", "_base.tex");
+                        var newPath = dPath.Replace("_d.tex", "_base.tex").Replace("--", "");
                         if (await rtx.FileExists(newPath, true))
                         {
-                            diff.TexturePath = diff.TexturePath.Replace("_d.tex", "_base.tex");
+                            diff.TexturePath = diff.TexturePath.Replace("_d.tex", "_base.tex").Replace("--", "");
                         }
                     }
 
+
+                    data = Mtrl.XivMtrlToUncompressedMtrl(mtrl);
+
+                    var path = IOUtil.GetFrameworkTempFile();
+                    File.WriteAllBytes(path, data);
+
+                    var info = new FileStorageInformation()
+                    {
+                        FileSize = data.Length,
+                        RealOffset = 0,
+                        RealPath = path,
+                        StorageType = EFileStorageType.UncompressedIndividual
+                    };
+
+                    o.Files[m] = info;
                 }
             });
         }
