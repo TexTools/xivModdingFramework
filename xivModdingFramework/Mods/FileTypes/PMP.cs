@@ -149,7 +149,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
 
             // Log the unused files that were contained in the PMP.
-            var unusedFiles = IOUtil.GetFilesInFolder(path).Select(x => x.Substring(path.Length + 1).ToLower()).Where(x => !allPmpFiles.Contains(x) && !x.EndsWith(".json")).ToList();
+            var unusedFiles = IOUtil.GetFilesInFolder(path).Select(x => x.Substring(path.Length + 1).ToLower()).Where(x => !allPmpFiles.Contains(x) && !IsPmpJsonFile(x)).ToList();
             pmp.ExtraFiles = new HashSet<string>(unusedFiles);
 
             if (includeImages && !alreadyUnzipped)
@@ -163,6 +163,21 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
 
             return (pmp, path, image);
+        }
+
+        private static bool IsPmpJsonFile(string file)
+        {
+            var name = Path.GetFileName(file).ToLower();
+            if (name.EndsWith(".json"))
+            {
+                if (name == "meta.json"
+                    || name == "default_mod.json"
+                    || name.StartsWith("group_"))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

@@ -64,6 +64,7 @@ CREATE TABLE "monsters" (
 	"name" TEXT NOT NULL,
 	"category" TEXT NOT NULL,
 	"primary_id"	INTEGER NOT NULL,
+	"icon"	INTEGER NOT NULL,
 	"secondary_id"	INTEGER NOT NULL,
 	"imc_variant"	INTEGER NOT NULL,
 	"model_type" TEXT NOT NULL,
