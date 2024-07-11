@@ -445,12 +445,12 @@ namespace xivModdingFramework.Exd.FileTypes
             {
                 if(column >= Columns.Count)
                 {
-                    throw new InvalidDataException(ExFile.ToString() + " Column " + column + " (" + name + ") is larger than the available column count.");
+                    throw new InvalidDataException("EX Table did not match expectations: " + ExFile.ToString() + " Column " + column + " (" + name + ") is larger than the available column count.");
                 }
 
                 if (Columns[column].Type != expectedType)
                 {
-                    throw new InvalidDataException(ExFile.ToString() + " Column " + column + " (" + name + ") had unexpected data type: " + Columns[column].Type.ToString() + ".  Expected: " + expectedType.ToString());
+                    throw new InvalidDataException("EX Table did not match expectations: " + ExFile.ToString() + " Column " + column + " (" + name + ") had unexpected data type: " + Columns[column].Type.ToString() + ".  Expected: " + expectedType.ToString());
                 }
             }
 

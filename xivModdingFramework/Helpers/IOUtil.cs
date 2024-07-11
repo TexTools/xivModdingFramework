@@ -423,7 +423,23 @@ namespace xivModdingFramework.Helpers
             {
                 RecursiveDeleteDirectory(dir);
             }
-            baseDir.Delete(true);
+
+            try
+            {
+                baseDir.Delete(true);
+            }
+            catch
+            {
+                // Try to handle readonly cases.
+                var files = Directory.GetFiles(baseDir.FullName);
+                foreach(var f in files)
+                {
+                    File.SetAttributes(f, FileAttributes.Normal);
+                    File.Delete(f);
+                }
+                baseDir.Attributes &= ~FileAttributes.ReadOnly;
+                baseDir.Delete(true);
+            }
         }
 
 

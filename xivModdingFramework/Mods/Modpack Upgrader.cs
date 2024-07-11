@@ -270,7 +270,15 @@ namespace xivModdingFramework.Mods
                     try
                     {
                         var raw = await TransactionDataHandler.GetUncompressedFile(f.Value);
-                        var mtrl = Mtrl.GetXivMtrl(raw, f.Key);
+                        XivMtrl mtrl;
+                        try
+                        {
+                            mtrl = Mtrl.GetXivMtrl(raw, f.Key);
+                        }
+                        catch
+                        {
+                            return;
+                        }
 
                         if (mtrl.ShaderPack != Materials.DataContainers.ShaderHelpers.EShaderPack.Hair) return;
 
