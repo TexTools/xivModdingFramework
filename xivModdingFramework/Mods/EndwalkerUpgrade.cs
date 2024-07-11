@@ -829,6 +829,7 @@ namespace xivModdingFramework.Mods
                 mtrl.ColorSetDyeData = newDyeData;
             }
 
+            var usesMaskAsSpec = mtrl.ShaderKeys.Any(x => x.KeyId == 0xC8BD1DEF && (x.Value == 0xA02F4828 || x.Value == 0x198D11CD));
 
 
             var normalTex = mtrl.Textures.FirstOrDefault(x => mtrl.ResolveFullUsage(x) == XivTexType.Normal);
@@ -858,11 +859,6 @@ namespace xivModdingFramework.Mods
             }
 
 
-            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
-            if (specTex != null)
-            {
-                specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
-            }
 
             // Create Id Texture reference if we have a normal map. (If we don't, idk wtf is going on here).
             if (normalTex != null)
@@ -915,36 +911,80 @@ namespace xivModdingFramework.Mods
                         maskPath = maskPath.Replace(".tex", "_dt_mask.tex"); ;
                     }
                     */
-
-                    var maskInfo = new UpgradeInfo()
+                    if (!usesMaskAsSpec)
                     {
-                        Usage = EUpgradeTextureUsage.GearMaskLegacy,
-                        Files = new Dictionary<string, string>()
+                        var maskInfo = new UpgradeInfo()
+                        {
+                            Usage = EUpgradeTextureUsage.GearMaskLegacy,
+                            Files = new Dictionary<string, string>()
                         {
                             { "mask_old", maskSamp.Dx11Path },
                             { "mask_new", maskSamp.Dx11Path }
                         },
-                    };
-                    maskSamp.TexturePath = maskSamp.Dx11Path;
-                    ret.Add(maskSamp.Dx11Path, maskInfo);
+                        };
+                        maskSamp.TexturePath = maskSamp.Dx11Path;
+                        ret.Add(maskSamp.Dx11Path, maskInfo);
+                    }
                 }
             }
-            else if (mtrl.ShaderPack == EShaderPack.CharacterGlass)
+            else if (mtrl.ShaderPack == EShaderPack.CharacterGlass )
             {
-                var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
-                if (maskSamp != null)
+                if (!usesMaskAsSpec)
                 {
-                    var maskInfo = new UpgradeInfo()
+                    var maskSamp = mtrl.Textures.FirstOrDefault(x => x.Sampler != null && x.Sampler.SamplerId == ESamplerId.g_SamplerMask);
+                    if (maskSamp != null)
                     {
-                        Usage = EUpgradeTextureUsage.GearMaskNew,
-                        Files = new Dictionary<string, string>()
+                        var maskInfo = new UpgradeInfo()
                         {
-                            { "mask_old", maskSamp.Dx11Path },
-                            { "mask_new", maskSamp.Dx11Path }
-                        },
-                    };
-                    maskSamp.TexturePath = maskSamp.Dx11Path;
-                    ret.Add(maskSamp.Dx11Path, maskInfo);
+                            Usage = EUpgradeTextureUsage.GearMaskNew,
+                            Files = new Dictionary<string, string>()
+                            {
+                                { "mask_old", maskSamp.Dx11Path },
+                                { "mask_new", maskSamp.Dx11Path }
+                            },
+                        };
+                        maskSamp.TexturePath = maskSamp.Dx11Path;
+                        ret.Add(maskSamp.Dx11Path, maskInfo);
+                    }
+                }
+            }
+            var specTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerSpecular);
+            var diffuseTex = mtrl.Textures.FirstOrDefault(x => x.Sampler.SamplerId == ESamplerId.g_SamplerDiffuse);
+            if (specTex != null)
+            {
+                if (diffuseTex != null)
+                {
+                    // Switch material to compat mode properly if it's not already.
+                    specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
+                    var key = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xC8BD1DEF);
+                    if (key == null)
+                    {
+                        key = new ShaderKey()
+                        {
+                            KeyId = 0xC8BD1DEF,
+                            Value = 0xA02F4828
+                        };
+                        mtrl.ShaderKeys.Add(key);
+                    }
+                    else
+                    {
+                        key.Value = 0xA02F4828;
+                    }
+
+                    key = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A);
+                    if (key == null)
+                    {
+                        key = new ShaderKey()
+                        {
+                            KeyId = 0xB616DC5A,
+                            Value = 0x198D11CD
+                        };
+                        mtrl.ShaderKeys.Add(key);
+                    }
+                    else
+                    {
+                        key.Value = 0x198D11CD;
+                    }
                 }
             }
 
