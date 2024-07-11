@@ -7,6 +7,7 @@ using xivModdingFramework.Helpers;
 using System.IO;
 using System.Diagnostics;
 using xivModdingFramework.Mods;
+using xivModdingFramework.SqPack.FileTypes;
 
 namespace xivModdingFramework.Mods
 {
@@ -17,7 +18,33 @@ namespace xivModdingFramework.Mods
     public static class ModpackUpgrader
     {
 
-        public static async Task<WizardData> UpgradeModpack(string path, bool includePartials = true)
+        private static bool AnyChanges(Dictionary<string, FileStorageInformation> original, Dictionary<string, FileStorageInformation> newFiles)
+        {
+            if (original.Count != newFiles.Count)
+            {
+                return true;
+            }
+            else
+            {
+                foreach (var kv in original)
+                {
+                    if (!newFiles.ContainsKey(kv.Key))
+                    {
+                        return true;
+                    }
+
+                    var o = kv.Value;
+                    var n = newFiles[kv.Key];
+                    if (!o.Equals(n))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public static async Task<(WizardData Data, bool AnyChanges)> UpgradeModpack(string path, bool includePartials = true)
         {
             if (Directory.Exists(path))
             {
@@ -28,6 +55,9 @@ namespace xivModdingFramework.Mods
             var textureUpgradeTargets = new Dictionary<string, EndwalkerUpgrade.UpgradeInfo>();
 
             var allTextures = new HashSet<string>();
+            var anyChanges = false;
+
+            var originals = new Dictionary<WizardOptionEntry, Dictionary<string, FileStorageInformation>>();
 
             // First Round Upgrade -
             // This does models and base MTRLS only.
@@ -42,6 +72,7 @@ namespace xivModdingFramework.Mods
                         {
                             try
                             {
+                                originals.Add(o, new Dictionary<string, FileStorageInformation>(o.StandardData.Files));
                                 var missing = await EndwalkerUpgrade.UpdateEndwalkerFiles(o.StandardData.Files);
                                 foreach (var kv in missing)
                                 {
@@ -53,6 +84,7 @@ namespace xivModdingFramework.Mods
 
                                 var textures = o.StandardData.Files.Select(x => x.Key).Where(x => x.EndsWith(".tex"));
                                 allTextures.UnionWith(textures);
+
                             }
                             catch (Exception ex)
                             {
@@ -124,14 +156,37 @@ namespace xivModdingFramework.Mods
                 }
             }
 
-            return data;
+            // Evaluate success
+            foreach(var p in data.DataPages)
+            {
+                foreach(var g in p.Groups)
+                {
+                    foreach(var o in g.Options)
+                    {
+                        if(o.StandardData != null)
+                        {
+                            if (!anyChanges)
+                            {
+                                anyChanges = AnyChanges(originals[o], o.StandardData.Files);
+                            }
+                        }
+
+                        if (anyChanges) break;
+                    }
+                    if (anyChanges) break;
+                }
+                if (anyChanges) break;
+            }
+
+            return (data, anyChanges);
         }
 
-        public static async Task UpgradeModpack(string path, string newPath, bool includePartials = true)
+        public static async Task<bool> UpgradeModpack(string path, string newPath, bool includePartials = true)
         {
             var data = await UpgradeModpack(path, includePartials);
 
-            await data.WriteModpack(newPath, true);
+            await data.Data.WriteModpack(newPath, true);
+            return data.AnyChanges;
         }
     }
 }
