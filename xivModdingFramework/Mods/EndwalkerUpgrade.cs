@@ -1164,7 +1164,7 @@ namespace xivModdingFramework.Mods
         }
 
 
-        private class HairRegexSet
+        internal class HairRegexSet
         {
             public Regex OldTextureRegex;
             public Regex MaterialRegex;
@@ -1172,7 +1172,7 @@ namespace xivModdingFramework.Mods
             public string MaterialFormat;
         }
 
-        private static HairRegexSet HairRegexes = new HairRegexSet()
+        internal static HairRegexSet HairRegexes = new HairRegexSet()
         {
             OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})h([0-9]{4})_hir_([ns])\\.tex"),
             MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})h([0-9]{4})_hir_a\\.mtrl"),
@@ -1180,14 +1180,14 @@ namespace xivModdingFramework.Mods
         };
 
         //chara/human/c0801/obj/tail/t0003/material/v0001/mt_c0801t0003_a.mtrl
-        private static HairRegexSet TailRegexes = new HairRegexSet()
+        internal static HairRegexSet TailRegexes = new HairRegexSet()
         {
             OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/tail\\/t[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})t([0-9]{4})_etc_([ns])\\.tex"),
             MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/tail\\/t[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})t([0-9]{4})_a\\.mtrl"),
             MaterialFormat = "chara/human/c{0}/obj/tail/t{1}/material/v0001/mt_c{0}t{1}_a.mtrl",
         };
 
-        private static HairRegexSet EarRegexes = new HairRegexSet()
+        internal static HairRegexSet EarRegexes = new HairRegexSet()
         {
             OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/zear\\/z[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})z([0-9]{4})_etc_([ns])\\.tex"),
             MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/zear\\/z[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})z([0-9]{4})_a\\.mtrl"),
@@ -1195,7 +1195,7 @@ namespace xivModdingFramework.Mods
         };
 
 
-        private static HairRegexSet AccessoryRegexes = new HairRegexSet()
+        internal static HairRegexSet AccessoryRegexes = new HairRegexSet()
         {
             OldTextureRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/texture\\/(?:--)?c([0-9]{4})h([0-9]{4})_acc_([dns])\\.tex"),
             MaterialRegex = new Regex("chara\\/human\\/c[0-9]{4}\\/obj\\/hair\\/h[0-9]{4}\\/material\\/v0001\\/mt_c([0-9]{4})h([0-9]{4})_acc_b\\.mtrl"),
