@@ -954,7 +954,7 @@ namespace xivModdingFramework.Mods
             {
                 if (diffuseTex != null)
                 {
-                    // Switch material to compat mode properly if it's not already.
+                    // Switch material to compat mode properly if it's not already
                     specTex.Sampler.SamplerId = ESamplerId.g_SamplerMask;
                     var key = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xC8BD1DEF);
                     if (key == null)
@@ -962,13 +962,13 @@ namespace xivModdingFramework.Mods
                         key = new ShaderKey()
                         {
                             KeyId = 0xC8BD1DEF,
-                            Value = 0xA02F4828
+                            Value = 0x198D11CD
                         };
                         mtrl.ShaderKeys.Add(key);
                     }
                     else
                     {
-                        key.Value = 0xA02F4828;
+                        key.Value = 0x198D11CD;
                     }
 
                     key = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A);
@@ -977,13 +977,13 @@ namespace xivModdingFramework.Mods
                         key = new ShaderKey()
                         {
                             KeyId = 0xB616DC5A,
-                            Value = 0x198D11CD
+                            Value = 0x600EF9DF
                         };
                         mtrl.ShaderKeys.Add(key);
                     }
                     else
                     {
-                        key.Value = 0x198D11CD;
+                        key.Value = 0x600EF9DF;
                     }
                 }
             }
