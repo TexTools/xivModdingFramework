@@ -1349,7 +1349,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                 // Ancient bug issues....
-                if (needsTexFix && file.FullPath.EndsWith(".tex") && includeData)
+                if (needsTexFix && file.FullPath.EndsWith(".tex") && includeData && !file.FullPath.StartsWith("ui/"))
                 {
                     try
                     {

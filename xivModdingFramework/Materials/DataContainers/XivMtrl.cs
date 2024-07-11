@@ -482,6 +482,16 @@ namespace xivModdingFramework.Materials.DataContainers
             return ret;
         }
 
+        public string GetUniqueTextureName(XivTexType texType, bool includeVariant = true)
+        {
+            var name = GetDefaultTexureName(texType, includeVariant);
+            var hash = (uint)HashGenerator.GetHash(MTRLPath);
+
+            name = name.Replace(".tex", "_" + hash + ".tex");
+
+            return name;
+        }
+
         /// <summary>
         /// Gets the Material/Part identifier letter based on the file path.
         /// </summary>
