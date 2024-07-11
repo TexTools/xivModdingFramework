@@ -779,7 +779,7 @@ namespace xivModdingFramework.Mods.FileTypes
                 manips.Add(GetManip(sr, PMPRspAttribute.BustMinY, fullEntry.BustMinY));
                 manips.Add(GetManip(sr, PMPRspAttribute.BustMaxY, fullEntry.BustMaxY));
                 manips.Add(GetManip(sr, PMPRspAttribute.BustMinZ, fullEntry.BustMinZ));
-                manips.Add(GetManip(sr, PMPRspAttribute.BustMaxY, fullEntry.BustMaxZ));
+                manips.Add(GetManip(sr, PMPRspAttribute.BustMaxZ, fullEntry.BustMaxZ));
                 manips.Add(GetManip(sr, PMPRspAttribute.FemaleMinTail, fullEntry.MinTail));
                 manips.Add(GetManip(sr, PMPRspAttribute.FemaleMaxTail, fullEntry.MaxTail));
                 manips.Add(GetManip(sr, PMPRspAttribute.FemaleMinSize, fullEntry.MinSize));
