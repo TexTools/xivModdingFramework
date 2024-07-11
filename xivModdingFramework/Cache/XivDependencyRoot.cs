@@ -1197,7 +1197,7 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
             {
-                db.BusyTimeout = 3;
+                db.BusyTimeout = 3000;
                 db.Open();
                 var rootString = Info.ToString();
 
@@ -1275,7 +1275,7 @@ namespace xivModdingFramework.Cache
             var items = new List<IItemModel>();
             using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
             {
-                db.BusyTimeout = 3;
+                db.BusyTimeout = 3000;
                 db.Open();
                 var rootString = Info.ToString();
 
