@@ -1107,7 +1107,7 @@ namespace xivModdingFramework.Cache
                 Console.WriteLine("Saving all valid roots...");
                 using (var db = new SQLiteConnection(RootsCacheConnectionString))
                 {
-                    db.BusyTimeout = 3;
+                    db.BusyTimeout = 3000;
                     db.Open();
 
                     using (var transaction = db.BeginTransaction())
