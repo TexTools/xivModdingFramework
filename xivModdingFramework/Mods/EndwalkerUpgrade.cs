@@ -1656,7 +1656,7 @@ namespace xivModdingFramework.Mods
             {
                 if(tx != null)
                 {
-                    if (tx.ModifiedFiles.Contains(path))
+                    if (tx.ModifiedFiles.Contains(path) || tx.PrepFiles.Contains(path))
                     {
                         return true;
                     }
