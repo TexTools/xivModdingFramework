@@ -79,7 +79,7 @@ namespace xivModdingFramework.Items.Categories
                             var c2 = (XivCharacter)c.Clone();
                             c2.ModelInfo.SecondaryID = id;
                             c2.TertiaryCategory = c.Name;
-                            c2.Name = c2.SecondaryCategory + " " + id;
+                            c2.Name = race.GetDisplayName() + " " + c2.SecondaryCategory + " " + id;
                             characterList.Add(c2);
                         }
                     }
@@ -97,7 +97,7 @@ namespace xivModdingFramework.Items.Categories
                             var c2 = (XivCharacter)c.Clone();
                             c2.ModelInfo.SecondaryID = id;
                             c2.TertiaryCategory = c.Name;
-                            c2.Name = c2.SecondaryCategory + " " + id;
+                            c2.Name = race.GetDisplayName() + " " + c2.SecondaryCategory + " " + id;
                             characterList.Add(c2);
                         }
                     }
@@ -116,7 +116,7 @@ namespace xivModdingFramework.Items.Categories
                             var c2 = (XivCharacter)c.Clone();
                             c2.ModelInfo.SecondaryID = id;
                             c2.TertiaryCategory = c.Name;
-                            c2.Name = c2.SecondaryCategory + " " + id;
+                            c2.Name =  race.GetDisplayName() + " " + c2.SecondaryCategory + " " + id;
                             characterList.Add(c2);
                         }
                     }
@@ -135,7 +135,7 @@ namespace xivModdingFramework.Items.Categories
                             var c2 = (XivCharacter)c.Clone();
                             c2.ModelInfo.SecondaryID = id;
                             c2.TertiaryCategory = c.Name;
-                            c2.Name = c2.SecondaryCategory + " " + id;
+                            c2.Name = race.GetDisplayName() + " " + c2.SecondaryCategory + " " + id;
                             characterList.Add(c2);
                         }
                     }
@@ -154,7 +154,7 @@ namespace xivModdingFramework.Items.Categories
                             var c2 = (XivCharacter)c.Clone();
                             c2.ModelInfo.SecondaryID = id;
                             c2.TertiaryCategory = c.Name;
-                            c2.Name = c2.SecondaryCategory + " " + id;
+                            c2.Name = race.GetDisplayName() + " " + c2.SecondaryCategory + " " + id;
                             characterList.Add(c2);
                         }
                     }

@@ -980,6 +980,8 @@ namespace xivModdingFramework.Mods
         public string Version = "1.0";
         public string Image = "";
 
+        public List<string> Tags = new List<string>();
+
         public static WizardMetaEntry FromPMP(PMPJson pmp, string unzipPath)
         {
             var meta = pmp.Meta;
@@ -989,6 +991,7 @@ namespace xivModdingFramework.Mods
             page.Author = meta.Author;
             page.Description = meta.Description;
             page.Name = meta.Name;
+            page.Tags = meta.Tags;
 
 
             if (!string.IsNullOrWhiteSpace(meta.Image))
@@ -1451,6 +1454,7 @@ namespace xivModdingFramework.Mods
                 pmp.Meta.Tags = new List<string>();
                 pmp.Meta.FileVersion = PMP._WriteFileVersion;
                 pmp.Meta.Image = WizardHelpers.WriteImage(MetaPage.Image, tempFolder, "_MetaImage");
+                pmp.Meta.Tags = MetaPage.Tags;
 
                 var optionCount = DataPages.Sum(p => p.Groups.Sum(x => x.Options.Count));
 
