@@ -275,6 +275,52 @@ namespace xivModdingFramework.SqPack.FileTypes
             return true;
         }
 
+        public static void AssertOriginalOffsetIsSafe(XivDataFile df, long offset8x)
+        {
+            if(OriginalDats == null)
+            {
+                CacheOriginalDatList();
+            }
+
+            if (!OriginalDats.ContainsKey(df))
+            {
+                throw new InvalidDataException("Original offset pointed to a Data File which did not exist.");
+            }
+
+            if(offset8x == 0)
+            {
+                return;
+            }
+
+            var parts = IOUtil.Offset8xToParts(offset8x);
+            if (!OriginalDats[df].Contains(parts.DatNum))
+            {
+                throw new InvalidDataException("Original offset points to a Modded DAT file, cannot complete unsafe mod file write.");
+            }
+
+        }
+
+        private static Dictionary<XivDataFile, List<int>> OriginalDats;
+        internal static void CacheOriginalDatList()
+        {
+            OriginalDats = new Dictionary<XivDataFile, List<int>>();
+            foreach (XivDataFile f in Enum.GetValues(typeof(XivDataFile)))
+            {
+                var datList = new List<int>();
+                for (var i = 0; i < 8; i++)
+                {
+                    var datFilePath = Dat.GetDatPath(f, i);
+                    if (File.Exists(datFilePath))
+                    {
+                        if (IsOriginalDat(f, i))
+                        {
+                            datList.Add(i);
+                        }
+                    }
+                }
+                OriginalDats.Add(f, datList);
+            }
+        }
 
 
         /// <summary>
@@ -1265,6 +1311,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Write to the Data store and update the index with the temporary offset.
                 var offset8x = await tx.UNSAFE_WriteData(df, fileData, compressed);
+
                 var originalOffset = await tx.Get8xDataOffset(internalFilePath, true);
                 await tx.Set8xDataOffset(internalFilePath, offset8x);
                 
@@ -1312,6 +1359,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     mod.ItemCategory = category;
                     mod.SourceApplication = sourceApplication;
                 }
+
+                Dat.AssertOriginalOffsetIsSafe(IOUtil.GetDataFileFromPath(internalFilePath), mod.OriginalOffset8x);
 
                 modList.AddOrUpdateMod(mod);
 

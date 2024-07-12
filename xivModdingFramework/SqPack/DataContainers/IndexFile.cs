@@ -517,10 +517,10 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
             // Check Index1
             var offset = GetRawDataOffsetIndex1(filePath);
-            if(offset == 0)
+            var offset2 = GetRawDataOffsetIndex2(filePath);
+            if (offset != offset2)
             {
-                // Check Index2.
-                offset = GetRawDataOffsetIndex2(filePath);
+                return 0;
             }
             return offset;
         }

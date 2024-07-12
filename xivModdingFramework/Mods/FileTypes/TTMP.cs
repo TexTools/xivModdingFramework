@@ -770,6 +770,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
                         mod.SourceApplication = settings.SourceApplication;
 
+                        Dat.AssertOriginalOffsetIsSafe(mod.DataFile, mod.OriginalOffset8x);
                         modList.AddOrUpdateMod(mod);
 
                         // Add the modpack if we haven't already.
