@@ -402,6 +402,7 @@ namespace xivModdingFramework.Helpers
             {
                 return;
             }
+            var time = DateTime.Now;
             if (dir.StartsWith(Path.GetTempPath()))
             {
                 RecursiveDeleteDirectory(dir);
@@ -409,6 +410,8 @@ namespace xivModdingFramework.Helpers
             {
                 RecursiveDeleteDirectory(dir);
             }
+            var duration = DateTime.Now - time;
+            Trace.WriteLine("Deletion Time: " + duration);
         }
         public static void RecursiveDeleteDirectory(string dir)
         {
@@ -919,24 +922,5 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        public static string GetPenumbraDirectory()
-        {
-            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "Penumbra.json");
-            if (!File.Exists(path))
-            {
-                return "";
-            }
-
-            try
-            {
-                var obj = JObject.Parse(File.ReadAllText(path));
-                var st = (string) obj["ModDirectory"];
-                return st;
-            }
-            catch(Exception ex)
-            {
-                return "";
-            }
-        }
     }
 }
