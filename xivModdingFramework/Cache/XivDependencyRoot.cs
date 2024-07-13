@@ -283,7 +283,10 @@ namespace xivModdingFramework.Cache
             } else if (string.IsNullOrWhiteSpace(fakeSlot) && string.IsNullOrWhiteSpace(Slot))
             {
                 // The base material we're starting from has no slot suffix.
-                materialName = materialName.Replace("_" + Slot, "");
+                if (!string.IsNullOrWhiteSpace(Slot))
+                {
+                    materialName = materialName.Replace("_" + Slot, "");
+                }
             }
 
             if(!string.IsNullOrWhiteSpace(suffix))
