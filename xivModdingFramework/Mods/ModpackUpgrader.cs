@@ -155,6 +155,8 @@ namespace xivModdingFramework.Mods
                         )));
 
 
+                await ForAllOptions(data, UpdateSkinPaths);
+
                 // Third Round Upgrade - This inspects as-of-yet unupgraded textures for possible jank-upgrades,
                 // Which is to say, upgrades where we can infer their usage and pairing, but the base mtrl was not included.
                 foreach (var p in data.DataPages)
@@ -173,6 +175,7 @@ namespace xivModdingFramework.Mods
                                 {
                                     await EndwalkerUpgrade.UpdateEyeMask(possibleMask, "Unused", null, null, o.StandardData.Files);
                                 }
+
                             }
                         }
                     }
@@ -184,9 +187,11 @@ namespace xivModdingFramework.Mods
             {
                 foreach(var g in p.Groups)
                 {
-                    foreach(var o in g.Options)
+                    if (g == null) continue;
+                    foreach (var o in g.Options)
                     {
-                        if(o.StandardData != null)
+                        if (o == null) continue;
+                        if (o.StandardData != null)
                         {
                             if (!anyChanges)
                             {
@@ -470,6 +475,24 @@ namespace xivModdingFramework.Mods
                     o.Files[m] = info;
                 }
             });
+        }
+
+        public static async Task UpdateSkinPaths(WizardStandardOptionData opt)
+        {
+
+            var clone = new Dictionary<string, FileStorageInformation>(opt.Files);
+            foreach(var fkv in clone)
+            {
+                var file = fkv.Key;
+                if (EndwalkerUpgrade.SkinRepathDict.ContainsKey(file))
+                {
+                    var target = SkinRepathDict[file];
+                    if (opt.Files.ContainsKey(target)) continue;
+
+                    // Duplicate the pointer.
+                    opt.Files.Add(target, fkv.Value);
+                }
+            }
         }
 
     }

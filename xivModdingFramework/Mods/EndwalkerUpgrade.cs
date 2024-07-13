@@ -62,14 +62,14 @@ namespace xivModdingFramework.Mods
         /// Returns a collection of file upgrade information.
         /// </summary>
         /// <param name="filePaths"></param>
-        /// <param name="source"></param>
+        /// <param name="sourceApplication"></param>
         /// <param name="states"></param>
         /// <param name="progress"></param>
         /// <param name="tx"></param>
         /// <returns></returns>
-        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> paths, string source, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
+        public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> paths, string sourceApplication, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
-            var filePaths = paths.ToList();
+            var filePaths = new HashSet<string>(paths);
             var ret = new Dictionary<string, UpgradeInfo>();
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
@@ -80,7 +80,7 @@ namespace xivModdingFramework.Mods
             var fixableMtrlsRegex = new Regex("chara\\/.*\\.mtrl");
             var fixableMtrls = filePaths.Where(x => fixableMtrlsRegex.Match(x).Success).ToList();
 
-            ret = await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, source, tx, progress, _ConvertedTextures);
+            ret = await EndwalkerUpgrade.UpdateEndwalkerMaterials(fixableMtrls, sourceApplication, tx, progress, _ConvertedTextures);
 
             var idx = 0;
             var total = fixableMdls.Count;
@@ -88,24 +88,34 @@ namespace xivModdingFramework.Mods
             {
                 progress?.Report((idx, total, "Updating Endwalker Models..."));
                 idx++;
-                await EndwalkerUpgrade.UpdateEndwalkerModel(path, source, tx);
+                await EndwalkerUpgrade.UpdateEndwalkerModel(path, sourceApplication, tx);
             }
 
             if (includePartials)
             {
                 progress?.Report((0, total, "Updating Endwalker partial Hair Mods..."));
-                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths, source, tx, _ConvertedTextures);
+                await EndwalkerUpgrade.UpdateUnclaimedHairTextures(filePaths.ToList(), sourceApplication, tx, _ConvertedTextures);
 
                 progress?.Report((0, total, "Updating Endwalker partial Eye Mods..."));
                 foreach (var path in filePaths)
                 {
                     try
                     {
-                        await EndwalkerUpgrade.UpdateEyeMask(path, source, tx, _ConvertedTextures);
+                        await EndwalkerUpgrade.UpdateEyeMask(path, sourceApplication, tx, _ConvertedTextures);
                     }
                     catch(Exception ex)
                     {
                         Trace.WriteLine(ex);
+                    }
+                }
+
+                progress?.Report((0, total, "Updating Endwalker partial Skin Mods..."));
+                foreach(var path in filePaths)
+                {
+                    if (SkinRepathDict.ContainsKey(path))
+                    {
+                        var target = SkinRepathDict[path];
+                        await Dat.CopyFile(path, target, sourceApplication, true, null, tx);
                     }
                 }
             }
@@ -2050,5 +2060,50 @@ namespace xivModdingFramework.Mods
             return info;
         }
 
+
+        public static readonly Dictionary<string, string> SkinRepathDict = new Dictionary<string, string>()
+        {
+            // Base Game
+            { "chara/human/c0201/obj/body/b0001/texture/--c0201b0001_d.tex", "chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex" },
+            { "chara/human/c0401/obj/body/b0001/texture/--c0401b0001_d.tex", "chara/human/c0401/obj/body/b0001/texture/c0401b0001_base.tex" },
+            { "chara/human/c1401/obj/body/b0001/texture/--c1401b0001_d.tex", "chara/human/c1401/obj/body/b0001/texture/c1401b0001_base.tex" },
+            { "chara/human/c1401/obj/body/b0101/texture/--c1401b0101_d.tex", "chara/human/c1401/obj/body/b0101/texture/c1401b0101_base.tex" },
+            { "chara/human/c1801/obj/body/b0001/texture/--c1801b0001_d.tex", "chara/human/c1801/obj/body/b0001/texture/c1801b0001_base.tex" },
+
+            // Base Game Norms
+            { "chara/human/c0201/obj/body/b0001/texture/--c0201b0001_n.tex", "chara/human/c0201/obj/body/b0001/texture/c0201b0001_norm.tex" },
+            { "chara/human/c0401/obj/body/b0001/texture/--c0401b0001_n.tex", "chara/human/c0401/obj/body/b0001/texture/c0401b0001_norm.tex" },
+            { "chara/human/c1401/obj/body/b0001/texture/--c1401b0001_n.tex", "chara/human/c1401/obj/body/b0001/texture/c1401b0001_norm.tex" },
+            { "chara/human/c1401/obj/body/b0101/texture/--c1401b0101_n.tex", "chara/human/c1401/obj/body/b0101/texture/c1401b0101_norm.tex" },
+            { "chara/human/c1801/obj/body/b0001/texture/--c1801b0001_n.tex", "chara/human/c1801/obj/body/b0001/texture/c1801b0001_norm.tex" },
+
+            // Bibo
+            { "chara/bibo/midlander_d.tex", "chara/bibo_mid_base.tex" },
+            { "chara/bibo/raen_d.tex", "chara/bibo_raen_base.tex" },
+            { "chara/bibo/xaela_d.tex", "chara/bibo_xaela_base.tex" },
+            { "chara/bibo/viera_d.tex", "chara/bibo_viera_base.tex" },
+            { "chara/bibo/highlander_d.tex", "chara/bibo_high_base.tex" },
+
+            // Bibo Norms
+            { "chara/bibo/midlander_n.tex", "chara/bibo_mid_norm.tex" },
+            { "chara/bibo/raen_n.tex", "chara/bibo_raen_norm.tex" },
+            { "chara/bibo/xaela_n.tex", "chara/bibo_xaela_norm.tex" },
+            { "chara/bibo/viera_n.tex", "chara/bibo_viera_norm.tex" },
+            { "chara/bibo/highlander_n.tex", "chara/bibo_high_norm.tex" },
+
+            // TBSE
+            { "chara/human/c0101/obj/body/b0001/texture/--c0101b0001_b_d.tex", "chara/human/c0101/obj/body/b0001/texture/c0101b0001_b_d.tex" },
+            { "chara/human/c1301/obj/body/b0001/texture/--c1301b0001_b_d.tex", "chara/human/c1301/obj/body/b0001/texture/c1301b0001_b_d.tex" },
+            { "chara/human/c1301/obj/body/b0101/texture/--c1301b0101_b_d.tex", "chara/human/c1301/obj/body/b0101/texture/c1301b0101_b_d.tex" },
+            { "chara/human/c1701/obj/body/b0001/texture/--c1701b0001_b_d.tex", "chara/human/c1701/obj/body/b0001/texture/c1701b0001_b_d.tex" },
+            { "chara/human/c0301/obj/body/b0001/texture/--c0301b0001_b_d.tex", "chara/human/c0301/obj/body/b0001/texture/c0301b0001_b_d.tex" },
+
+            // TBSE Norms
+            { "chara/human/c0101/obj/body/b0001/texture/--c0101b0001_b_n.tex", "chara/human/c0101/obj/body/b0001/texture/c0101b0001_b_n.tex" },
+            { "chara/human/c1301/obj/body/b0001/texture/--c1301b0001_b_n.tex", "chara/human/c1301/obj/body/b0001/texture/c1301b0001_b_n.tex" },
+            { "chara/human/c1301/obj/body/b0101/texture/--c1301b0101_b_n.tex", "chara/human/c1301/obj/body/b0101/texture/c1301b0101_b_n.tex" },
+            { "chara/human/c1701/obj/body/b0001/texture/--c1701b0001_b_n.tex", "chara/human/c1701/obj/body/b0001/texture/c1701b0001_b_n.tex" },
+            { "chara/human/c0301/obj/body/b0001/texture/--c0301b0001_b_n.tex", "chara/human/c0301/obj/body/b0001/texture/c0301b0001_b_n.tex" },
+        };
     }
 }
