@@ -502,7 +502,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 using (var surface = Surface.LoadFromFile(externalPath))
                 {
                     if (surface == null)
-                        throw new FormatException($"Unsupported texture format");
+                        throw new FormatException($"Unsupported texture format or unable to load file: "  + externalPath);
 
                     surface.FlipVertically();
 

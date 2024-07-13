@@ -830,12 +830,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     var metalness = metalnessConst;
                     var occlusion = 1.0f;
 
-                    // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
-                    // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
-                    // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
-                    // This effectively undoes one of those conversions.
-                    diffuse = LinearToSrgb(diffuse);
-
                     float skinInfluence = (float)normal.Blue;// * normal.Blue;
                     var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
                     diffuse *= sColor;
@@ -872,8 +866,6 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                     //diffuse *= diffuseColorMul;
-                    // This is a bit of a hack here and probably not correct.
-                    diffuse *= LinearToSrgb(diffuseColorMul);
 
                     if (!settings.GeneratePbrMaps)
                     {

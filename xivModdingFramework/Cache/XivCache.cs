@@ -8,12 +8,14 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 using xivModdingFramework.Items;
 using xivModdingFramework.Items.Categories;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.DataContainers;
+using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.FileTypes;
@@ -75,7 +77,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.3.2");
+        public static readonly Version CacheVersion = new Version("1.0.3.3");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -585,7 +587,17 @@ namespace xivModdingFramework.Cache
 
         private static async Task MigrateCache(Version lastCacheVersion) {
 
-            // No migration tasks currently.
+            if (lastCacheVersion == null) return;
+            if (lastCacheVersion == new Version("0.0.0.0")) return;
+            if (lastCacheVersion == new Version()) return;
+
+            if (lastCacheVersion < new Version("1.0.3.3"))
+            {
+                // Clear user's Skeletons folder from Pre-DT.
+                var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
+                var skelFolder = Path.Combine(cwd, "Skeletons");
+                IOUtil.RecursiveDeleteDirectory(skelFolder);
+            }
 
         }
 
