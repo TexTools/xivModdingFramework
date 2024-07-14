@@ -148,6 +148,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
             }
 
+            var defOp = pmp.DefaultMod as PmpStandardOptionJson;
+            if(defOp != null)
+            {
+                foreach (var kv in defOp.Files)
+                {
+                    var zipPath = kv.Value;
+                    allPmpFiles.Add(zipPath);
+                }
+            }
+
             // Log the unused files that were contained in the PMP.
             var unusedFiles = IOUtil.GetFilesInFolder(path).Select(x => x.Substring(path.Length + 1).ToLower()).Where(x => !allPmpFiles.Contains(x) && !IsPmpJsonFile(x)).ToList();
             pmp.ExtraFiles = new HashSet<string>(unusedFiles);
