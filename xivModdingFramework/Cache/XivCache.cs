@@ -77,7 +77,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
-        public static readonly Version CacheVersion = new Version("1.0.3.3");
+        public static readonly Version CacheVersion = new Version("1.0.3.4");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
         private const string creationScript = "CreateCacheDB.sql";
@@ -981,15 +981,15 @@ namespace xivModdingFramework.Cache
                 {
                     foreach (var item in items)
                     {
-                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id,  is_weapon,  root) 
-                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $is_weapon, $root)";
+                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id,  equip_type,  root) 
+                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $equip_type, $root)";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             cmd.Parameters.AddWithValue("exd_id", item.ExdID);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
                             cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
-                            cmd.Parameters.AddWithValue("is_weapon", ((XivGearModelInfo)item.ModelInfo).IsWeapon);
+                            cmd.Parameters.AddWithValue("equip_type", ((XivGearModelInfo)item.ModelInfo).IsWeapon);
                             cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
@@ -1373,7 +1373,7 @@ namespace xivModdingFramework.Cache
 
             item.Name = reader.GetString("name");
             item.IconId = (uint)reader.GetInt32("icon_id");
-            //primaryMi.IsWeapon = reader.GetBoolean("is_weapon");
+            item.EquipType = (uint)reader.GetInt32("equip_type");
             primaryMi.PrimaryID = reader.GetInt32("primary_id");
             primaryMi.SecondaryID = reader.GetInt32("secondary_id");
             primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");

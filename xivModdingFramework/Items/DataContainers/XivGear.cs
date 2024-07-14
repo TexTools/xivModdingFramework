@@ -83,6 +83,11 @@ namespace xivModdingFramework.Items.DataContainers
         public uint IconId { get; set; }
 
         /// <summary>
+        /// The Skeleton type for weapons
+        /// </summary>
+        public uint EquipType { get; set; }
+
+        /// <summary>
         /// The gear EquipSlotCategory key
         /// </summary>
         public int EquipSlotCategory { get; set; }
