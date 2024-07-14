@@ -2042,9 +2042,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="ogMdl"></param>
         /// <param name="loggingFunction"></param>
         /// <returns></returns>
-        public static async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public static async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null, bool upgradePrecision = true)
         {
-            var mdl = MakeUncompressedMdlFile(ttModel, ogMdl, loggingFunction);
+            var mdl = MakeUncompressedMdlFile(ttModel, ogMdl, loggingFunction, upgradePrecision);
             var compressed = await CompressMdlFile(mdl);
             return compressed;
         }
@@ -2371,6 +2371,7 @@ namespace xivModdingFramework.Models.FileTypes
             return MakeUncompressedMdlFile(model, xivMdl, loggingFunction);
 
         }
+
         /// <summary>
         /// Creates a new Uncompressed MDL file from the given information.
         /// OGMdl is used to fill in gaps in data types we do not know about.
@@ -2378,7 +2379,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        public static byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public static byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null, bool upgradePrecision = true)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
 
@@ -2392,10 +2393,6 @@ namespace xivModdingFramework.Models.FileTypes
             ttModel.MdlVersion = mdlVersion;
 
             byte _LoDCount = 1;
-
-            // Pipe some user var down here and we could ship this toggle.
-            // Not really much reason to ever use lower precision other than file size/perf though.
-            bool _UpgradePrecision = true;
 
             // Distance used for model LoD settings. 0 is infinite.
             float _ModelLoDDistance = 0.0f;
@@ -2411,6 +2408,8 @@ namespace xivModdingFramework.Models.FileTypes
 
             try
             {
+                var usageInfo = ttModel.GetUsageInfo();
+
                 ttModel.OrderMeshGroupsForImport();
                 var rawShapeData = ttModel.GetRawShapeParts();
 
@@ -2493,7 +2492,7 @@ namespace xivModdingFramework.Models.FileTypes
                     vertexStreamCounts.Add(source.Max(x => x.DataBlock) + 1);
 
                     // If we're upgrading precision on a v6 mdl, might as well add all the bells and whistles.
-                    if(mdlVersion >= 6 && _UpgradePrecision)
+                    if(mdlVersion >= 6 && upgradePrecision)
                     {
                         // Add precomputed tangent data.
                         var tangentCount = source.Count(x => x.DataUsage == VertexUsageType.Tangent);
@@ -2508,21 +2507,23 @@ namespace xivModdingFramework.Models.FileTypes
                                 DataType = VertexDataType.Ubyte4n,
                                 DataUsage = VertexUsageType.Tangent
                             });
-
                         }
-                        
-                        // Add 2nd color channel for faux-wind simulation.
-                        var colorCounts = source.Count(x => x.DataUsage == VertexUsageType.Color);
-                        var colorIdx = source.FindIndex(x => x.DataUsage == VertexUsageType.Color);
-                        if (colorCounts == 1)
+
+                        if (usageInfo.UsesVColor2)
                         {
-                            source.Insert(colorIdx + 1, new VertexDataStruct()
+                            // Add 2nd color channel for faux-wind simulation.
+                            var colorCounts = source.Count(x => x.DataUsage == VertexUsageType.Color);
+                            var colorIdx = source.FindIndex(x => x.DataUsage == VertexUsageType.Color);
+                            if (colorCounts == 1)
                             {
-                                DataBlock = 1,
-                                DataOffset = 0, // Offset doesn't matter since we recalculate it anyways.
-                                DataType = VertexDataType.Ubyte4n,
-                                DataUsage = VertexUsageType.Color
-                            });
+                                source.Insert(colorIdx + 1, new VertexDataStruct()
+                                {
+                                    DataBlock = 1,
+                                    DataOffset = 0, // Offset doesn't matter since we recalculate it anyways.
+                                    DataType = VertexDataType.Ubyte4n,
+                                    DataUsage = VertexUsageType.Color
+                                });
+                            }
                         }
                     }
 
@@ -2542,7 +2543,7 @@ namespace xivModdingFramework.Models.FileTypes
                         // Perform precision updates if requested, and adjustments for MDL version.
                         if (dataUsage == VertexUsageType.Position)
                         {
-                            if (_UpgradePrecision)
+                            if (upgradePrecision)
                             {
                                 dataType = VertexDataType.Float3;
                             }
@@ -2554,7 +2555,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (dataUsage == VertexUsageType.BoneWeight)
                         {
-                            if (mdlVersion >= 6 && _UpgradePrecision)
+                            if (mdlVersion >= 6 && upgradePrecision)
                             {
                                 dataType = VertexDataType.UByte8;
                             }
@@ -2566,7 +2567,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (dataUsage == VertexUsageType.BoneIndex)
                         {
-                            if (mdlVersion >= 6 && _UpgradePrecision)
+                            if (mdlVersion >= 6 && upgradePrecision)
                             {
                                 dataType = VertexDataType.UByte8;
                             }
@@ -2578,7 +2579,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (dataUsage == VertexUsageType.Normal)
                         {
-                            if (_UpgradePrecision)
+                            if (upgradePrecision)
                             {
                                 dataType = VertexDataType.Float3;
                             }
@@ -2590,26 +2591,25 @@ namespace xivModdingFramework.Models.FileTypes
 
                         if (dataUsage == VertexUsageType.TextureCoordinate)
                         {
-                            if (_UpgradePrecision)
+                            if (upgradePrecision)
                             {
-                                if (dataType == VertexDataType.Half2)
-                                {
-                                    dataType = VertexDataType.Float2;
-                                }
-                                else if (dataType == VertexDataType.Half4)
+                                if (usageInfo.UsesUv2)
                                 {
                                     dataType = VertexDataType.Float4;
+                                }
+                                else
+                                {
+                                    dataType = VertexDataType.Float2;
                                 }
                             }
                             else
                             {
-                                if (dataType == VertexDataType.Float2)
-                                {
-                                    dataType = VertexDataType.Half2;
-                                }
-                                else if (dataType == VertexDataType.Float4)
+                                if (usageInfo.UsesUv2)
                                 {
                                     dataType = VertexDataType.Half4;
+                                } else
+                                {
+                                    dataType = VertexDataType.Half2;
                                 }
                             }
                         }
