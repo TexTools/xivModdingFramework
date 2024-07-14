@@ -891,7 +891,7 @@ namespace xivModdingFramework.Textures.FileTypes
                 var inFull = Path.Combine(workingDirectory, input);
 
                 //var bcq = "-bc q";
-                var bcq = "";
+                var bcq = "-bc q";
 
                 File.Copy(file, inFull);
                 try

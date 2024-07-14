@@ -1076,7 +1076,33 @@ namespace xivModdingFramework.Mods
             data.ModPack = mp;
             data.RawSource = pmp;
 
-            if (pmp.Groups.Count > 0 && pmp.Groups.Any(x => x.Options.Count > 0))
+            var def = pmp.DefaultMod as PmpStandardOptionJson;
+            if (def != null)
+            {
+                var anyData = def.Manipulations.Count > 0 || def.FileSwaps.Count > 0 || def.Files.Count > 0;
+                if (anyData)
+                {
+                    // Just drum up a basic group containing the default option.
+                    var fakeGroup = new PMPGroupJson();
+                    fakeGroup.Name = "Default";
+                    fakeGroup.Options = new List<PMPOptionJson>() { pmp.DefaultMod };
+                    fakeGroup.SelectedSettings = 1;
+                    fakeGroup.Type = "Single";
+
+                    if (string.IsNullOrWhiteSpace(pmp.DefaultMod.Name))
+                    {
+                        pmp.DefaultMod.Name = "Default";
+                    }
+
+                    var page = new WizardPageEntry();
+                    page.Name = "Page 1";
+                    page.Groups = new List<WizardGroupEntry>();
+                    page.Groups.Add(await WizardGroupEntry.FromPMPGroup(fakeGroup, unzipPath));
+                    data.DataPages.Add(page);
+                }
+            }
+
+            if (pmp.Groups.Count > 0)
             {
                 // Create sufficient pages.
                 var pageMax = pmp.Groups.Max(x => x.Page);
@@ -1094,27 +1120,6 @@ namespace xivModdingFramework.Mods
                     var page = data.DataPages[g.Page];
                     page.Groups.Add(await WizardGroupEntry.FromPMPGroup(g, unzipPath));
                 }
-            }
-            else
-            {
-
-                // Just drum up a basic group containing the default option.
-                var fakeGroup = new PMPGroupJson();
-                fakeGroup.Name = "Default";
-                fakeGroup.Options = new List<PMPOptionJson>() { pmp.DefaultMod };
-                fakeGroup.SelectedSettings = 1;
-                fakeGroup.Type = "Single";
-
-                if (string.IsNullOrWhiteSpace(pmp.DefaultMod.Name))
-                {
-                    pmp.DefaultMod.Name = "Default";
-                }
-
-                var page = new WizardPageEntry();
-                page.Name = "Page 1";
-                page.Groups = new List<WizardGroupEntry>();
-                page.Groups.Add(await WizardGroupEntry.FromPMPGroup(fakeGroup, unzipPath));
-                data.DataPages.Add(page);
             }
             return data;
         }

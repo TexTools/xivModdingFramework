@@ -165,6 +165,7 @@ namespace xivModdingFramework.Items.Categories
 
                     primaryMi.PrimaryID = primaryQuad.Values[0];
                     secondaryMi.PrimaryID = secondaryQuad.Values[0];
+
                     if (hasBodyId)
                     {
                         primaryMi.SecondaryID = primaryQuad.Values[1];

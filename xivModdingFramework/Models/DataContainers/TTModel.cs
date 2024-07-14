@@ -7,6 +7,7 @@ using SharpDX;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -672,6 +673,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public ushort MdlVersion;
 
+
         /// <summary>
         /// The Mesh groups and parts of this mesh.
         /// </summary>
@@ -1201,6 +1203,59 @@ namespace xivModdingFramework.Models.DataContainers
             return MeshGroups.Count(x => x.MeshType == type);
         }
 
+        public (bool UsesVColor2, bool UsesUv2, bool NeedsEightWeights) GetUsageInfo()
+        {
+            bool usesVcolor2 = false;
+            bool usesUv2 = false;
+            bool needs8Weight = false;
+
+            foreach (var m in MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    foreach(var v in p.Vertices)
+                    {
+                        if (!needs8Weight)
+                        {
+                            if(v.Weights.Length > 4)
+                            {
+                                for(int i = 4; i < v.Weights.Length; i++)
+                                {
+                                    if (v.Weights[i] > 0 || v.BoneIds[i] > 0)
+                                    {
+                                        needs8Weight = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!usesUv2)
+                        {
+                            if (v.UV2 != Vector2.Zero)
+                            {
+                                usesUv2 = true;
+                            }
+                        }
+
+                        if (!usesVcolor2)
+                        {
+                            if (v.VertexColor2[0] != 0 
+                                || v.VertexColor2[1] != 0
+                                || v.VertexColor2[2] != 0
+                                || v.VertexColor2[3] != 255)
+                            {
+                                usesVcolor2 = true;
+                            }
+                        }
+
+                    }
+                }
+            }
+
+            return (usesVcolor2, usesUv2, needs8Weight);
+        }
+
         /// <summary>
         /// Creates a bone set from the model and group information.
         /// </summary>
@@ -1310,6 +1365,10 @@ namespace xivModdingFramework.Models.DataContainers
             if (loggingFunction == null)
             {
                 loggingFunction = ModelModifiers.NoOp;
+            }
+            if(settings == null)
+            {
+                settings = new ModelImportOptions();
             }
 
             var connectionString = "Data Source=" + filePath + ";Pooling=True;";
