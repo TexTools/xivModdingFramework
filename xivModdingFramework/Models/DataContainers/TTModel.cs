@@ -673,6 +673,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public ushort MdlVersion;
 
+
         /// <summary>
         /// The Mesh groups and parts of this mesh.
         /// </summary>
@@ -1239,7 +1240,10 @@ namespace xivModdingFramework.Models.DataContainers
 
                         if (!usesVcolor2)
                         {
-                            if(v.VertexColor2.Any(x => x != 0))
+                            if (v.VertexColor2[0] != 0 
+                                || v.VertexColor2[1] != 0
+                                || v.VertexColor2[2] != 0
+                                || v.VertexColor2[3] != 255)
                             {
                                 usesVcolor2 = true;
                             }
@@ -2579,10 +2583,6 @@ namespace xivModdingFramework.Models.DataContainers
 
             ModelModifiers.FixUpSkinReferences(ttModel, rawMdl.MdlPath);
 
-            var sum = ttModel.MeshGroups.Sum(m => m.Parts.Sum(p => p.Vertices.Count + p.ShapeParts.Sum(z => z.Value.Vertices.Count)));
-            var indices = ttModel.MeshGroups.Sum(m => m.Parts.Sum(p => p.TriangleIndices.Count));
-            Trace.WriteLine("Vertex Count: " + sum);
-            Trace.WriteLine("Index Count: " + indices);
             return ttModel;
         }
 
