@@ -1697,6 +1697,11 @@ namespace xivModdingFramework.Mods
             {
                 try
                 {
+                    if (files[path].RealPath == null || !File.Exists(files[path].RealPath))
+                    {
+                        return null;
+                    }
+
                     return await TransactionDataHandler.GetUncompressedFile(files[path]);
                 } catch
                 {
