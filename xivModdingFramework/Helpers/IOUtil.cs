@@ -429,6 +429,8 @@ namespace xivModdingFramework.Helpers
 
             try
             {
+                if (!baseDir.Exists)
+                    return;
                 baseDir.Delete(true);
             }
             catch

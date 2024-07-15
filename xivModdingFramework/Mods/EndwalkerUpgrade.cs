@@ -1798,7 +1798,10 @@ namespace xivModdingFramework.Mods
 
                         var data = await ResolveFile(upgrade.Files["mask_old"], files, null);
                         data = await UpgradeMaskTex(data);
-                        await WriteFile(data, upgrade.Files["mask_new"], files, null);
+                        if (data != null)
+                        {
+                            await WriteFile(data, upgrade.Files["mask_new"], files, null);
+                        }
                     }
                 }
                 else if (upgrade.Usage == EUpgradeTextureUsage.GearMaskLegacy)
@@ -1807,8 +1810,11 @@ namespace xivModdingFramework.Mods
                     {
 
                         var data = await ResolveFile(upgrade.Files["mask_old"], files, null);
-                        data = await UpgradeMaskTex(data, true);
-                        await WriteFile(data, upgrade.Files["mask_new"], files, null);
+                        if (data != null)
+                        {
+                            data = await UpgradeMaskTex(data, true);
+                            await WriteFile(data, upgrade.Files["mask_new"], files, null);
+                        }
                     }
                 }
             }
