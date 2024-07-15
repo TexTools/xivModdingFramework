@@ -114,7 +114,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 if (Path.GetFileName(file).StartsWith("group_") && Path.GetFileName(file).ToLower().EndsWith(".json"))
                 {
-                    groups.Add(JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file)));
+                    var group = JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file));
+                    if (group != null)
+                    {
+                        groups.Add(group);
+                    }
                 }
             }
 
@@ -137,9 +141,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 foreach(var o in g.Options)
                 {
                     var op = o as PmpStandardOptionJson;
-                    if(op != null)
+                    if (op != null)
                     {
-                        foreach(var kv in op.Files)
+                        ValidateOption(op);
+                        foreach (var kv in op.Files)
                         {
                             var zipPath = kv.Value;
                             allPmpFiles.Add(zipPath);
@@ -151,6 +156,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var defOp = pmp.DefaultMod as PmpStandardOptionJson;
             if(defOp != null)
             {
+                ValidateOption(defOp);
                 foreach (var kv in defOp.Files)
                 {
                     var zipPath = kv.Value;
@@ -188,6 +194,26 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
             }
             return false;
+        }
+
+        /// <summary>
+        /// Preforms basic cleanup-validation on options.
+        /// </summary>
+        /// <param name="op"></param>
+        private static void ValidateOption(PmpStandardOptionJson op)
+        {
+            if (op.Files == null)
+            {
+                op.Files = new Dictionary<string, string>();
+            }
+            if(op.Manipulations == null)
+            {
+                op.Manipulations = new List<PMPManipulationWrapperJson>();
+            }
+            if(op.FileSwaps == null)
+            {
+                op.FileSwaps = new Dictionary<string, string>();
+            }
         }
 
         /// <summary>
@@ -712,6 +738,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 pmp.Meta.FileVersion = 3;
                 pmp.Meta.Version = modpackMeta.Version.ToString();
                 pmp.Meta.Website = modpackMeta.Url;
+                pmp.Meta.ModTags = pmp.Meta.ModTags ?? new List<string>();
 
 
                 await WritePmp(pmp, workingPath, zip ? destination : null);
@@ -733,6 +760,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         {
             var metapath = Path.Combine(workingDirectory, "meta.json");
             var defaultModPath = Path.Combine(workingDirectory, "default_mod.json");
+
+            if(pmp.Meta.ModTags == null)
+            {
+                pmp.Meta.ModTags = new List<string>();
+            }
 
             var metaString = JsonConvert.SerializeObject(pmp.Meta, Formatting.Indented);
             File.WriteAllText(metapath, metaString);

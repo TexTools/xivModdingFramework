@@ -92,6 +92,11 @@ namespace xivModdingFramework.Mods
 
         public void SortManipulations()
         {
+            if(Manipulations == null)
+            {
+                Manipulations = new List<PMPManipulationWrapperJson>();
+            }
+
             Manipulations.Sort((a, b) =>
             {
                 if (a == null || b == null)
