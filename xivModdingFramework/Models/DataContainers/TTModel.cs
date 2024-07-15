@@ -14,6 +14,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
+using xivModdingFramework.General;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Items.Enums;
@@ -1391,6 +1392,9 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 db.Open();
                 SetPragmas(db);
+
+                MigrateImportDb(db);
+
                 // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
 
                 // Load Mesh Groups
@@ -1639,6 +1643,49 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MakeImportReady(model, loggingFunction);
 
             return model;
+        }
+
+        private static void MigrateImportDb(SQLiteConnection db)
+        {
+            //cmd.Parameters.AddWithValue("value", typeof(XivCache).Assembly.GetName().Version);
+            Version version = null;
+
+            bool hasUv3 = false;
+            var query = @"PRAGMA table_info(vertices);";
+            using (var cmd = new SQLiteCommand(query, db))
+            {
+                using (var sqlReader = cmd.ExecuteReader())
+                {
+                    while (sqlReader.Read())
+                    {
+                        var name = sqlReader.GetString(1);
+                        if(name == "uv_3_u")
+                        {
+                            hasUv3 = true;
+                        }
+                    }
+
+                    if (!sqlReader.IsClosed)
+                    {
+                        sqlReader.Close();
+                    }
+                }
+            }
+
+            if (!hasUv3)
+            {
+                query = "ALTER TABLE vertices ADD COLUMN uv_3_u INTEGER NOT NULL DEFAULT 0;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+                query = "ALTER TABLE vertices ADD COLUMN uv_3_v INTEGER NOT NULL DEFAULT 0;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+            }
+
         }
 
 
