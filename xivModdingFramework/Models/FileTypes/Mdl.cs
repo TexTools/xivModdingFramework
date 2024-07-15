@@ -62,6 +62,7 @@ using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.Formats;
 using Image = SixLabors.ImageSharp.Image;
 using System.Diagnostics.CodeAnalysis;
+using HelixToolkit.SharpDX.Core.Animations;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -2376,6 +2377,16 @@ namespace xivModdingFramework.Models.FileTypes
         // but vertex buffers larger than 2^23 will overflow and wrap around in game.
         public const int _MaxVertexBufferSize = 8388608;
 
+        private static void AddVertexHeader(List<VertexDataStruct> source, VertexDataStruct newData)
+        {
+            var elem = source.FirstOrDefault(x => x.DataUsage == newData.DataUsage && x.Count == newData.Count);
+            if (elem != null)
+            {
+                elem.DataType = newData.DataType;
+            }
+
+            source.Add(newData);
+        }
 
         /// <summary>
         /// Creates a new Uncompressed MDL file from the given information.
@@ -2421,9 +2432,15 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     vertexSize += 8;
                 }
-                if (usageInfo.UsesUv2)
+                if (usageInfo.MaxUv > 1)
                 {
-                    vertexSize += 8;
+                    if (usageInfo.MaxUv == 2)
+                    {
+                        vertexSize += 8;
+                    } else if(usageInfo.MaxUv >= 3)
+                    {
+                        vertexSize += 16;
+                    }
                 }
                 if (usageInfo.UsesVColor2)
                 {
@@ -2506,94 +2523,107 @@ namespace xivModdingFramework.Models.FileTypes
                     var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
 
 
-                    List<VertexDataStruct> source;
-                    if (ogGroup == null)
-                    {
-                        // New Group, copy data over.
-                        source = lod.MeshDataList[0].VertexDataStructList;
-                    }
-                    else
-                    {
-                        source = ogGroup.VertexDataStructList;
-                    }
-
                     // Vertex Header Writing
-                    var runningOffsets = new List<int>() { 0, 0, 0 };
-                    source.OrderBy(x => (x.DataBlock * -1000) + x.DataOffset);
-                    vertexStreamCounts.Add(source.Max(x => x.DataBlock) + 1);
+                    List<VertexDataStruct> source = new List<VertexDataStruct>();
 
-                    if(upgradePrecision)
+                    // Standard elements
+                    AddVertexHeader(source, new VertexDataStruct()
                     {
-                        // Add precomputed tangent data.
-                        var tangentCount = source.Count(x => x.DataUsage == VertexUsageType.Tangent);
-                        var binormalIdx = source.FindIndex(x => x.DataUsage == VertexUsageType.Binormal);
-                        if(binormalIdx >= 0 && tangentCount <= 0 && false)
-                        {
-                            // Goes in after Binormal
-                            source.Insert(binormalIdx + 1, new VertexDataStruct()
-                            {
-                                DataBlock = 1,
-                                DataOffset = 0, // Offset doesn't matter since we recalculate it anyways.
-                                DataType = VertexDataType.Ubyte4n,
-                                DataUsage = VertexUsageType.Tangent
-                            });
-                        }
-                    } else
-                    {
-                        source.RemoveAll(x => x.DataUsage == VertexUsageType.Tangent);
-                    }
-
-                    if (usageInfo.UsesVColor2)
-                    {
-                        // Add 2nd color channel for faux-wind simulation.
-                        var colorCounts = source.Count(x => x.DataUsage == VertexUsageType.Color);
-                        var colorIdx = source.FindIndex(x => x.DataUsage == VertexUsageType.Color);
-                        if (colorCounts == 1)
-                        {
-                            source.Insert(colorIdx + 1, new VertexDataStruct()
-                            {
-                                DataBlock = 1,
-                                DataOffset = 0, // Offset doesn't matter since we recalculate it anyways.
-                                DataType = VertexDataType.Ubyte4n,
-                                DataUsage = VertexUsageType.Color
-                            });
-                        }
-                    } else
-                    {
-                        source.RemoveAll(x => x.DataUsage == VertexUsageType.Color && x.Count == 1);
-                    }
+                        DataBlock = 0,
+                        DataType = upgradePrecision ? VertexDataType.Float3 : VertexDataType.Half4,
+                        DataUsage = VertexUsageType.Position,
+                    });
 
                     if (ttModel.HasWeights)
                     {
-                        // Ensure we have bone vertex structs if we need them.
-                        var bone = source.FirstOrDefault(x => x.DataUsage == VertexUsageType.BoneWeight);
-                        if (bone == null)
+                        AddVertexHeader(source, new VertexDataStruct()
                         {
-                            source.Add(new VertexDataStruct()
-                            {
-                                DataBlock = 0,
-                                DataOffset = 0,
-                                DataType = VertexDataType.Ubyte4,
-                                DataUsage = VertexUsageType.BoneWeight
-                            });
-                        }
-                        bone = source.FirstOrDefault(x => x.DataUsage == VertexUsageType.BoneIndex);
-                        if (bone == null)
+                            DataBlock = 0,
+                            DataType = usageInfo.NeedsEightWeights ? VertexDataType.UByte8 : VertexDataType.Ubyte4n,
+                            DataUsage = VertexUsageType.BoneWeight
+                        });
+                        AddVertexHeader(source, new VertexDataStruct()
                         {
-                            source.Add(new VertexDataStruct()
-                            {
-                                DataBlock = 0,
-                                DataOffset = 0,
-                                DataType = VertexDataType.Ubyte4,
-                                DataUsage = VertexUsageType.BoneIndex
-                            });
-                        }
+                            DataBlock = 0,
+                            DataType = usageInfo.NeedsEightWeights ? VertexDataType.UByte8 : VertexDataType.Ubyte4,
+                            DataUsage = VertexUsageType.BoneIndex
+                        });
+                    }
+
+                    AddVertexHeader(source, new VertexDataStruct()
+                    {
+                        DataBlock = 1,
+                        DataType = upgradePrecision ? VertexDataType.Float3 : VertexDataType.Half4,
+                        DataUsage = VertexUsageType.Normal
+                    });
+
+                    AddVertexHeader(source, new VertexDataStruct()
+                    {
+                        DataBlock = 1,
+                        DataType = VertexDataType.Ubyte4n,
+                        DataUsage = VertexUsageType.Binormal
+                    });
+
+                    // Optional/Situational Elements
+                    if (upgradePrecision)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = VertexDataType.Ubyte4n,
+                            DataUsage = VertexUsageType.Tangent
+                        });
+                    }
+
+                    AddVertexHeader(source, new VertexDataStruct()
+                    {
+                        DataBlock = 1,
+                        DataType = VertexDataType.Ubyte4n,
+                        DataUsage = VertexUsageType.Color
+                    });
+
+                    if (usageInfo.UsesVColor2)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = VertexDataType.Ubyte4n,
+                            DataUsage = VertexUsageType.Color,
+                            Count = 1
+                        });
+                    }
+
+                    if (usageInfo.MaxUv == 1)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = upgradePrecision ? VertexDataType.Float2 : VertexDataType.Half2,
+                            DataUsage = VertexUsageType.TextureCoordinate,
+                        });
                     } else
                     {
-                        // Remove bone vertex structs if they're not used.
-                        source.RemoveAll(x => x.DataUsage == VertexUsageType.BoneWeight);
-                        source.RemoveAll(x => x.DataUsage == VertexUsageType.BoneIndex);
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = upgradePrecision ? VertexDataType.Float4 : VertexDataType.Half4,
+                            DataUsage = VertexUsageType.TextureCoordinate,
+                        });
                     }
+
+                    if (usageInfo.MaxUv > 2)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = upgradePrecision ? VertexDataType.Float2 : VertexDataType.Half2,
+                            DataUsage = VertexUsageType.TextureCoordinate,
+                            Count = 1
+                        });
+                    }
+
+                    var runningOffsets = new List<int>() { 0, 0, 0 };
+                    vertexStreamCounts.Add(source.Max(x => x.DataBlock) + 1);
 
                     foreach (var vds in source)
                     {
@@ -2601,86 +2631,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var dataOffset = vds.DataOffset;
                         var dataType = vds.DataType;
                         var dataUsage = vds.DataUsage;
-
-                        // Model version 5 doesn't allow double color channel information.
-                        if (vdsDictionary.ContainsKey(dataUsage) && mdlVersion == 5)
-                        {
-                            continue;
-                        }
-
-                        // Perform precision updates if requested, and adjustments for MDL version.
-                        if (dataUsage == VertexUsageType.Position)
-                        {
-                            if (upgradePrecision)
-                            {
-                                dataType = VertexDataType.Float3;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Half4;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.BoneWeight)
-                        {
-                            if (usageInfo.NeedsEightWeights)
-                            {
-                                dataType = VertexDataType.UByte8;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Ubyte4n;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.BoneIndex)
-                        {
-                            if (usageInfo.NeedsEightWeights)
-                            {
-                                dataType = VertexDataType.UByte8;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Ubyte4;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.Normal)
-                        {
-                            if (upgradePrecision)
-                            {
-                                dataType = VertexDataType.Float3;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Half4;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.TextureCoordinate)
-                        {
-                            if (upgradePrecision)
-                            {
-                                if (usageInfo.UsesUv2)
-                                {
-                                    dataType = VertexDataType.Float4;
-                                }
-                                else
-                                {
-                                    dataType = VertexDataType.Float2;
-                                }
-                            }
-                            else
-                            {
-                                if (usageInfo.UsesUv2)
-                                {
-                                    dataType = VertexDataType.Half4;
-                                } else
-                                {
-                                    dataType = VertexDataType.Half2;
-                                }
-                            }
-                        }
+                        var ct = vds.Count;
 
                         var count = 0;
                         if (!vdsDictionary.ContainsKey(dataUsage))
@@ -4104,6 +4055,21 @@ namespace xivModdingFramework.Models.FileTypes
                         importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV2[0]).RawValue));
                         importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV2[1]).RawValue));
                     }
+                }
+            }
+            if(vertexInfoList.ContainsKey(VertexUsageType.TextureCoordinate) && vertexInfoList[VertexUsageType.TextureCoordinate].Count > 1)
+            {
+                var texCoordDataType = vertexInfoList[VertexUsageType.TextureCoordinate][1];
+                if (texCoordDataType == VertexDataType.Float2)
+                {
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV3[0]));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV3[1]));
+
+                }
+                else if (texCoordDataType == VertexDataType.Half2)
+                {
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV3[0]).RawValue));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV3[1]).RawValue));
                 }
             }
 

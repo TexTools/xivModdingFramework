@@ -4,6 +4,7 @@ using HelixToolkit.SharpDX.Core.Core;
 using HelixToolkit.SharpDX.Core.Model.Scene2D;
 using Newtonsoft.Json;
 using SharpDX;
+using SharpDX.Direct3D11;
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
@@ -93,6 +94,7 @@ namespace xivModdingFramework.Models.DataContainers
 
         public Vector2 UV1 = new Vector2(0, 0);
         public Vector2 UV2 = new Vector2(0, 0);
+        public Vector2 UV3 = new Vector2(0, 0);
 
         // RGBA
         public byte[] VertexColor = new byte[] { 255, 255, 255, 255 };
@@ -123,8 +125,9 @@ namespace xivModdingFramework.Models.DataContainers
             if (a.Handedness != b.Handedness) return false;
             if (a.UV1 != b.UV1) return false;
             if (a.UV2 != b.UV2) return false;
+            if (a.UV2 != b.UV3) return false;
 
-            for(var ci = 0; ci < _BONE_ARRAY_LENGTH; ci++)
+            for (var ci = 0; ci < _BONE_ARRAY_LENGTH; ci++)
             {
                 if (ci < 4)
                 {
@@ -1203,10 +1206,10 @@ namespace xivModdingFramework.Models.DataContainers
             return MeshGroups.Count(x => x.MeshType == type);
         }
 
-        public (bool UsesVColor2, bool UsesUv2, bool NeedsEightWeights) GetUsageInfo()
+        public (bool UsesVColor2, int MaxUv, bool NeedsEightWeights) GetUsageInfo()
         {
             bool usesVcolor2 = false;
-            bool usesUv2 = false;
+            int MaxUv = 1;
             bool needs8Weight = false;
 
             foreach (var m in MeshGroups)
@@ -1230,11 +1233,19 @@ namespace xivModdingFramework.Models.DataContainers
                             }
                         }
 
-                        if (!usesUv2)
+                        if (MaxUv < 2)
                         {
                             if (v.UV2 != Vector2.Zero)
                             {
-                                usesUv2 = true;
+                                MaxUv = 2;
+                            }
+                        }
+
+                        if (MaxUv < 3)
+                        {
+                            if (v.UV3 != Vector2.Zero)
+                            {
+                                MaxUv = 3;
                             }
                         }
 
@@ -1253,7 +1264,7 @@ namespace xivModdingFramework.Models.DataContainers
                 }
             }
 
-            return (usesVcolor2, usesUv2, needs8Weight);
+            return (usesVcolor2, MaxUv, needs8Weight);
         }
 
         /// <summary>
@@ -1533,6 +1544,8 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.UV1.Y = reader.GetFloat("uv_1_v");
                             vertex.UV2.X = reader.GetFloat("uv_2_u");
                             vertex.UV2.Y = reader.GetFloat("uv_2_v");
+                            vertex.UV3.X = reader.GetFloat("uv_3_u");
+                            vertex.UV3.Y = reader.GetFloat("uv_3_v");
 
                             // Bone Ids
                             vertex.BoneIds[0] = (byte)(reader.GetByte("bone_1_id"));
@@ -1862,75 +1875,8 @@ namespace xivModdingFramework.Models.DataContainers
                                 var vIdx = 0;
                                 foreach (var v in p.Vertices)
                                 {
-                                    query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,  color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
-                                                        values    ( $mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b, $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
-                                    using (var cmd = new SQLiteCommand(query, db))
-                                    {
-                                        cmd.Parameters.AddWithValue("part", partIdx);
-                                        cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                        cmd.Parameters.AddWithValue("vertex_id", vIdx);
-
-                                        cmd.Parameters.AddWithValue("position_x", v.Position.X);
-                                        cmd.Parameters.AddWithValue("position_y", v.Position.Y);
-                                        cmd.Parameters.AddWithValue("position_z", v.Position.Z);
-
-                                        cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
-                                        cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
-                                        cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
-
-                                        cmd.Parameters.AddWithValue("binormal_x", v.Binormal.X);
-                                        cmd.Parameters.AddWithValue("binormal_y", v.Binormal.Y);
-                                        cmd.Parameters.AddWithValue("binormal_z", v.Binormal.Z);
-
-                                        cmd.Parameters.AddWithValue("tangent_x", v.Tangent.X);
-                                        cmd.Parameters.AddWithValue("tangent_y", v.Tangent.Y);
-                                        cmd.Parameters.AddWithValue("tangent_z", v.Tangent.Z);
-
-                                        cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
-                                        cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
-                                        cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
-                                        cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
-
-                                        cmd.Parameters.AddWithValue("color2_r", v.VertexColor2[0] / 255f);
-                                        cmd.Parameters.AddWithValue("color2_g", v.VertexColor2[1] / 255f);
-                                        cmd.Parameters.AddWithValue("color2_b", v.VertexColor2[2] / 255f);
-                                        cmd.Parameters.AddWithValue("color2_a", v.VertexColor2[3] / 255f);
-
-                                        cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
-                                        cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
-                                        cmd.Parameters.AddWithValue("uv_2_u", v.UV2.X);
-                                        cmd.Parameters.AddWithValue("uv_2_v", v.UV2.Y);
-
-
-                                        cmd.Parameters.AddWithValue("bone_1_id", v.BoneIds[0]);
-                                        cmd.Parameters.AddWithValue("bone_1_weight", v.Weights[0] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_2_id", v.BoneIds[1]);
-                                        cmd.Parameters.AddWithValue("bone_2_weight", v.Weights[1] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_3_id", v.BoneIds[2]);
-                                        cmd.Parameters.AddWithValue("bone_3_weight", v.Weights[2] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
-                                        cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_5_id", v.BoneIds[4]);
-                                        cmd.Parameters.AddWithValue("bone_5_weight", v.Weights[4] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_6_id", v.BoneIds[5]);
-                                        cmd.Parameters.AddWithValue("bone_6_weight", v.Weights[5] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_7_id", v.BoneIds[6]);
-                                        cmd.Parameters.AddWithValue("bone_7_weight", v.Weights[6] / 255f);
-
-                                        cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
-                                        cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
-
-
-
-                                        cmd.ExecuteScalar();
-                                        vIdx++;
-                                    }
+                                    WriteVertex(v, db, meshIdx, partIdx, vIdx);
+                                    vIdx++;
                                 }
 
                                 // Indices
@@ -2335,73 +2281,8 @@ namespace xivModdingFramework.Models.DataContainers
                                     var vIdx = 0;
                                     foreach (var v in p.Vertices)
                                     {
-                                        query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight) 
-                                                        values         ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight);";
-                                        using (var cmd = new SQLiteCommand(query, db))
-                                        {
-                                            cmd.Parameters.AddWithValue("part", partIdx);
-                                            cmd.Parameters.AddWithValue("mesh", meshIdx);
-                                            cmd.Parameters.AddWithValue("vertex_id", vIdx);
-
-                                            cmd.Parameters.AddWithValue("position_x", v.Position.X);
-                                            cmd.Parameters.AddWithValue("position_y", v.Position.Y);
-                                            cmd.Parameters.AddWithValue("position_z", v.Position.Z);
-
-                                            cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
-                                            cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
-                                            cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
-
-                                            cmd.Parameters.AddWithValue("binormal_x", v.Binormal.X);
-                                            cmd.Parameters.AddWithValue("binormal_y", v.Binormal.Y);
-                                            cmd.Parameters.AddWithValue("binormal_z", v.Binormal.Z);
-
-                                            cmd.Parameters.AddWithValue("tangent_x", v.Tangent.X);
-                                            cmd.Parameters.AddWithValue("tangent_y", v.Tangent.Y);
-                                            cmd.Parameters.AddWithValue("tangent_z", v.Tangent.Z);
-
-                                            cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
-                                            cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
-                                            cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
-                                            cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
-
-                                            cmd.Parameters.AddWithValue("color2_r", v.VertexColor2[0] / 255f);
-                                            cmd.Parameters.AddWithValue("color2_g", v.VertexColor2[1] / 255f);
-                                            cmd.Parameters.AddWithValue("color2_b", v.VertexColor2[2] / 255f);
-                                            cmd.Parameters.AddWithValue("color2_a", v.VertexColor2[3] / 255f);
-
-                                            cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
-                                            cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
-                                            cmd.Parameters.AddWithValue("uv_2_u", v.UV2.X);
-                                            cmd.Parameters.AddWithValue("uv_2_v", v.UV2.Y);
-
-
-                                            cmd.Parameters.AddWithValue("bone_1_id", v.BoneIds[0]);
-                                            cmd.Parameters.AddWithValue("bone_1_weight", v.Weights[0] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_2_id", v.BoneIds[1]);
-                                            cmd.Parameters.AddWithValue("bone_2_weight", v.Weights[1] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_3_id", v.BoneIds[2]);
-                                            cmd.Parameters.AddWithValue("bone_3_weight", v.Weights[2] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
-                                            cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_5_id", v.BoneIds[4]);
-                                            cmd.Parameters.AddWithValue("bone_5_weight", v.Weights[4] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_6_id", v.BoneIds[5]);
-                                            cmd.Parameters.AddWithValue("bone_6_weight", v.Weights[5] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_7_id", v.BoneIds[6]);
-                                            cmd.Parameters.AddWithValue("bone_7_weight", v.Weights[6] / 255f);
-
-                                            cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
-                                            cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
-
-                                            cmd.ExecuteScalar();
-                                            vIdx++;
-                                        }
+                                        WriteVertex(v, db, meshIdx, partIdx, vIdx);
+                                        vIdx++;
                                     }
 
                                     // Indices
@@ -2464,6 +2345,77 @@ namespace xivModdingFramework.Models.DataContainers
                     throw Ex;
                 }
                 ModelModifiers.MakeImportReady(model, loggingFunction);
+            }
+        }
+
+        private static void WriteVertex(TTVertex v, SQLiteConnection db, int meshIdx, int partIdx, int vIdx)
+        {
+            var query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight,  uv_3_u,  uv_3_v) 
+                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b, $color2_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight, $uv_3_u, $uv_3_v);";
+            using (var cmd = new SQLiteCommand(query, db))
+            {
+                cmd.Parameters.AddWithValue("part", partIdx);
+                cmd.Parameters.AddWithValue("mesh", meshIdx);
+                cmd.Parameters.AddWithValue("vertex_id", vIdx);
+
+                cmd.Parameters.AddWithValue("position_x", v.Position.X);
+                cmd.Parameters.AddWithValue("position_y", v.Position.Y);
+                cmd.Parameters.AddWithValue("position_z", v.Position.Z);
+
+                cmd.Parameters.AddWithValue("normal_x", v.Normal.X);
+                cmd.Parameters.AddWithValue("normal_y", v.Normal.Y);
+                cmd.Parameters.AddWithValue("normal_z", v.Normal.Z);
+
+                cmd.Parameters.AddWithValue("binormal_x", v.Binormal.X);
+                cmd.Parameters.AddWithValue("binormal_y", v.Binormal.Y);
+                cmd.Parameters.AddWithValue("binormal_z", v.Binormal.Z);
+
+                cmd.Parameters.AddWithValue("tangent_x", v.Tangent.X);
+                cmd.Parameters.AddWithValue("tangent_y", v.Tangent.Y);
+                cmd.Parameters.AddWithValue("tangent_z", v.Tangent.Z);
+
+                cmd.Parameters.AddWithValue("color_r", v.VertexColor[0] / 255f);
+                cmd.Parameters.AddWithValue("color_g", v.VertexColor[1] / 255f);
+                cmd.Parameters.AddWithValue("color_b", v.VertexColor[2] / 255f);
+                cmd.Parameters.AddWithValue("color_a", v.VertexColor[3] / 255f);
+
+                cmd.Parameters.AddWithValue("color2_r", v.VertexColor2[0] / 255f);
+                cmd.Parameters.AddWithValue("color2_g", v.VertexColor2[1] / 255f);
+                cmd.Parameters.AddWithValue("color2_b", v.VertexColor2[2] / 255f);
+                cmd.Parameters.AddWithValue("color2_a", v.VertexColor2[3] / 255f);
+
+                cmd.Parameters.AddWithValue("uv_1_u", v.UV1.X);
+                cmd.Parameters.AddWithValue("uv_1_v", v.UV1.Y);
+                cmd.Parameters.AddWithValue("uv_2_u", v.UV2.X);
+                cmd.Parameters.AddWithValue("uv_2_v", v.UV2.Y);
+                cmd.Parameters.AddWithValue("uv_3_u", v.UV3.X);
+                cmd.Parameters.AddWithValue("uv_3_v", v.UV3.Y);
+
+                cmd.Parameters.AddWithValue("bone_1_id", v.BoneIds[0]);
+                cmd.Parameters.AddWithValue("bone_1_weight", v.Weights[0] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_2_id", v.BoneIds[1]);
+                cmd.Parameters.AddWithValue("bone_2_weight", v.Weights[1] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_3_id", v.BoneIds[2]);
+                cmd.Parameters.AddWithValue("bone_3_weight", v.Weights[2] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_4_id", v.BoneIds[3]);
+                cmd.Parameters.AddWithValue("bone_4_weight", v.Weights[3] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_5_id", v.BoneIds[4]);
+                cmd.Parameters.AddWithValue("bone_5_weight", v.Weights[4] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_6_id", v.BoneIds[5]);
+                cmd.Parameters.AddWithValue("bone_6_weight", v.Weights[5] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_7_id", v.BoneIds[6]);
+                cmd.Parameters.AddWithValue("bone_7_weight", v.Weights[6] / 255f);
+
+                cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
+                cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
+
+                cmd.ExecuteScalar();
             }
         }
 

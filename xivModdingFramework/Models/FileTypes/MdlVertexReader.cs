@@ -73,8 +73,15 @@ namespace xivModdingFramework.Models.FileTypes
             if(usage == VertexUsageType.TextureCoordinate)
             {
                 var r = ReadDoubleVector(br, type);
-                data.TextureCoordinates0.Add(r.Vec0);
-                data.TextureCoordinates1.Add(r.Vec1);
+                if (count == 0)
+                {
+                    data.TextureCoordinates0.Add(r.Vec0);
+                    data.TextureCoordinates1.Add(r.Vec1);
+                }
+                else
+                {
+                    data.TextureCoordinates2.Add(r.Vec0);
+                }
             } else if(usage == VertexUsageType.Binormal)
             {
                 var r = ReadByteVector(br, type);

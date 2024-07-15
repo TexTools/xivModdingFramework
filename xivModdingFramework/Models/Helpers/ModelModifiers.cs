@@ -537,6 +537,21 @@ namespace xivModdingFramework.Models.Helpers
                             }
                         }
 
+                        if (baseMesh.VertexData.TextureCoordinates2.Count > oldVertexId)
+                        {
+                            ttVert.UV3 = baseMesh.VertexData.TextureCoordinates2[oldVertexId];
+
+                            if (float.IsNaN(ttVert.UV3.X))
+                            {
+                                ttVert.UV3.X = 0;
+                            }
+
+                            if (float.IsNaN(ttVert.UV3.Y))
+                            {
+                                ttVert.UV3.Y = 0;
+                            }
+                        }
+
 
                         var vertexBoneArrayLength = baseMesh.VertexBoneArraySize;
                         // Now for the fun part, establishing bones.
@@ -2315,18 +2330,10 @@ namespace xivModdingFramework.Models.Helpers
             {
                 v.UV1[1] -= 1;
                 v.UV2[1] -= 1;
+                v.UV3[1] -= 1;
             }
 
-            foreach (var shpKv in p.ShapeParts)
-            {
-                foreach (var vKv in shpKv.Value.VertexReplacements)
-                {
-                    var shpVertex = shpKv.Value.Vertices[vKv.Value];
-                    var pVertex = p.Vertices[vKv.Key];
-                    shpVertex.UV1 = pVertex.UV1;
-                    shpVertex.UV2 = pVertex.UV2;
-                }
-            }
+            UpdateShapeParts(p);
         }
 
         public static void ShiftExportUV_Part(TTMeshPart p)
@@ -2335,18 +2342,10 @@ namespace xivModdingFramework.Models.Helpers
             {
                 v.UV1[1] += 1;
                 v.UV2[1] += 1;
+                v.UV3[1] += 1;
             }
 
-            foreach (var shpKv in p.ShapeParts)
-            {
-                foreach (var vKv in shpKv.Value.VertexReplacements)
-                {
-                    var shpVertex = shpKv.Value.Vertices[vKv.Value];
-                    var pVertex = p.Vertices[vKv.Key];
-                    shpVertex.UV1 = pVertex.UV1;
-                    shpVertex.UV2 = pVertex.UV2;
-                }
-            }
+            UpdateShapeParts(p);
         }
     }
 }
