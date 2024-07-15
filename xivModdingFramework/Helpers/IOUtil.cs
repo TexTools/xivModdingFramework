@@ -668,7 +668,23 @@ namespace xivModdingFramework.Helpers
                         var toUnzip = zip.Entries.Where(x => ReplaceSlashes(x.FileName).ToLower() == taskFile);
                         foreach (var e in toUnzip)
                         {
-                            e.Extract(destination, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                            var pathSafe = IOUtil.MakePathSafe(Path.GetFileName(e.FileName), false);
+                            var def = Path.GetFileName(e.FileName);
+                            var illegal = def != pathSafe;
+                            if (illegal)
+                            {
+                                try
+                                {
+                                    e.Extract(destination, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                                }
+                                catch(Exception ex)
+                                {
+                                    Trace.WriteLine(ex);
+                                }
+                            } else
+                            {
+                                e.Extract(destination, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                            }
                         }
                     }
                 }));

@@ -548,7 +548,11 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public EquipmentParameter ToEquipmentParameter()
         {
-            var slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+            string slot = "top";
+            if (PMPExtensions.PenumbraSlotToGameSlot.ContainsKey(Slot))
+            {
+                slot = PMPExtensions.PenumbraSlotToGameSlot[Slot];
+            }
             var offset = EquipmentParameterSet.EntryOffsets[slot];
             var size = EquipmentParameterSet.EntrySizes[slot];
 
