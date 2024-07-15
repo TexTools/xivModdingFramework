@@ -418,14 +418,8 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns></returns>
         public static async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
-            var root = await XivCache.GetFirstRoot(internalPath);
-            bool useMips = root != null;
-
-            if (internalPath.StartsWith("chara/common/texture/decal_face"))
-            {
-                // Hacky exception is fine for now.
-                useMips = true;
-            }
+            var df= IOUtil.GetDataFileFromPath(internalPath);
+            bool useMips = df != XivDataFile._06_Ui;
 
 
             // First of all, check if the file is a DDS file.
