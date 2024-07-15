@@ -1246,7 +1246,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Image;
 
         // These exist.
-        public List<string> Tags;
+        public List<string> ModTags;
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
