@@ -66,6 +66,8 @@ CREATE TABLE "vertices" (
 	"uv_1_v"	REAL NOT NULL,
 	"uv_2_u"	REAL NOT NULL,
 	"uv_2_v"	REAL NOT NULL,
+	"uv_3_u"	REAL NOT NULL,
+	"uv_3_v"	REAL NOT NULL,
 
 	-- Bone Weights
 	"bone_1_id"			INTEGER,

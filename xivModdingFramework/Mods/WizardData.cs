@@ -92,6 +92,11 @@ namespace xivModdingFramework.Mods
 
         public void SortManipulations()
         {
+            if(Manipulations == null)
+            {
+                Manipulations = new List<PMPManipulationWrapperJson>();
+            }
+
             Manipulations.Sort((a, b) =>
             {
                 if (a == null || b == null)
@@ -991,7 +996,7 @@ namespace xivModdingFramework.Mods
             page.Author = meta.Author;
             page.Description = meta.Description;
             page.Name = meta.Name;
-            page.Tags = meta.Tags;
+            page.Tags = meta.ModTags;
 
 
             if (!string.IsNullOrWhiteSpace(meta.Image))
@@ -1456,10 +1461,10 @@ namespace xivModdingFramework.Mods
                 pmp.Meta.Website = MetaPage.Url;
                 pmp.Meta.Description = MetaPage.Description;
                 pmp.Meta.Version = ver.ToString();
-                pmp.Meta.Tags = new List<string>();
+                pmp.Meta.ModTags = new List<string>();
                 pmp.Meta.FileVersion = PMP._WriteFileVersion;
                 pmp.Meta.Image = WizardHelpers.WriteImage(MetaPage.Image, tempFolder, "_MetaImage");
-                pmp.Meta.Tags = MetaPage.Tags;
+                pmp.Meta.ModTags = MetaPage.Tags;
 
                 var optionCount = DataPages.Sum(p => p.Groups.Sum(x => x.Options.Count));
 

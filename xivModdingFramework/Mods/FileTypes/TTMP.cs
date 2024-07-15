@@ -493,10 +493,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (mpdName == null)
                 {
-                    using (var zf = ZipFile.Read(path))
-                    {
-                        zf.ExtractAll(targetPath);
-                    }
+                    await IOUtil.UnzipFiles(path, targetPath);
                 }
                 else
                 {

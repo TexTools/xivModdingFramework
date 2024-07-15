@@ -94,6 +94,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// The secondary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
         public Vector2Collection TextureCoordinates1 { get; set; } = new Vector2Collection();
+        public Vector2Collection TextureCoordinates2 { get; set; } = new Vector2Collection();
 
         /// <summary>
         /// The index data for the mesh
