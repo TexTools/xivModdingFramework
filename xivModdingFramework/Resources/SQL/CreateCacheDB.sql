@@ -23,7 +23,6 @@ CREATE TABLE "items" (
 	"name"	TEXT NOT NULL,
 	"primary_id"	INTEGER NOT NULL,
 	"secondary_id"	INTEGER NOT NULL,
-	"equip_type"	INTEGER NOT NULL,
 	"slot"		TEXT,
 	"slot_full"	TEXT NOT NULL,
 	"imc_variant"	INTEGER NOT NULL,

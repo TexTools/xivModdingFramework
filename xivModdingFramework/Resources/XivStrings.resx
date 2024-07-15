@@ -984,4 +984,10 @@
   <data name="Painting Icons" xml:space="preserve">
     <value>Painting Icons</value>
   </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>Weapons</value>
+  </data>
+  <data name="Accessories" xml:space="preserve">
+    <value>Accessories</value>
+  </data>
 </root>

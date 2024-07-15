@@ -14,11 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using HelixToolkit.SharpDX.Core;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Items.DataContainers;
 using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
@@ -47,24 +49,20 @@ namespace xivModdingFramework.Items
 
             if (item.PrimaryCategory == null || item.SecondaryCategory == null) return XivItemType.unknown;
 
-            if (item.SecondaryCategory.Equals(XivStrings.Main_Hand) || item.SecondaryCategory.Equals(XivStrings.Off_Hand) ||
-                item.SecondaryCategory.Equals(XivStrings.Main_Off) || item.SecondaryCategory.Equals(XivStrings.Two_Handed) || item.SecondaryCategory.Equals(XivStrings.Dual_Wield) || item.SecondaryCategory.Equals(XivStrings.Food))
+            if (item.PrimaryCategory == XivStrings.Weapons)
             {
                 itemType = XivItemType.weapon;
 
-                var asIm = item as IItemModel;
-                if (asIm != null)
+                var asGear = item as XivGear;
+                if (asGear != null && asGear.ModelInfo != null)
                 {
-                    var gearinfo = asIm.ModelInfo as XivGearModelInfo;
-                    if(gearinfo != null && !gearinfo.IsWeapon)
+                    if(XivWeaponTypes.GetWeaponType(asGear.ModelInfo.PrimaryID) == XivWeaponType.FistsGloves)
                     {
                         itemType = XivItemType.equipment;
-
                     }
                 }
             }
-            else if (item.PrimaryCategory.Equals(XivStrings.Gear) && (item.SecondaryCategory.Equals(XivStrings.Earring) || item.SecondaryCategory.Equals(XivStrings.Neck) ||
-                     item.SecondaryCategory.Equals(XivStrings.Wrists) || item.SecondaryCategory.Equals(XivStrings.Rings) || item.SecondaryCategory.Equals(XivStrings.LeftRing)))
+            else if (item.PrimaryCategory == XivStrings.Accessories)
             {
                 itemType = XivItemType.accessory;
             }
@@ -182,19 +180,16 @@ namespace xivModdingFramework.Items
         public static string GetItemSlotAbbreviation(this IItem item)
         {
             // Test to make sure we're in the right category for these.
-            if (item.SecondaryCategory == XivStrings.Dual_Wield)
+            var asGear = item as XivGear;
+
+            if(asGear != null && asGear.ModelInfo != null)
             {
-                try
+                if (asGear != null && asGear.ModelInfo != null)
                 {
-                    var im = ((XivGearModelInfo)((XivGear)item).ModelInfo);
-                    if(!im.IsWeapon)
+                    if (XivWeaponTypes.GetWeaponType(asGear.ModelInfo.PrimaryID) == XivWeaponType.FistsGloves)
                     {
                         return Mdl.SlotAbbreviationDictionary[XivStrings.Hands];
                     }
-                }
-                catch
-                {
-                    // Use the default logic if we failed the cast.
                 }
             }
 
@@ -324,27 +319,6 @@ namespace xivModdingFramework.Items
         }
 
         /// <summary>
-        /// Finds suffix-less -name- of the IMC File for a given child path..
-        /// </summary>
-        /// <param name="path"></param>
-        /// <returns></returns>
-        private static string GetIMCNameFromChildPath(string path)
-        {
-            var match = _equipmentRegex.Match(path);
-            if (match.Success) return match.Groups[2].Value;
-            match = _accessoryRegex.Match(path);
-            if (match.Success) return match.Groups[2].Value;
-            match = _weaponRegex.Match(path);
-            if (match.Success) return match.Groups[2].Value;
-            match = _monsterRegex.Match(path);
-            if (match.Success) return match.Groups[2].Value;
-            match = _demihumanRegex.Match(path);
-            if (match.Success) return match.Groups[2].Value;
-
-            return null;
-        }
-
-        /// <summary>
         /// Gets the IMC path for a given child path.
         /// </summary>
         /// <param name="path"></param>
@@ -352,14 +326,8 @@ namespace xivModdingFramework.Items
         public static string GetIMCPathFromChildPath(string path)
         {
 
-            var imcName = GetIMCNameFromChildPath(path);
-            var rootFolder = GetRootFolderFromPath(path);
-            if (imcName == null || rootFolder == null)
-            {
-                return null;
-            }
-
-            return rootFolder + imcName + ".imc";
+            var root = XivCache.GetFilePathRoot(path);
+            return root.GetRawImcFilePath();
         }
 
 

@@ -108,7 +108,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 9, ExcelColumnDataType.String ) },
-                { "EquipType", ( 46, ExcelColumnDataType.UInt8 ) },
+                //{ "EquipType", ( 46, ExcelColumnDataType.UInt8 ) },
                 { "PrimaryInfo", ( 47, ExcelColumnDataType.UInt64 ) },
                 { "SecondaryInfo", ( 48, ExcelColumnDataType.UInt64 ) },
                 { "SlotNum", ( 17, ExcelColumnDataType.UInt8 ) },

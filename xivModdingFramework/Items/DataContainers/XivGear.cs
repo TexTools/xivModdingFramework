@@ -18,6 +18,7 @@ using System;
 using System.Linq;
 using xivModdingFramework.Cache;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Models.FileTypes;
 using xivModdingFramework.Resources;
@@ -82,15 +83,26 @@ namespace xivModdingFramework.Items.DataContainers
         /// </summary>
         public uint IconId { get; set; }
 
-        /// <summary>
-        /// The Skeleton type for weapons
-        /// </summary>
-        public uint EquipType { get; set; }
+        public bool IsWeapon
+        {
+            get
+            {
+                return this.ModelInfo != null && this.ModelInfo.SecondaryID > 0;
+            }
+        }
 
-        /// <summary>
-        /// The gear EquipSlotCategory key
-        /// </summary>
-        public int EquipSlotCategory { get; set; }
+
+        public XivWeaponType WeaponType { get
+            {
+                if (ModelInfo == null) return XivWeaponType.Unknown;
+                if (PrimaryCategory != XivStrings.Weapons) return XivWeaponType.Unknown;
+
+                var root = this.GetRoot();
+                if(root == null) return XivWeaponType.Unknown;
+
+                return XivWeaponTypes.GetWeaponType(ModelInfo.PrimaryID);
+            }
+        }
 
         /// <summary>
         /// The other item in this pair (main or offhand)
@@ -117,7 +129,7 @@ namespace xivModdingFramework.Items.DataContainers
         internal static IItemModel FromDependencyRoot(XivDependencyRoot root, int imcSubset)
         {
             var item = new XivGear();
-            item.ModelInfo = new XivGearModelInfo();
+            item.ModelInfo = new XivModelInfo();
             item.ModelInfo.PrimaryID = root.Info.PrimaryId;
             if (root.Info.SecondaryId != null)
             {
@@ -126,15 +138,20 @@ namespace xivModdingFramework.Items.DataContainers
             item.ModelInfo.ImcSubsetID = imcSubset;
 
             item.Name = root.Info.GetBaseFileName() + "_v" + imcSubset.ToString();
-            item.PrimaryCategory = XivStrings.Gear;
 
             if (root.Info.PrimaryType == Enums.XivItemType.weapon)
             {
-                //((XivGearModelInfo)item.ModelInfo).IsWeapon = true;
-                item.SecondaryCategory = XivStrings.Main_Hand;
+                item.PrimaryCategory = XivStrings.Weapons;
+                item.SecondaryCategory = item.WeaponType.GetNiceName();
+
+            } else if(root.Info.PrimaryType == XivItemType.accessory)
+            {
+                item.PrimaryCategory = XivStrings.Accessories;
+                item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.First(x => x.Value == root.Info.Slot).Key;
             }
             else
             {
+                item.PrimaryCategory = XivStrings.Gear;
                 item.SecondaryCategory = Mdl.SlotAbbreviationDictionary.First(x => x.Value == root.Info.Slot).Key;
             }
 
@@ -145,7 +162,7 @@ namespace xivModdingFramework.Items.DataContainers
         public object Clone()
         {
             var copy = (XivGear)this.MemberwiseClone();
-            copy.ModelInfo = (XivGearModelInfo)ModelInfo.Clone();
+            copy.ModelInfo = (XivModelInfo)ModelInfo.Clone();
 
             return copy;
         }
@@ -156,14 +173,6 @@ namespace xivModdingFramework.Items.DataContainers
         }
 
         public override string ToString() => Name;
-    }
 
-    public class XivGearModelInfo : XivModelInfo
-    {
-        public bool IsWeapon {
-            get {
-                return this.SecondaryID > 0;
-            }
-        }
     }
 }

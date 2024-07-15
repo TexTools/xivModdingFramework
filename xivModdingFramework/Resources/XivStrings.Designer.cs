@@ -61,6 +61,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Accessories.
+        /// </summary>
+        internal static string Accessories {
+            get {
+                return ResourceManager.GetString("Accessories", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Accessory.
         /// </summary>
         internal static string Accessory {
@@ -2595,6 +2604,15 @@ namespace xivModdingFramework.Resources {
         internal static string Weapon {
             get {
                 return ResourceManager.GetString("Weapon", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Weapons.
+        /// </summary>
+        internal static string Weapons {
+            get {
+                return ResourceManager.GetString("Weapons", resourceCulture);
             }
         }
         

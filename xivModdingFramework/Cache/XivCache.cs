@@ -981,15 +981,14 @@ namespace xivModdingFramework.Cache
                 {
                     foreach (var item in items)
                     {
-                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id,  equip_type,  root) 
-                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $equip_type, $root)";
+                        var query = @"insert into items ( exd_id,  primary_id,  secondary_id,  imc_variant,  slot,  slot_full,  name,  icon_id, root) 
+                                                  values($exd_id, $primary_id, $secondary_id, $imc_variant, $slot, $slot_full, $name, $icon_id, $root)";
                         var root = item.GetRootInfo();
                         using (var cmd = new SQLiteCommand(query, db))
                         {
                             cmd.Parameters.AddWithValue("exd_id", item.ExdID);
                             cmd.Parameters.AddWithValue("primary_id", item.ModelInfo.PrimaryID);
                             cmd.Parameters.AddWithValue("secondary_id", item.ModelInfo.SecondaryID);
-                            cmd.Parameters.AddWithValue("equip_type", ((XivGearModelInfo)item.ModelInfo).IsWeapon);
                             cmd.Parameters.AddWithValue("slot", item.GetItemSlotAbbreviation());
                             cmd.Parameters.AddWithValue("slot_full", item.SecondaryCategory);
                             cmd.Parameters.AddWithValue("imc_variant", item.ModelInfo.ImcSubsetID);
@@ -1361,7 +1360,7 @@ namespace xivModdingFramework.Cache
         /// <returns></returns>
         internal static XivGear MakeGear(CacheReader reader)
         {
-            var primaryMi = new XivGearModelInfo();
+            var primaryMi = new XivModelInfo();
 
             var item = new XivGear
             {
@@ -1373,10 +1372,23 @@ namespace xivModdingFramework.Cache
 
             item.Name = reader.GetString("name");
             item.IconId = (uint)reader.GetInt32("icon_id");
-            item.EquipType = (uint)reader.GetInt32("equip_type");
             primaryMi.PrimaryID = reader.GetInt32("primary_id");
             primaryMi.SecondaryID = reader.GetInt32("secondary_id");
             primaryMi.ImcSubsetID = reader.GetInt32("imc_variant");
+
+            if (item.IsWeapon)
+            {
+                item.PrimaryCategory = XivStrings.Weapons;
+                var wt = item.WeaponType;
+                item.SecondaryCategory = wt.GetNiceName();
+            }
+            else if (item.SecondaryCategory == XivStrings.Earring
+                            || item.SecondaryCategory == XivStrings.Neck
+                            || item.SecondaryCategory == XivStrings.Wrists
+                            || item.SecondaryCategory == XivStrings.Rings)
+            {
+                item.PrimaryCategory = XivStrings.Accessories;
+            }
 
             return item;
         }
