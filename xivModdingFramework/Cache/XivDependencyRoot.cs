@@ -255,6 +255,16 @@ namespace xivModdingFramework.Cache
             }
 
             var basePath = info.GetRootFolder();
+            if (info.PrimaryType == XivItemType.weapon)
+            {
+                var wType = XivWeaponTypes.GetWeaponType(info.PrimaryId);
+                if (Imc.ImcSharingWeaponTypes.Contains(wType))
+                {
+                    var nInfo = info;
+                    nInfo.PrimaryId -= 50;
+                    basePath = nInfo.GetRootFolder();
+                }
+            }
 
             if (UsesMaterialSets())
             {
@@ -1078,7 +1088,18 @@ namespace xivModdingFramework.Cache
             {
                 var iPrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
                 var iId = Info.SecondaryId.ToString().PadLeft(4, '0');
-                imcPath = Info.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
+
+                var nInfo = Info;
+                if (Info.PrimaryType == XivItemType.weapon)
+                {
+                    var wType = XivWeaponTypes.GetWeaponType(Info.PrimaryId);
+                    if (Imc.ImcSharingWeaponTypes.Contains(wType))
+                    {
+                        nInfo.PrimaryId -= 50;
+                    }
+                }
+
+                imcPath = nInfo.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
             }
             return imcPath;
 

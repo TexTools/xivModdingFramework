@@ -1079,7 +1079,7 @@ namespace xivModdingFramework.Mods
             var def = pmp.DefaultMod as PmpStandardOptionJson;
             if (def != null)
             {
-                var anyData = def.Manipulations.Count > 0 || def.FileSwaps.Count > 0 || def.Files.Count > 0;
+                var anyData = (def.Manipulations != null && def.Manipulations.Count > 0) || def.FileSwaps.Count > 0 || def.Files.Count > 0;
                 if (anyData)
                 {
                     // Just drum up a basic group containing the default option.

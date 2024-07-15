@@ -429,6 +429,8 @@ namespace xivModdingFramework.Helpers
 
             try
             {
+                if (!baseDir.Exists)
+                    return;
                 baseDir.Delete(true);
             }
             catch
@@ -872,6 +874,7 @@ namespace xivModdingFramework.Helpers
 
         public static async Task CompressWindowsDirectory(string dir)
         {
+            if (!Directory.Exists(dir)) return;
             try
             {
                 var wrappedDir = Regex.Replace(dir, @"(\\*)" + "\"", @"$1$1\" + "\"");

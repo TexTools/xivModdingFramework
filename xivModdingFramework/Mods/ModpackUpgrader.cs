@@ -209,11 +209,15 @@ namespace xivModdingFramework.Mods
             return (data, anyChanges);
         }
 
-        public static async Task<bool> UpgradeModpack(string path, string newPath, bool includePartials = true)
+        public static async Task<bool> UpgradeModpack(string path, string newPath, bool includePartials = true, bool rewriteOnNoChanges = false)
         {
             var data = await UpgradeModpack(path, includePartials);
 
-            await data.Data.WriteModpack(newPath, true);
+            if (data.AnyChanges || rewriteOnNoChanges)
+            {
+                await data.Data.WriteModpack(newPath, true);
+            }
+
             return data.AnyChanges;
         }
 

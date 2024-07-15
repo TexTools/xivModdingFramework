@@ -63,6 +63,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             get
             {
+                if (RealPath == null) return false;
                 return RealPath.StartsWith(XivCache.GameInfo.GameDirectory.FullName) && RealPath.EndsWith(Dat.DatExtension) && StorageType == EFileStorageType.CompressedBlob;
             }
         }

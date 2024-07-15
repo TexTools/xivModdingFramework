@@ -43,11 +43,21 @@ namespace xivModdingFramework.Variants.FileTypes
         Set = 31
     }
 
+
     /// <summary>
     /// This class contains the methods that deal with the .imc file type 
     /// </summary>
     public static class Imc
     {
+
+        public static HashSet<XivWeaponType> ImcSharingWeaponTypes = new HashSet<XivWeaponType>()
+        {
+            XivWeaponType.FistsOff,
+            XivWeaponType.TwinfangsOff,
+            XivWeaponType.DaggersOff,
+            XivWeaponType.GlaivesOff,
+        };
+
         private const string ImcExtension = ".imc";
         public static bool UsesImc(IItemModel item)
         {
@@ -156,7 +166,6 @@ namespace xivModdingFramework.Variants.FileTypes
 
             var imcPath = await GetImcPath(item, tx);
             var path = imcPath.Folder + "/" + imcPath.File;
-
 
             if(!await tx.FileExists(path, forceOriginal))
             {
@@ -490,6 +499,21 @@ namespace xivModdingFramework.Variants.FileTypes
             var secondaryId = item.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemType = item.GetPrimaryItemType();
 
+
+            if (itemType == XivItemType.weapon)
+            {
+                var gear = item as XivGear;
+                if (gear != null)
+                {
+                    var wType = gear.WeaponType;
+                    if (ImcSharingWeaponTypes.Contains(wType))
+                    {
+                        primaryId = (item.ModelInfo.PrimaryID -50).ToString().PadLeft(4, '0');
+                    }
+                }
+            }
+
+
             switch (itemType)
             {
                 case XivItemType.equipment:
@@ -513,17 +537,6 @@ namespace xivModdingFramework.Variants.FileTypes
                     break;
             }
 
-            var exists = await tx.FileExists(imcFolder + "/" + imcFile);
-
-            if (!exists)
-            {
-                // Offhands sometimes use their mainhand's path.
-                var gear = item as XivGear;
-                if (gear != null && gear.PairedItem != null)
-                {
-                    return await GetImcPath(gear.PairedItem, tx);
-                }
-            }
 
             return (imcFolder, imcFile);
         }
