@@ -1338,6 +1338,8 @@ namespace xivModdingFramework.Models.Helpers
 
                 // Now we're ready to animate...
 
+                var usageInfo = model.GetUsageInfo();
+
                 // For each mesh
                 foreach (var m in model.MeshGroups)
                 {
@@ -1576,6 +1578,9 @@ namespace xivModdingFramework.Models.Helpers
             {
                 return;
             }
+
+            var usage = model.GetUsageInfo();
+
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
@@ -1587,7 +1592,14 @@ namespace xivModdingFramework.Models.Helpers
                     var vIdx = 0;
                     foreach (var v in p.Vertices)
                     {
-                        var majorCorrection = CleanWeight(v, model.MdlVersion == 5 ? 4 : 8, loggingFunction);
+                        bool majorCorrection = false;
+                        if(usage.NeedsEightWeights)
+                        {
+                            majorCorrection = CleanWeight(v, 8, loggingFunction);
+                        } else
+                        {
+                            majorCorrection = CleanWeight(v, 4, loggingFunction);
+                        }
                         if (majorCorrection)
                         {
                             perPartMajorCorrections++;

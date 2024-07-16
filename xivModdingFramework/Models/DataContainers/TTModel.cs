@@ -1642,6 +1642,8 @@ namespace xivModdingFramework.Models.DataContainers
             // Convert the model to FFXIV's internal weirdness.
             ModelModifiers.MakeImportReady(model, loggingFunction);
 
+            ModelModifiers.CleanWeights(model, loggingFunction);
+
             return model;
         }
 
@@ -2907,17 +2909,39 @@ namespace xivModdingFramework.Models.DataContainers
 
                     bool anyAlpha = false;
                     bool anyColor = false;
-                    bool anyColor2 = false;
+                    bool fullWhiteColor2 = true;
                     bool anyWeirdUV1s = false;
                     bool anyWeirdUV2s = false;
+                    bool anyWeirdUV3s = false;
+
+                    var firstUv2 = p.Vertices[0].UV2;
+                    var firstUv3 = p.Vertices[0].UV3;
 
                     foreach (var v in p.Vertices)
                     {
                         anyAlpha = anyAlpha || (v.VertexColor[3] > 0);
                         anyColor = anyColor || (v.VertexColor[0] > 0 || v.VertexColor[1] > 0 || v.VertexColor[2] > 0);
-                        anyColor2 = anyColor2 || (v.VertexColor2[0] > 0 || v.VertexColor2[1] > 0 || v.VertexColor2[2] > 0 || v.VertexColor2[3] > 0);
+
+                        if(fullWhiteColor2 == true && 
+                            (v.VertexColor2[0] < 255
+                            || v.VertexColor2[1] < 255
+                            || v.VertexColor2[2] < 255))
+                        {
+                            fullWhiteColor2 = false;
+                        }
+
                         anyWeirdUV1s = anyWeirdUV1s || (v.UV1.X > 2 || v.UV1.X < -2 || v.UV1.Y > 2 || v.UV1.Y < -2);
-                        anyWeirdUV2s = anyWeirdUV2s || (v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2);
+                        anyWeirdUV2s = anyWeirdUV2s || ((v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2) && v.UV2 != firstUv2);
+                        anyWeirdUV3s = anyWeirdUV3s || ((v.UV3.X > 2 || v.UV3.X < -2 || v.UV3.Y > 2 || v.UV3.Y < -2) && v.UV3 != firstUv3);
+
+                        if((v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2))
+                        {
+                            Trace.WriteLine(v.UV2);
+                        }
+                        if ((v.UV2.X > 2 || v.UV2.X < -2 || v.UV2.Y > 2 || v.UV2.Y < -2))
+                        {
+                            Trace.WriteLine(v.UV2);
+                        }
                     }
 
                     if (!anyAlpha)
@@ -2929,9 +2953,10 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
                     }
-                    if (!anyColor)
+
+                    if (fullWhiteColor2)
                     {
-                        // TODO: Do we care about this? Who knows.
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully white Vertex Color 2 channel.  This may turn the model into wiggly jiggly jello in game.");
                     }
 
                     if (anyWeirdUV1s)
@@ -2942,6 +2967,11 @@ namespace xivModdingFramework.Models.DataContainers
                     if (anyWeirdUV2s)
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV2 data.  This can have unexpected results on decal placement or opacity.  Was this intended?");
+                    }
+
+                    if (anyWeirdUV3s)
+                    {
+                        loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has unusual UV3 data.  This can have unexpected results on some shaders.  Was this intended?");
                     }
 
                     pIdx++;
