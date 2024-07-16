@@ -423,8 +423,11 @@ namespace xivModdingFramework.Textures.FileTypes
                 } else if (format == XivTexFormat.BC7)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM;
-                } else {
+                } else if (format == XivTexFormat.A8R8G8B8) {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
+                } else
+                {
+                    throw new InvalidDataException("DDS Writer does not know how to write TexFormat: " + format.ToString());
                 }
                 header.AddRange(BitConverter.GetBytes(dxgiFormat));
 
