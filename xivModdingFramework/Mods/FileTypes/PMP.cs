@@ -82,6 +82,24 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 });
                 path = tempFolder;
             }
+
+            var metaPath = Path.GetFullPath(Path.Combine(path, "meta.json"));
+            if (!File.Exists(metaPath))
+            {
+                if (Directory.Exists(path))
+                {
+                    var subs = Directory.EnumerateDirectories(path).ToList();
+                    if(subs.Count == 1)
+                    {
+                        metaPath = Path.GetFullPath(Path.Combine(path, subs[0], "meta.json"));
+                        if (File.Exists(metaPath))
+                        {
+                            path = Path.GetFullPath(Path.Combine(path, subs[0]));
+                        }
+                    }
+                }
+            }
+
             return path;
         }
 
