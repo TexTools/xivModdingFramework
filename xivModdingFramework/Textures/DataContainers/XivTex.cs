@@ -125,7 +125,8 @@ namespace xivModdingFramework.Textures.DataContainers
             tex.Height = header.Height;
 
 
-            tex.Layers = header.Depth;
+            // I HAVE NO IDEA WHAT I'M DOING WITH MULTILAYER DDS
+            tex.Layers = header.ArraySize * header.Depth;
             tex.MipMapCount = header.MipCount;
 
             // We can technically calculate this size based on the texture format and size information.
