@@ -1338,6 +1338,8 @@ namespace xivModdingFramework.Models.Helpers
 
                 // Now we're ready to animate...
 
+                var usageInfo = model.GetUsageInfo();
+
                 // For each mesh
                 foreach (var m in model.MeshGroups)
                 {
@@ -1347,6 +1349,15 @@ namespace xivModdingFramework.Models.Helpers
                         // And each vertex in that part...
                         foreach (var v in p.Vertices)
                         {
+                            // Normalize weights before transforming to ensure consistent results.
+                            if (usageInfo.NeedsEightWeights)
+                            {
+                                ModelModifiers.CleanWeight(v, 8, loggingFunction);
+                            } else
+                            {
+                                ModelModifiers.CleanWeight(v, 4, loggingFunction);
+                            }
+
                             Vector3 position = Vector3.Zero;
                             Vector3 normal = Vector3.Zero;
                             Vector3 binormal = Vector3.Zero;
