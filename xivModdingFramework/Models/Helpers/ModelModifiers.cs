@@ -1349,15 +1349,6 @@ namespace xivModdingFramework.Models.Helpers
                         // And each vertex in that part...
                         foreach (var v in p.Vertices)
                         {
-                            // Normalize weights before transforming to ensure consistent results.
-                            if (usageInfo.NeedsEightWeights)
-                            {
-                                ModelModifiers.CleanWeight(v, 8, loggingFunction);
-                            } else
-                            {
-                                ModelModifiers.CleanWeight(v, 4, loggingFunction);
-                            }
-
                             Vector3 position = Vector3.Zero;
                             Vector3 normal = Vector3.Zero;
                             Vector3 binormal = Vector3.Zero;
@@ -1587,6 +1578,9 @@ namespace xivModdingFramework.Models.Helpers
             {
                 return;
             }
+
+            var usage = model.GetUsageInfo();
+
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
@@ -1598,7 +1592,14 @@ namespace xivModdingFramework.Models.Helpers
                     var vIdx = 0;
                     foreach (var v in p.Vertices)
                     {
-                        var majorCorrection = CleanWeight(v, model.MdlVersion == 5 ? 4 : 8, loggingFunction);
+                        bool majorCorrection = false;
+                        if(usage.NeedsEightWeights)
+                        {
+                            majorCorrection = CleanWeight(v, 8, loggingFunction);
+                        } else
+                        {
+                            majorCorrection = CleanWeight(v, 4, loggingFunction);
+                        }
                         if (majorCorrection)
                         {
                             perPartMajorCorrections++;

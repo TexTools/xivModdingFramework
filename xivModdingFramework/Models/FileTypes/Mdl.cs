@@ -3972,7 +3972,6 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 if (vertexInfoList[VertexUsageType.BoneIndex][0] == VertexDataType.UByte8)
                 {
-                    ModelModifiers.CleanWeight(v, 8, loggingFunction);
 
                     // 8 Byte stye...
                     importData.VertexData0.Add(v.Weights[0]);
@@ -3994,7 +3993,6 @@ namespace xivModdingFramework.Models.FileTypes
                     importData.VertexData0.Add(v.BoneIds[7]);
                 } else
                 {
-                    ModelModifiers.CleanWeight(v, 4, loggingFunction);
                     // 4 byte style ...
                     importData.VertexData0.Add(v.Weights[0]);
                     importData.VertexData0.Add(v.Weights[1]);
