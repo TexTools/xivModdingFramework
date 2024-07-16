@@ -291,12 +291,6 @@ namespace xivModdingFramework.General.Enums
                 Race = XivRace.Hyur_Highlander_Male_NPC,
                 Children = new List<XivRaceNode>()
             });
-            dict.Add(XivRace.Viera_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Highlander_Male],
-                Race = XivRace.Viera_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
 
 
             dict.Add(XivRace.Hyur_Highlander_Female_NPC, new XivRaceNode()
@@ -366,6 +360,12 @@ namespace xivModdingFramework.General.Enums
             {
                 Parent = dict[XivRace.Lalafell_Female],
                 Race = XivRace.Lalafell_Female_NPC,
+                Children = new List<XivRaceNode>()
+            });
+            dict.Add(XivRace.Viera_Male_NPC, new XivRaceNode()
+            {
+                Parent = dict[XivRace.Viera_Male],
+                Race = XivRace.Viera_Male_NPC,
                 Children = new List<XivRaceNode>()
             });
             dict.Add(XivRace.Viera_Female_NPC, new XivRaceNode()
@@ -460,7 +460,28 @@ namespace xivModdingFramework.General.Enums
                 }
             }
             return false;
+        }
 
+        public static XivRace GetNextChildToward(this XivRace parentRace, XivRace childRace)
+        {
+            if(!parentRace.IsParentOf(childRace))
+            {
+                return XivRace.All_Races;
+            }
+
+            var node = GetNode(childRace);
+            if(node == null)
+            {
+                return XivRace.All_Races;
+            }
+
+            var race = childRace;
+            while (node.Parent != null && node.Parent.Race != parentRace)
+            {
+                node = node.Parent;
+                race = node.Race;
+            }
+            return race;
         }
 
         /// <summary>
@@ -478,12 +499,11 @@ namespace xivModdingFramework.General.Enums
                 return true;
             }
 
-            var node = GetNode(possibleChild);
+            var child = GetNode(possibleChild);
 
-            if (node?.Parent != null)
+            if (child?.Parent != null)
             {
-                node = node.Parent;
-                if (node.Race == possibleParent)
+                if (child.Parent.Race == possibleParent)
                 {
                     return true;
                 }

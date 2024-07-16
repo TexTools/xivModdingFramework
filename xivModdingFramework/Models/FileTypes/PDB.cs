@@ -44,7 +44,6 @@ namespace xivModdingFramework.Models.FileTypes
             public ushort FirstChildIndex;
             public ushort NextSiblingIndex;
             public ushort DeformerIndex;
-
         }
 
         public struct BoneDeform
