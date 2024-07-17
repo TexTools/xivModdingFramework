@@ -3519,6 +3519,7 @@ namespace xivModdingFramework.Models.FileTypes
                     if (i < 2)
                     {
                         // First bounding box is bounds from the origin.
+
                         boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.X > 0 ? 0.0f : minVect.X));
                         boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.Y > 0 ? 0.0f : minVect.Y));
                         boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.Z > 0 ? 0.0f : minVect.Z));
@@ -3536,21 +3537,47 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
-                // Afterwards there are is a bounding box for every bone.
-                // Again, we'll be lazy and just use the full model bounding box for each.
-                // Unsure what these are actually used for since there seems no difference
-                // in model function whether these have real data or no data.
+                var ogBbDict = new Dictionary<string, List<Vector4>>();
+
+                var boneId = 0;
+                foreach(var bbList in ogMdl.BoneBoundingBoxes)
+                {
+                    if (boneId >= ogMdl.PathData.BoneList.Count) continue;
+                    var bone = ogMdl.PathData.BoneList[boneId];
+
+                    var list = bbList;
+                    // Ignore old bad data.
+                    if (new Vector3(bbList[0][0], bbList[0][1], bbList[0][2]) == minVect
+                        && new Vector3(bbList[1][0], bbList[1][1], bbList[1][2]) == maxVect)
+                    {
+                        list = new List<Vector4>()
+                        {
+                            new Vector4(0,0,0,0),
+                            new Vector4(0,0,0,0),
+                        };
+                    }
+
+                    ogBbDict.Add(bone, list);
+                    boneId++;
+                }
+
+
+                // Bone bounding boxes.  We use a 1/10th model size cube for every bone.
+                // This gives us something functional, without having to do a bunch of wild and crazy
+                // parsing/math or demanding the user import models with a functional skeleton.
+                const float _Divisor = 20.0f;
                 var boneBoundingBoxDataBlock = new List<byte>();
                 for (var i = 0; i < ttModel.Bones.Count; i++)
                 {
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.Z));
+                    var bone = ttModel.Bones[i];
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(-1 * modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(-1 * modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(-1 * modelRadius / _Divisor));
                     boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
 
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.Z));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(modelRadius / _Divisor));
                     boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
                 }
 
