@@ -1438,7 +1438,7 @@ namespace xivModdingFramework.Models.FileTypes
             var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
-            model.SaveToFile(dbPath, outputFilePath);
+            model.SaveToFile(dbPath, outputFilePath, null, tx);
 
 
             if (fileFormat == "db")

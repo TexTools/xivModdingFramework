@@ -128,7 +128,7 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="fullMdlPath"></param>
         /// <returns></returns>
-        public static async Task<string> GetExtraSkeletonFile(string fullMdlPath)
+        public static async Task<string> GetExtraSkeletonFile(string fullMdlPath, ModTransaction tx = null)
         {
             var root = await XivCache.GetFirstRoot(fullMdlPath);
 
@@ -138,7 +138,7 @@ namespace xivModdingFramework.Models.FileTypes
             // This is a hair/hat/face/body model at this point so this is a safe pull.
             var race = XivRaces.GetXivRace(fullMdlPath.Substring(1, 4));
 
-            return await GetExtraSkeletonFile(root.Info, race);
+            return await GetExtraSkeletonFile(root.Info, race, tx);
             
         }
 
@@ -160,7 +160,7 @@ namespace xivModdingFramework.Models.FileTypes
                 root = nRoot;
             }
 
-            var file = await GetExtraSkelbPath(root, race);
+            var file = await GetExtraSkelbPath(root, race, tx);
             if (file == null) return null;
 
             var skelName = Path.GetFileNameWithoutExtension(file).Replace("skl_", "");
@@ -315,7 +315,7 @@ namespace xivModdingFramework.Models.FileTypes
             return originalXml;
         }
 
-        private static async Task<string> GetExtraSkelbPath(XivDependencyRootInfo root, XivRace race = XivRace.All_Races)
+        private static async Task<string> GetExtraSkelbPath(XivDependencyRootInfo root, XivRace race = XivRace.All_Races, ModTransaction tx = null)
         {
 
             var type = Est.GetEstType(root);
@@ -338,7 +338,7 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            var entry = await Est.GetExtraSkeletonEntry(type, race, id);
+            var entry = await Est.GetExtraSkeletonEntry(type, race, id, false, tx);
             var skelId = entry.SkelId;
             if(skelId == 0)
             {
@@ -355,7 +355,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // It's worth noting in these cases, the Skeletal bones themselves will still be using the matrices appropriate
                 // for their parent race in this method, but that should be sufficient for now.
-                return await GetExtraSkelbPath(root, parent.Race);
+                return await GetExtraSkelbPath(root, parent.Race, tx);
             }
 
             var prefix = Est.GetSystemPrefix(type);

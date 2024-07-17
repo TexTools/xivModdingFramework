@@ -1696,7 +1696,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public void SaveToFile(string filePath, string texturePath = null, Action<bool, string> loggingFunction = null)
+        public void SaveToFile(string filePath, string texturePath = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -1722,7 +1722,7 @@ namespace xivModdingFramework.Models.DataContainers
                 var boneDict = new Dictionary<string, SkeletonData>();
                 if (IsInternal && Bones.Count > 0)
                 {
-                    boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction);
+                    boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction, tx);
                 } else if(Bones.Count > 0)
                 {
                     var i = 0;
@@ -1993,7 +1993,7 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.MakeImportReady(this, loggingFunction);
         }
 
-        public static Dictionary<string, SkeletonData> ResolveFullBoneHeirarchy(XivRace race, List<string> models, Action<bool, string> loggingFunction = null)
+        public static Dictionary<string, SkeletonData> ResolveFullBoneHeirarchy(XivRace race, List<string> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -2090,7 +2090,7 @@ namespace xivModdingFramework.Models.DataContainers
                 rootsToResolve.Add(root);
             }
 
-            var boneDict = TTModel.ResolveBoneHeirarchyRaw(rootsToResolve, race, null, loggingFunction);
+            var boneDict = TTModel.ResolveBoneHeirarchyRaw(rootsToResolve, race, null, loggingFunction, tx);
             return boneDict;
         }
 
@@ -2099,7 +2099,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null)
+        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -2114,7 +2114,7 @@ namespace xivModdingFramework.Models.DataContainers
                 paths.Add(m.Source);
             }
 
-            var boneDict = ResolveFullBoneHeirarchy(race, paths, loggingFunction);
+            var boneDict = ResolveFullBoneHeirarchy(race, paths, loggingFunction, tx);
 
 
 
@@ -2628,7 +2628,7 @@ namespace xivModdingFramework.Models.DataContainers
             return arr;
         }
 
-        public Dictionary<string, SkeletonData> ResolveBoneHeirarchy(List<XivDependencyRootInfo> roots = null, XivRace race = XivRace.All_Races, List<string> bones = null, Action<bool, string> loggingFunction = null)
+        public Dictionary<string, SkeletonData> ResolveBoneHeirarchy(List<XivDependencyRootInfo> roots = null, XivRace race = XivRace.All_Races, List<string> bones = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (roots == null || roots.Count == 0)
             {
@@ -2651,7 +2651,7 @@ namespace xivModdingFramework.Models.DataContainers
                 roots = new List<XivDependencyRootInfo>() { root };
             }
 
-            return TTModel.ResolveBoneHeirarchyRaw(roots, race, bones, loggingFunction);
+            return TTModel.ResolveBoneHeirarchyRaw(roots, race, bones, loggingFunction, tx);
         }
         /// <summary>
         /// Resolves the full bone heirarchy necessary to animate this TTModel.
@@ -2661,7 +2661,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// This is niche enough to leave for the moment and come back to if it proves an issue.
         /// </summary>
         /// <returns></returns>
-        public static Dictionary<string, SkeletonData> ResolveBoneHeirarchyRaw(List<XivDependencyRootInfo> roots, XivRace race, List<string> bones = null, Action<bool, string> loggingFunction = null)
+        public static Dictionary<string, SkeletonData> ResolveBoneHeirarchyRaw(List<XivDependencyRootInfo> roots, XivRace race, List<string> bones = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -2704,7 +2704,7 @@ namespace xivModdingFramework.Models.DataContainers
                     }
 
 
-                    extraSkeletonPath = await Sklb.GetExtraSkeletonFile(root, race);
+                    extraSkeletonPath = await Sklb.GetExtraSkeletonFile(root, race, tx);
                     // Did this root have an extra skeleton in use?
                     if (!String.IsNullOrEmpty(extraSkeletonPath))
                     {
