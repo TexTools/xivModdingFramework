@@ -31,6 +31,8 @@ namespace xivModdingFramework.Models.FileTypes
             public float Scale;
             public Dictionary<string, BoneDeform> Deforms = new Dictionary<string, BoneDeform>();
             public BoneDeformTreeEntry TreeEntry;
+            public BoneDeformSet Parent;
+            public List<BoneDeformSet> Children = new List<BoneDeformSet>();
 
             public BoneDeformSet()
             {
@@ -44,7 +46,6 @@ namespace xivModdingFramework.Models.FileTypes
             public ushort FirstChildIndex;
             public ushort NextSiblingIndex;
             public ushort DeformerIndex;
-
         }
 
         public struct BoneDeform
@@ -118,6 +119,17 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                     owner.TreeEntry = te;
                     DeformSets[owner.RaceId] = owner;
+                }
+
+                // Bind parent-child relationships.
+                foreach(var s in DeformSets.Values)
+                {
+                    var parentTreeId = s.TreeEntry.ParentIndex;
+                    var parent = DeformSets.Values.FirstOrDefault(x => x.TreeIndex == parentTreeId);
+                    if (parent == null) continue;
+
+                    s.Parent = parent;
+                    parent.Children.Add(s);
                 }
 
                 // Read Data for each set.
@@ -318,15 +330,19 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="def"></param>
         private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, DeformationCollection def)
         {
-            if (node.BoneParent == -1)
+            if (def.InvertedDeformations.ContainsKey(node.BoneName))
+            {
+                // Already processed somehow.  Double listed?
+            }
+            else if (node.BoneParent == -1)
             {
                 if (!def.Deformations.ContainsKey(node.BoneName))
                 {
                     def.Deformations.Add(node.BoneName, Matrix.Identity);
+                    def.InvertedDeformations.Add(node.BoneName, Matrix.Identity);
+                    def.NormalDeformations.Add(node.BoneName, Matrix.Identity);
+                    def.InvertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
                 }
-                def.InvertedDeformations.Add(node.BoneName, Matrix.Identity);
-                def.NormalDeformations.Add(node.BoneName, Matrix.Identity);
-                def.InvertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
             }
             else
             {

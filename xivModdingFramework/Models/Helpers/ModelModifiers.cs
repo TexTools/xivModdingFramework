@@ -1148,35 +1148,39 @@ namespace xivModdingFramework.Models.Helpers
         {
             try
             {
-                // Current race is already parent node
-                // Direct conversion
-                // [ Current > (apply deform) > Target ]
                 if (originalRace.IsDirectParentOf(targetRace))
                 {
+                    // Current race is already parent node
+                    // Direct conversion
+                    // [ Current > (apply deform) > Target ]
                     await ModelModifiers.ApplyRacialDeform(model, targetRace, false, loggingFunction, tx);
+                    return;
                 }
-                // Target race is parent node of Current race
-                // Convert to parent (invert deform)
-                // [ Current > (apply inverse deform) > Target ]
                 else if (targetRace.IsDirectParentOf(originalRace))
                 {
+                    // Target race is parent node of Current race
+                    // Convert to parent (invert deform)
+                    // [ Current > (apply inverse deform) > Target ]
                     await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction, tx);
+                    return;
                 }
-                // Current race is not parent of Target Race and Current race has parent
-                // Make a recursive call with the current races parent race
-                // [ Current > (apply inverse deform) > Current.Parent > Recursive Call ]
-                else if (originalRace.GetNode().Parent != null)
+                else if (originalRace.IsParentOf(targetRace))
                 {
-                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction, tx);
-                    await RaceConvertRecursive(model, targetRace, originalRace.GetNode().Parent.Race, loggingFunction, tx);
+                    // We need to transform down chain, towards the target.
+                    var race = originalRace.GetNextChildToward(targetRace);
+
+                    await ModelModifiers.ApplyRacialDeform(model, race, false, loggingFunction, tx);
+                    await ModelModifiers.RaceConvertRecursive(model, targetRace, race, loggingFunction, tx);
+                    return;
                 }
-                // Current race has no parent
-                // Make a recursive call with the target races parent race
-                // [ Target > (apply deform on Target.Parent) > Target.Parent > Recursive Call ]
                 else
                 {
-                    await ModelModifiers.ApplyRacialDeform(model, targetRace.GetNode().Parent.Race, false, loggingFunction, tx);
-                    await RaceConvertRecursive(model, targetRace, targetRace.GetNode().Parent.Race, loggingFunction, tx);
+                    // We need to transform up the chain.
+                    // Either our target is a significantly higher parent, or cannot be reached from this node.
+                    var pRace = originalRace.GetNode().Parent.Race;
+                    await ModelModifiers.ApplyRacialDeform(model, originalRace, true, loggingFunction, tx);
+                    await ModelModifiers.RaceConvertRecursive(model, targetRace, pRace, loggingFunction, tx);
+                    return;
                 }
             }
             catch (Exception ex)

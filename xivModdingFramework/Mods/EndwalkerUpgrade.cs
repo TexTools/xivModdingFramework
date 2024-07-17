@@ -1283,7 +1283,8 @@ namespace xivModdingFramework.Mods
             var results = new Dictionary<int, Dictionary<int, List<(string Path, XivTexType TexType)>>>();
 
             var materials = new List<(int Race, int Hair)>();
-            foreach (var file in files)
+            List<string> fileList = fileInfos != null ? fileInfos.Keys.ToList() : files.ToList();
+            foreach (var file in fileList)
             {
                 var matMatch = hairset.MaterialRegex.Match(file);
                 if (matMatch.Success)
@@ -1293,6 +1294,9 @@ namespace xivModdingFramework.Mods
                     materials.Add((rid, hid));
                     continue;
                 }
+
+                // Only match textures to those in the main list.
+                if (!files.Contains(file)) continue;
 
                 var match = hairset.OldTextureRegex.Match(file);
                 if (!match.Success) continue;
@@ -1398,7 +1402,7 @@ namespace xivModdingFramework.Mods
                     {
                         var newPath = tex.TexType == XivTexType.Normal ? normTex.Dx11Path : maskTex.Dx11Path;
 
-                        if (files.Contains(newPath))
+                        if (fileList.Contains(newPath))
                         {
                             // Already converted.
                             skip = true;

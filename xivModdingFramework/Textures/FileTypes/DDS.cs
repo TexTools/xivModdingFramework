@@ -58,6 +58,7 @@ namespace xivModdingFramework.Textures.FileTypes
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC4U"), 0) , XivTexFormat.BC4 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI2"), 0) , XivTexFormat.BC5 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("AR15"), 0) , XivTexFormat.A1R5G5B5 },
 
             //ARGB 16F
             { 0x71, XivTexFormat.A16B16G16R16F },
@@ -66,13 +67,9 @@ namespace xivModdingFramework.Textures.FileTypes
             { 0, XivTexFormat.A8R8G8B8 }
         };
 
-        internal static uint GetDDSType(XivTexFormat format)
-        {
-            return DdsTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
-        }
-
         /// <summary>
         /// A dictionary containing the int representations of known DXGI header extension enum values to Xiv Tex Enum
+        /// These are only used if the format does not appear in the previous dictionary (DdsTypeToXivTex) above.
         /// </summary>
         internal static readonly Dictionary<uint, XivTexFormat> DxgiTypeToXivTex = new Dictionary<uint, XivTexFormat>
         {
@@ -85,6 +82,11 @@ namespace xivModdingFramework.Textures.FileTypes
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_R16G16B16A16_FLOAT, XivTexFormat.A16B16G16R16F },
             {(uint)DDS.DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, XivTexFormat.A8R8G8B8 }
         };
+
+        internal static uint GetDDSType(XivTexFormat format)
+        {
+            return DdsTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
+        }
         internal static uint GetDxgiType(XivTexFormat format)
         {
             return DxgiTypeToXivTex.FirstOrDefault(x => x.Value == format).Key;
@@ -421,8 +423,11 @@ namespace xivModdingFramework.Textures.FileTypes
                 } else if (format == XivTexFormat.BC7)
                 {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM;
-                } else {
+                } else if (format == XivTexFormat.A8R8G8B8) {
                     dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
+                } else
+                {
+                    throw new InvalidDataException("DDS Writer does not know how to write TexFormat: " + format.ToString());
                 }
                 header.AddRange(BitConverter.GetBytes(dxgiFormat));
 
