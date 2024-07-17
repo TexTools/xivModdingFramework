@@ -55,6 +55,19 @@ namespace xivModdingFramework.Mods
 
         private const string _SampleHair = "chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl";
 
+        public static async Task AssertIsDawntrail(ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            if(!await tx.FileExists(Eqp.DawntrailTestFile, true))
+            {
+                throw new InvalidDataException("The currently set FFXIV Directory is not a Dawntrail install.");
+            }
+        }
+
         /// <summary>
         /// Performs Endwalker => Dawntrail Upgrades on an arbitrary set of internal files as part of a transaction.
         /// This is used primarily during Modpack installs.
@@ -69,6 +82,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> paths, string sourceApplication, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
+            await AssertIsDawntrail();
             var filePaths = new HashSet<string>(paths);
             var ret = new Dictionary<string, UpgradeInfo>();
 
@@ -136,6 +150,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(Dictionary<string, FileStorageInformation> files, IProgress<(int current, int total, string message)> progress = null)
         {
+            await AssertIsDawntrail();
             var ret = new Dictionary<string, UpgradeInfo>();
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
