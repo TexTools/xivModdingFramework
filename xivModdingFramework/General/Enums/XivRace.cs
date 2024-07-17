@@ -19,9 +19,13 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data.SQLite;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Resources;
+using System.Threading.Tasks;
+using xivModdingFramework.Models.FileTypes;
+using xivModdingFramework.Mods;
 using xivModdingFramework.Resources;
 
 namespace xivModdingFramework.General.Enums
@@ -120,290 +124,79 @@ namespace xivModdingFramework.General.Enums
 
     public class XivRaceNode {
         public XivRaceNode Parent;
-        public List<XivRaceNode> Children;
+        public List<XivRaceNode> Children = new List<XivRaceNode>();
         public XivRace Race;
         public bool HasSkin = false;
     }
 
     public static class XivRaceTree
     {
-        private static XivRaceNode tree;
-        private static Dictionary<XivRace, XivRaceNode> dict;
+        private static Dictionary<XivRace, XivRaceNode> _Dict;
 
-
-        // Validates the underlying tree structure, generating it if needed.
-        private static void CheckTree()
+        public static async Task BuildRaceTree(ModTransaction tx = null)
         {
-            if (tree != null) return;
-            dict = new Dictionary<XivRace, XivRaceNode>();
-            // Common Race Males
-            dict.Add(XivRace.Hyur_Midlander_Male, new XivRaceNode()
-            {
-                Race = XivRace.Hyur_Midlander_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Elezen_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Elezen_Male,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Miqote_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Miqote_Male,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.AuRa_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.AuRa_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Viera_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Viera_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
+            var sets = await PDB.GetBoneDeformSets(tx);
+            _Dict = new Dictionary<XivRace, XivRaceNode>();
 
-
-            // Muscular Race Males
-            dict.Add(XivRace.Hyur_Highlander_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Hyur_Highlander_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Roegadyn_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Roegadyn_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Hrothgar_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Roegadyn_Male],
-                Race = XivRace.Hrothgar_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-
-
-            // Common Race Females
-            dict.Add(XivRace.Hyur_Midlander_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Hyur_Midlander_Female,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Elezen_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Elezen_Female,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Viera_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Viera_Female,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Miqote_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Miqote_Female,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.AuRa_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.AuRa_Female,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-#if DAWNTRAIL
-            dict.Add(XivRace.Hrothgar_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Hrothgar_Female,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-#endif
-
-
-            // Muscular Race Females
-            dict.Add(XivRace.Hyur_Highlander_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Hyur_Highlander_Female,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Roegadyn_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Roegadyn_Female,
-                Children = new List<XivRaceNode>()
-            });
-
-
-            // Lalas
-            dict.Add(XivRace.Lalafell_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Lalafell_Male,
-                Children = new List<XivRaceNode>(),
-                HasSkin = true
-            });
-            dict.Add(XivRace.Lalafell_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Lalafell_Male],
-                Race = XivRace.Lalafell_Female,
-                Children = new List<XivRaceNode>()
-            });
-
-            // NPCs
-            dict.Add(XivRace.Hyur_Midlander_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.Hyur_Midlander_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-            dict.Add(XivRace.Hyur_Midlander_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.Hyur_Midlander_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Hyur_Highlander_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Highlander_Male],
-                Race = XivRace.Hyur_Highlander_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-
-            dict.Add(XivRace.Hyur_Highlander_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Highlander_Female],
-                Race = XivRace.Hyur_Highlander_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.AuRa_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.AuRa_Male],
-                Race = XivRace.AuRa_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.AuRa_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.AuRa_Female],
-                Race = XivRace.AuRa_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Roegadyn_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Roegadyn_Male],
-                Race = XivRace.Roegadyn_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-            dict.Add(XivRace.Roegadyn_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Roegadyn_Female],
-                Race = XivRace.Roegadyn_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Elezen_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Elezen_Male],
-                Race = XivRace.Elezen_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-            dict.Add(XivRace.Elezen_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Elezen_Female],
-                Race = XivRace.Elezen_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Miqote_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Miqote_Male],
-                Race = XivRace.Miqote_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-            dict.Add(XivRace.Miqote_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Miqote_Female],
-                Race = XivRace.Miqote_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Lalafell_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Lalafell_Male],
-                Race = XivRace.Lalafell_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Lalafell_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Lalafell_Female],
-                Race = XivRace.Lalafell_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Viera_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Viera_Male],
-                Race = XivRace.Viera_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Viera_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Viera_Female],
-                Race = XivRace.Viera_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.Hrothgar_Male_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hrothgar_Male],
-                Race = XivRace.Hrothgar_Male_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-            dict.Add(XivRace.Hrothgar_Female_NPC, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hrothgar_Female],
-                Race = XivRace.Hrothgar_Female_NPC,
-                Children = new List<XivRaceNode>()
-            });
-
-            dict.Add(XivRace.NPC_Male, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Male],
-                Race = XivRace.NPC_Male,
-                Children = new List<XivRaceNode>()
-            });
-            dict.Add(XivRace.NPC_Female, new XivRaceNode()
-            {
-                Parent = dict[XivRace.Hyur_Midlander_Female],
-                Race = XivRace.NPC_Female,
-                Children = new List<XivRaceNode>()
-            });
-
-
-            tree = dict[XivRace.Hyur_Midlander_Male];
+            var node = MakeNode(XivRace.Hyur_Midlander_Male);
+            AddChildren(node, sets);
         }
+
+        private static void AddChildren(XivRaceNode node, Dictionary<ushort, PDB.BoneDeformSet> sets)
+        {
+            var key = (ushort)node.Race;
+            if (!sets.ContainsKey(key)) return;
+            var children = sets[key].Children;
+
+            foreach(var c in children)
+            {
+                var cNode = MakeNode(c.RaceId);
+                if (cNode == null)
+                {
+                    Trace.WriteLine("Unknown Race exists in PDB: " + (int)c.RaceId);
+                    continue;
+                }
+                cNode.Parent = node;
+                node.Children.Add(cNode);
+                AddChildren(cNode, sets);
+            }
+        }
+
+        private static HashSet<XivRace> SkinRaces = new HashSet<XivRace>()
+        {
+            XivRace.Hyur_Midlander_Male,
+            XivRace.AuRa_Male,
+            XivRace.AuRa_Female,
+            XivRace.Hrothgar_Male,
+            XivRace.Hrothgar_Female,
+            XivRace.Hyur_Highlander_Male,
+            XivRace.Hyur_Highlander_Female,
+            XivRace.Viera_Male,
+            XivRace.Viera_Female,
+            XivRace.Roegadyn_Male,
+            XivRace.Lalafell_Male
+        };
+        private static XivRaceNode MakeNode(ushort raceId)
+        {
+            var race = (XivRace)raceId;
+            return MakeNode(race);
+        }
+        private static XivRaceNode MakeNode(XivRace race)
+        {
+            if (race == XivRace.All_Races)
+            {
+                return null;
+            }
+            var node = new XivRaceNode()
+            {
+                Race = race,
+                HasSkin = SkinRaces.Contains(race)
+            };
+
+            _Dict.Add(node.Race, node);
+            return node;
+        }
+
 
         /// <summary>
         /// Gets the full race tree.
@@ -411,8 +204,7 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static XivRaceNode GetFullRaceTree()
         {
-            CheckTree();
-            return dict[XivRace.Hyur_Midlander_Male];
+            return _Dict[XivRace.Hyur_Midlander_Male];
         }
 
         /// <summary>
@@ -424,7 +216,6 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static bool IsChildOf(this XivRace possibleChild, XivRace possibleParent, bool allowSame = true)
         {
-            CheckTree();
             if (possibleChild == possibleParent && allowSame)
             {
                 return true;
@@ -442,7 +233,6 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static bool IsParentOf(this XivRace possibleParent, XivRace possibleChild, bool allowSame = true)
         {
-            CheckTree();
             if (possibleChild == possibleParent && allowSame)
             {
                 return true;
@@ -493,7 +283,6 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static bool IsDirectParentOf(this XivRace possibleParent, XivRace possibleChild, bool allowSame = true)
         {
-            CheckTree();
             if (possibleChild == possibleParent && allowSame)
             {
                 return true;
@@ -519,8 +308,7 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static XivRaceNode GetNode(this XivRace race)
         {
-            CheckTree();
-            return dict[race];
+            return _Dict[race];
         }
 
         /// <summary>
@@ -531,7 +319,6 @@ namespace xivModdingFramework.General.Enums
         /// <returns></returns>
         public static List<XivRace> GetChildren(this XivRace race, bool includeNPCs = false)
         {
-            CheckTree();
             var node = GetNode(race);
             var name = node.Race.ToString();
 

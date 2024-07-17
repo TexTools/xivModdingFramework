@@ -300,6 +300,8 @@ namespace xivModdingFramework.Cache
 					await RebuildCache(ver, reason);
                 }
             }
+
+            await XivRaceTree.BuildRaceTree();
             await SetCacheWorkerState(enableCacheWorker);
 
         }
