@@ -2427,7 +2427,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 var usageInfo = ttModel.GetUsageInfo();
 
-                var vertexSize = 48;
+                var vertexSize = 52;
                 if (usageInfo.NeedsEightWeights)
                 {
                     vertexSize += 8;
@@ -2446,7 +2446,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     vertexSize += 4;
                 }
-                var shapeVertCount = ttModel.MeshGroups.Sum(m => m.Parts.Sum(p => p.ShapeParts.Sum(s => s.Value.Vertices.Count)));
+                var shapeVertCount = ttModel.MeshGroups.Sum(m => m.Parts.Sum(p => p.ShapeParts.Sum(s => s.Key == "original" ? 0 : s.Value.Vertices.Count)));
                 var totalVertexCount = shapeVertCount + ttModel.VertexCount;
                 var estimatedVertexBufferSize = (vertexSize * totalVertexCount);
 
