@@ -1259,6 +1259,12 @@ namespace xivModdingFramework.Models.ModelTextures
         private static (Color4? Color, bool Blend) GetSkinBonusColor(XivMtrl mtrl, CustomModelColors colors)
         {
             Color4? bonusColor = null;
+            var compatMode = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF) != null;
+            if (compatMode)
+            {
+                return (null, false);
+            }
+
 
             var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
 
@@ -1294,6 +1300,11 @@ namespace xivModdingFramework.Models.ModelTextures
         private static (Color4? Color, bool Blend) GetSkinBonusColor2(XivMtrl mtrl, CustomModelColors colors)
         {
             Color4? bonusColor = null;
+            var compatMode = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF) != null;
+            if (compatMode)
+            {
+                return (null, false);
+            }
 
             var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
 
