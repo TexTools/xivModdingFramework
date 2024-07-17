@@ -723,7 +723,13 @@ namespace xivModdingFramework.Mods
                         dstSlot = srcSlot + dstSlot;
                     }
 
-                    file = file.Replace(srcSlot, dstSlot);
+                    if (!string.IsNullOrWhiteSpace(srcSlot))
+                    {
+                        file = file.Replace(srcSlot, dstSlot);
+                    } else if(!string.IsNullOrWhiteSpace(dstSlot))
+                    {
+                        file = file.Replace(match.Groups[0].Value, match.Groups[0].Value + "_" + dstSlot);
+                    }
                 }
 
 

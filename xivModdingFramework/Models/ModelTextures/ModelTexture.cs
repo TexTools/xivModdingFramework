@@ -824,8 +824,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
                 var highlightColor = GetSkinBonusColor2(mtrl, colors);
                 var metalnessConst = 1 - GetFloatConst(mtrl, 0x59BDA0B1, 1.0f);
+                var isHroth = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0 && x.Value == 0x57FF3B64) != null;
 
-                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
+                 return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     var roughness = 0.0f;
                     var metalness = metalnessConst;
                     var occlusion = 1.0f;
@@ -887,6 +888,11 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    if (isHroth)
+                    {
+                        alpha = 1.0f;
+                    }
 
                     var emissive = emissiveColorMul;
                     var sss = mask.Blue;
