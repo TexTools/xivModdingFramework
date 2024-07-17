@@ -165,6 +165,7 @@ namespace xivModdingFramework.General.Enums
         private static HashSet<XivRace> SkinRaces = new HashSet<XivRace>()
         {
             XivRace.Hyur_Midlander_Male,
+            XivRace.Hyur_Midlander_Female,
             XivRace.AuRa_Male,
             XivRace.AuRa_Female,
             XivRace.Hrothgar_Male,
@@ -174,7 +175,11 @@ namespace xivModdingFramework.General.Enums
             XivRace.Viera_Male,
             XivRace.Viera_Female,
             XivRace.Roegadyn_Male,
-            XivRace.Lalafell_Male
+            XivRace.Lalafell_Male,
+            XivRace.Hyur_Midlander_Male_NPC,
+            XivRace.Miqote_Female_NPC,
+            XivRace.AuRa_Male_NPC,
+            XivRace.AuRa_Female_NPC,
         };
         private static XivRaceNode MakeNode(ushort raceId)
         {
