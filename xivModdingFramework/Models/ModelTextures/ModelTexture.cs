@@ -824,8 +824,9 @@ namespace xivModdingFramework.Models.ModelTextures
                 var bonusColor = GetSkinBonusColor(mtrl, colors);
                 var highlightColor = GetSkinBonusColor2(mtrl, colors);
                 var metalnessConst = 1 - GetFloatConst(mtrl, 0x59BDA0B1, 1.0f);
+                var isHroth = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0 && x.Value == 0x57FF3B64) != null;
 
-                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
+                 return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     var roughness = 0.0f;
                     var metalness = metalnessConst;
                     var occlusion = 1.0f;
@@ -887,6 +888,11 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    if (isHroth)
+                    {
+                        alpha = 1.0f;
+                    }
 
                     var emissive = emissiveColorMul;
                     var sss = mask.Blue;
@@ -1253,6 +1259,12 @@ namespace xivModdingFramework.Models.ModelTextures
         private static (Color4? Color, bool Blend) GetSkinBonusColor(XivMtrl mtrl, CustomModelColors colors)
         {
             Color4? bonusColor = null;
+            var compatMode = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF) != null;
+            if (compatMode)
+            {
+                return (null, false);
+            }
+
 
             var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
 
@@ -1288,6 +1300,11 @@ namespace xivModdingFramework.Models.ModelTextures
         private static (Color4? Color, bool Blend) GetSkinBonusColor2(XivMtrl mtrl, CustomModelColors colors)
         {
             Color4? bonusColor = null;
+            var compatMode = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF) != null;
+            if (compatMode)
+            {
+                return (null, false);
+            }
 
             var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
 
