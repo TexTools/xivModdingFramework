@@ -779,7 +779,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var metapath = Path.Combine(workingDirectory, "meta.json");
             var defaultModPath = Path.Combine(workingDirectory, "default_mod.json");
 
-            if(pmp.Meta.ModTags == null)
+
+            var oldJsons = Directory.EnumerateFiles(workingDirectory, "*.json", SearchOption.TopDirectoryOnly);
+            foreach(var j in oldJsons)
+            {
+                if (Path.GetFileName(j).StartsWith("group_"))
+                {
+                    File.Delete(j);
+                }
+            }
+
+            if (pmp.Meta.ModTags == null)
             {
                 pmp.Meta.ModTags = new List<string>();
             }

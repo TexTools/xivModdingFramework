@@ -1130,6 +1130,40 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
+        internal static List<Vector4> ReadBoundingBox(BinaryReader br)
+        {
+            var ret = new List<Vector4>();
+
+            ret.Add(new Vector4(
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle()
+            ));
+
+            ret.Add(new Vector4(
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle()
+            ));
+
+            return ret;
+        }
+        internal static void WriteBoundingBox(BinaryWriter bw, List<Vector4> bb)
+        {
+            bw.Write(BitConverter.GetBytes(bb[0][0]));
+            bw.Write(BitConverter.GetBytes(bb[0][1]));
+            bw.Write(BitConverter.GetBytes(bb[0][2]));
+            bw.Write(BitConverter.GetBytes(bb[0][3]));
+
+            bw.Write(BitConverter.GetBytes(bb[1][0]));
+            bw.Write(BitConverter.GetBytes(bb[1][1]));
+            bw.Write(BitConverter.GetBytes(bb[1][2]));
+            bw.Write(BitConverter.GetBytes(bb[1][3]));
+        }
+
+
         /// <summary>
         /// Extracts and calculates the full MTRL paths from a given MDL file.
         /// A material variant of -1 gets the materials for ALL variants,
@@ -1438,7 +1472,7 @@ namespace xivModdingFramework.Models.FileTypes
             var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
-            model.SaveToFile(dbPath, outputFilePath);
+            model.SaveToFile(dbPath, outputFilePath, null, tx);
 
 
             if (fileFormat == "db")
@@ -2567,12 +2601,13 @@ namespace xivModdingFramework.Models.FileTypes
                     // Optional/Situational Elements
                     if (upgradePrecision)
                     {
+                        /*
                         AddVertexHeader(source, new VertexDataStruct()
                         {
                             DataBlock = 1,
                             DataType = VertexDataType.Ubyte4n,
                             DataUsage = VertexUsageType.Tangent
-                        });
+                        });*/
                     }
 
                     AddVertexHeader(source, new VertexDataStruct()
@@ -3934,7 +3969,7 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case VertexUsageType.Tangent:
                     value = v.Tangent;
-                    handedness = !v.Handedness;
+                    handedness = v.Handedness;
                     break;
                 default:
                     return false;

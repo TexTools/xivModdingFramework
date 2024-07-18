@@ -710,8 +710,15 @@ namespace xivModdingFramework.Mods
                                     continue;
                                 }
                             }
+                            if (data.Files.ContainsKey(mj.FullPath))
+                            {
 
-                            data.Files.Add(mj.FullPath, finfo);
+                                data.Files[mj.FullPath] = finfo;
+                            }
+                            else
+                            {
+                                data.Files.Add(mj.FullPath, finfo);
+                            }
                         }
                     }
                 }

@@ -55,6 +55,19 @@ namespace xivModdingFramework.Mods
 
         private const string _SampleHair = "chara/human/c0801/obj/hair/h0115/material/v0001/mt_c0801h0115_hir_a.mtrl";
 
+        public static async Task AssertIsDawntrail(ModTransaction tx = null)
+        {
+            if(tx == null)
+            {
+                tx = ModTransaction.BeginReadonlyTransaction();
+            }
+
+            if(!await tx.FileExists(Eqp.DawntrailTestFile, true))
+            {
+                throw new InvalidDataException("The currently set FFXIV Directory is not a Dawntrail install.");
+            }
+        }
+
         /// <summary>
         /// Performs Endwalker => Dawntrail Upgrades on an arbitrary set of internal files as part of a transaction.
         /// This is used primarily during Modpack installs.
@@ -69,6 +82,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(IEnumerable<string> paths, string sourceApplication, bool includePartials = true, IProgress<(int current, int total, string message)> progress = null, ModTransaction tx = null)
         {
+            await AssertIsDawntrail();
             var filePaths = new HashSet<string>(paths);
             var ret = new Dictionary<string, UpgradeInfo>();
 
@@ -136,6 +150,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task<Dictionary<string, UpgradeInfo>> UpdateEndwalkerFiles(Dictionary<string, FileStorageInformation> files, IProgress<(int current, int total, string message)> progress = null)
         {
+            await AssertIsDawntrail();
             var ret = new Dictionary<string, UpgradeInfo>();
 
             HashSet<string> _ConvertedTextures = new HashSet<string>();
@@ -406,11 +421,55 @@ namespace xivModdingFramework.Mods
                 idx++;
             }
 
-            var end = bonesetStart + boneSetSize;
+            // Net size of old bone sets
+            var end = bonesetStart + (((64 * 2) + 4) * mdlData.BoneSetCount);
             while(bw.BaseStream.Position < end)
             {
                 // Fill out the remainder of the block with 0s.
                 bw.Write((byte)0);
+            }
+
+            var endOfBoneSet = bw.BaseStream.Position;
+
+            // Shape Data is next.
+            var shpCount = mdlData.ShapeCount;
+            var shpParts = mdlData.ShapePartCount;
+            var shpIndices = mdlData.ShapeDataCount;
+
+            var endOfShapeHeaders = endOfBoneSet + (shpCount * 16);
+            var endOfShapePartHeaders = endOfShapeHeaders + (shpParts * 12);
+            var endOfShapeIndices = endOfShapePartHeaders + (shpIndices * 4);
+
+            // Part Bone Sets
+            br.BaseStream.Seek(endOfShapeIndices, SeekOrigin.Begin);
+            var partBoneSets = br.ReadInt32();
+            var endOfPartBones = br.BaseStream.Position + (partBoneSets);
+
+            // Padding
+            br.BaseStream.Seek(endOfPartBones, SeekOrigin.Begin);
+            var padding = br.ReadByte();
+            br.BaseStream.Seek(br.BaseStream.Position + padding, SeekOrigin.Begin);
+
+            // Bounding Boxes
+            var baseBox = Mdl.ReadBoundingBox(br);
+            var mdlBox = Mdl.ReadBoundingBox(br);
+            var waterBox = Mdl.ReadBoundingBox(br);
+            var shadowBox = Mdl.ReadBoundingBox(br);
+
+            const float _Divisor = 20.0f;
+            var min = -1 * (mdlData.Radius / _Divisor);
+            var max = (mdlData.Radius / _Divisor);
+            var bb = new List<Vector4>()
+            {
+                new Vector4(min, min, min, 1.0f),
+                new Vector4(max, max, max, 1.0f),
+            };
+
+            // Write new bone bounding boxes.
+            bw.BaseStream.Seek(br.BaseStream.Position, SeekOrigin.Begin);
+            for(int i = 0; i < mdlData.BoneCount; i++)
+            {
+                Mdl.WriteBoundingBox(bw, bb);
             }
 
             return true;
@@ -1068,6 +1127,7 @@ namespace xivModdingFramework.Mods
             var constantBase = await Mtrl.GetXivMtrl(_SampleHair, true, tx);
             var originalConsts = mtrl.ShaderConstants;
             mtrl.ShaderConstants = constantBase.ShaderConstants;
+            mtrl.AdditionalData = constantBase.AdditionalData;
 
             // Copy the alpha threshold over since the functionality there is unchanged.
             var alpha = originalConsts.FirstOrDefault(x => x.ConstantId == 0x29AC0223);
