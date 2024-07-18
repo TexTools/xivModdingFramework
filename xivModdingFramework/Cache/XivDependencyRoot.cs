@@ -68,6 +68,23 @@ namespace xivModdingFramework.Cache
             };
         }
 
+        public bool IsHumanMaterialVersionException()
+        {
+            if (PrimaryType == XivItemType.human)
+            {
+                if(SecondaryType != null && 
+                    (SecondaryType == XivItemType.tail || SecondaryType == XivItemType.body))
+                {
+                    if(PrimaryId == XivRace.Hrothgar_Female.GetRaceCodeInt()
+                        || PrimaryId == XivRace.Hrothgar_Male.GetRaceCodeInt())
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         /// <summary>
         /// Converts this dependency root into a raw string entry.
         /// </summary>
@@ -733,9 +750,28 @@ namespace xivModdingFramework.Cache
 
             index = await tx.GetIndexFile(df);
             modlist = await tx.GetModList();
-
             var materials = new HashSet<string>();
-            if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
+
+            if (Info.IsHumanMaterialVersionException())
+            {
+                // Special Hrothgar Cases.
+                var primary = Info.PrimaryId.ToString("D4");
+                var secondary = Info.SecondaryId.Value.ToString("D4");
+                var path = $"chara/human/c{primary}/obj/body/b{secondary}/material/v0001/mt_c{primary}b{secondary}_a.mtrl";
+                if(Info.SecondaryType == XivItemType.tail)
+                {
+                    path = $"chara/human/c{primary}/obj/tail/t{secondary}/material/v0001/mt_c{primary}t{secondary}_a.mtrl";
+                }
+
+                materials.Add(path);
+                for (int i = 2; i <= 5; i++)
+                {
+                    materials.Add(path.Replace("/v0001/", "/v000" + i + "/"));
+                }
+
+                materialVariant = -1;
+            }
+            else if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
             {
                 // Bleargh.  So here's the exception of exception class.  Because the "models" in human body are 
                 // are so sparse and all over the place, relying on them is impossible.  Thankfully, body types only ever
@@ -745,25 +781,10 @@ namespace xivModdingFramework.Cache
                 var path = $"chara/human/c{primary}/obj/body/b{body}/material/v0001/mt_c{primary}b{body}_a.mtrl";
 
                 // Just validate it exists and call it a day.
-
                 var exists = index.FileExists(path);
                 if (exists)
                 {
                     materials.Add(path);
-                }
-
-                // XXX: I noticed female hrothgar also have patterns so I'm gonna put them here too
-                if (Info.PrimaryId == XivRace.Hrothgar_Male.GetRaceCodeInt()
-                    || Info.PrimaryId == XivRace.Hrothgar_Female.GetRaceCodeInt()
-                    )
-                {
-                    // JK, Hrothgar actually have 5 material sets (that's how their fur pattern stuff is set)
-                    for (int i = 2; i <= 5; i++)
-                    {
-                        var mSet = i.ToString().PadLeft(4, '0');
-                        path = $"chara/human/c{primary}/obj/body/b{body}/material/v{mSet}/mt_c{primary}b{body}_a.mtrl";
-                        materials.Add(path);
-                    }
                 }
 
                 materialVariant = -1;
