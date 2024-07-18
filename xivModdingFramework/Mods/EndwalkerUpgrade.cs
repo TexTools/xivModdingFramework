@@ -1127,6 +1127,7 @@ namespace xivModdingFramework.Mods
             var constantBase = await Mtrl.GetXivMtrl(_SampleHair, true, tx);
             var originalConsts = mtrl.ShaderConstants;
             mtrl.ShaderConstants = constantBase.ShaderConstants;
+            mtrl.AdditionalData = constantBase.AdditionalData;
 
             // Copy the alpha threshold over since the functionality there is unchanged.
             var alpha = originalConsts.FirstOrDefault(x => x.ConstantId == 0x29AC0223);

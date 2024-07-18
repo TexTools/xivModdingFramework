@@ -659,13 +659,13 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             if (xivMtrl.ColorSetData != null && xivMtrl.ColorSetData.Count > 0)
             {
-                xivMtrl.AdditionalData[0] |= 0x04;
+                //xivMtrl.AdditionalData[0] |= 0x04;
             }
             else
             {
                 unchecked
                 {
-                    xivMtrl.AdditionalData[0] &= (byte)(~0x04);
+                    //xivMtrl.AdditionalData[0] &= (byte)(~0x04);
                 }
             }
 

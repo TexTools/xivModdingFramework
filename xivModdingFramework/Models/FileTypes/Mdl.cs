@@ -2601,12 +2601,13 @@ namespace xivModdingFramework.Models.FileTypes
                     // Optional/Situational Elements
                     if (upgradePrecision)
                     {
+                        /*
                         AddVertexHeader(source, new VertexDataStruct()
                         {
                             DataBlock = 1,
                             DataType = VertexDataType.Ubyte4n,
                             DataUsage = VertexUsageType.Tangent
-                        });
+                        });*/
                     }
 
                     AddVertexHeader(source, new VertexDataStruct()
@@ -3968,7 +3969,7 @@ namespace xivModdingFramework.Models.FileTypes
                     break;
                 case VertexUsageType.Tangent:
                     value = v.Tangent;
-                    handedness = !v.Handedness;
+                    handedness = v.Handedness;
                     break;
                 default:
                     return false;
