@@ -2963,7 +2963,7 @@ namespace xivModdingFramework.Models.DataContainers
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully black Vertex Color channel.  This can have unexpected results on in-game rendering.  Was this intended?");
                     }
 
-                    if (fullWhiteColor && m.Material.Contains("_iri_"))
+                    if (fullWhiteColor && m.Material != null && m.Material.Contains("_iri_"))
                     {
                         loggingFunction(true, "Mesh: " + mIdx + " Part: " + pIdx + " has a fully white Vertex Color channel on an Iris material.  This will break Heterochromia and cause discoloration.  Was this intended?");
                     }

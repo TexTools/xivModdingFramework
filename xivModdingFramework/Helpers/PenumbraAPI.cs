@@ -72,6 +72,26 @@ namespace xivModdingFramework.Helpers
         }
 
 
+        public static string GetQuickLauncherGameDirectory()
+        {
+            var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "launcherConfigV3.json");
+            if (!File.Exists(path))
+            {
+                return "";
+            }
+
+            try
+            {
+                var obj = JObject.Parse(File.ReadAllText(path));
+                var st = (string)obj["GamePath"];
+                return st;
+            }
+            catch (Exception ex)
+            {
+                return "";
+            }
+        }
+
         public static string GetPenumbraDirectory()
         {
             var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "Penumbra.json");
@@ -91,6 +111,7 @@ namespace xivModdingFramework.Helpers
                 return "";
             }
         }
+
         public static bool IsPenumbraInstalled()
         {
             var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "dalamudConfig.json");
