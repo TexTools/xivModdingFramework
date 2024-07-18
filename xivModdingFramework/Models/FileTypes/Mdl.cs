@@ -940,6 +940,7 @@ namespace xivModdingFramework.Models.FileTypes
                     xivMdl.BoneBoundingBoxes.Add(new List<Vector4>() { minPoint, maxPoint });
                 }
 
+                var preBound = br.BaseStream.Position;
                 xivMdl.BonelessPartBoundingBoxes = new List<List<Vector4>>();
                 for (var i = 0; i < xivMdl.ModelData.FurniturePartBoundingBoxCount; i++)
                 {
@@ -955,15 +956,29 @@ namespace xivModdingFramework.Models.FileTypes
                 // Attempts to catch weird broken mod mdls.
                 // This has been known to occur with both certain penumbra MDLs, and very old
                 // TexTools MDLs.
-                if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
-                    || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                if (xivMdl.BonelessPartBoundingBoxes.Count != 0)
                 {
+                    if(xivMdl.LoDList[0].VertexDataOffset == preBound)
+                    {
+                        foreach(var bl in xivMdl.BonelessPartBoundingBoxes)
+                        {
+                            bl[0] = new Vector4(0, 0, 0, 1);
+                            bl[1] = new Vector4(0, 0, 0, 1);
+                        }
+                        br.BaseStream.Seek(preBound, SeekOrigin.Begin);
+                    }
+                }
+                else { 
+                    if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
+                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                    {
 
-                    var delta = (int) (xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
-                    xivMdl.LoDList[0].VertexDataOffset -= delta;
-                    xivMdl.LoDList[0].IndexDataOffset -= delta;
-                    //var rem = br.ReadBytes(delta);
-                    var z = "z";
+                        var delta = (int)(xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
+                        xivMdl.LoDList[0].VertexDataOffset -= delta;
+                        xivMdl.LoDList[0].IndexDataOffset -= delta;
+                        //var rem = br.ReadBytes(delta);
+                        var z = "z";
+                    }
                 }
 
 
