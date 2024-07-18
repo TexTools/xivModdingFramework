@@ -1408,6 +1408,76 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             return colorSetExtraData;
         }
+
+
+        /// <summary>
+        /// Ensures the given texture meets normal size requirements, with an optional max size.
+        /// Returns true if the texture was altered.
+        /// </summary>
+        /// <param name="tex"></param>
+        /// <param name="maxSize"></param>
+        /// <returns></returns>
+        public static async Task<bool> EnsureValidSize(XivTex tex, int maxSize = -1)
+        {
+            var usesMips = false;
+            if (!string.IsNullOrWhiteSpace(tex.FilePath))
+            {
+                var df = IOUtil.GetDataFileFromPath(tex.FilePath);
+                if(df == XivDataFile._06_Ui)
+                {
+                    usesMips = false;
+                } else
+                {
+                    usesMips = true;
+                }
+            }
+            else
+            {
+                usesMips = tex.MipMapCount > 1;
+            }
+
+            var newWidth = tex.Width;
+            var newHeight = tex.Height;
+            if (usesMips)
+            {
+                if(!IOUtil.IsPowerOfTwo(tex.Width))
+                {
+                    newWidth = IOUtil.RoundToPowerOfTwo(tex.Width);
+                }
+
+                if (!IOUtil.IsPowerOfTwo(tex.Height))
+                {
+                    newHeight = IOUtil.RoundToPowerOfTwo(tex.Height);
+                }
+            }
+
+            if (maxSize > 0)
+            {
+                while (newWidth > maxSize || newHeight > maxSize)
+                {
+                    newWidth /= 2;
+                    newHeight /= 2;
+                }
+            }
+
+            var regenMips = false;
+            if(usesMips && tex.MipMapCount == 1)
+            {
+                regenMips = true;
+                tex.MipMapCount = GetMipCount(tex.Width, tex.Height);
+            } else if(!usesMips && tex.MipMapCount > 1)
+            {
+                regenMips = true;
+                tex.MipMapCount = 1;
+            }
+
+            if(newWidth != tex.Width || newHeight != tex.Height || regenMips)
+            {
+                await ResizeXivTx(tex, newWidth, newHeight, false);
+                return true;
+            }
+            return false;
+        }
 #endregion
 
         #region Static Dictionaries

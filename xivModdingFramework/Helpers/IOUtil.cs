@@ -874,7 +874,7 @@ namespace xivModdingFramework.Helpers
             return max - x < x - min ? max : min;
         }
 
-        private static int CeilPower2(int x)
+        public static int CeilPower2(int x)
         {
             if (x < 2)
             {
@@ -883,7 +883,7 @@ namespace xivModdingFramework.Helpers
             return (int)Math.Pow(2, (int)Math.Log(x - 1, 2) + 1);
         }
 
-        private static int FloorPower2(int x)
+        public static int FloorPower2(int x)
         {
             if (x < 1)
             {
