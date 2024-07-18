@@ -421,11 +421,55 @@ namespace xivModdingFramework.Mods
                 idx++;
             }
 
-            var end = bonesetStart + boneSetSize;
+            // Net size of old bone sets
+            var end = bonesetStart + (((64 * 2) + 4) * mdlData.BoneSetCount);
             while(bw.BaseStream.Position < end)
             {
                 // Fill out the remainder of the block with 0s.
                 bw.Write((byte)0);
+            }
+
+            var endOfBoneSet = bw.BaseStream.Position;
+
+            // Shape Data is next.
+            var shpCount = mdlData.ShapeCount;
+            var shpParts = mdlData.ShapePartCount;
+            var shpIndices = mdlData.ShapeDataCount;
+
+            var endOfShapeHeaders = endOfBoneSet + (shpCount * 16);
+            var endOfShapePartHeaders = endOfShapeHeaders + (shpParts * 12);
+            var endOfShapeIndices = endOfShapePartHeaders + (shpIndices * 4);
+
+            // Part Bone Sets
+            br.BaseStream.Seek(endOfShapeIndices, SeekOrigin.Begin);
+            var partBoneSets = br.ReadInt32();
+            var endOfPartBones = br.BaseStream.Position + (partBoneSets);
+
+            // Padding
+            br.BaseStream.Seek(endOfPartBones, SeekOrigin.Begin);
+            var padding = br.ReadByte();
+            br.BaseStream.Seek(br.BaseStream.Position + padding, SeekOrigin.Begin);
+
+            // Bounding Boxes
+            var baseBox = Mdl.ReadBoundingBox(br);
+            var mdlBox = Mdl.ReadBoundingBox(br);
+            var waterBox = Mdl.ReadBoundingBox(br);
+            var shadowBox = Mdl.ReadBoundingBox(br);
+
+            const float _Divisor = 20.0f;
+            var min = -1 * (mdlData.Radius / _Divisor);
+            var max = (mdlData.Radius / _Divisor);
+            var bb = new List<Vector4>()
+            {
+                new Vector4(min, min, min, 1.0f),
+                new Vector4(max, max, max, 1.0f),
+            };
+
+            // Write new bone bounding boxes.
+            bw.BaseStream.Seek(br.BaseStream.Position, SeekOrigin.Begin);
+            for(int i = 0; i < mdlData.BoneCount; i++)
+            {
+                Mdl.WriteBoundingBox(bw, bb);
             }
 
             return true;
