@@ -850,7 +850,7 @@ namespace xivModdingFramework.Mods
                 newData[offset + 0] = mtrl.ColorSetData[pixel + 0];
                 newData[offset + 1] = mtrl.ColorSetData[pixel + 1];
                 newData[offset + 2] = mtrl.ColorSetData[pixel + 2];
-                newData[offset + 3] = mtrl.ColorSetData[pixel + 3];
+                //newData[offset + 3] = mtrl.ColorSetData[pixel + 3];
 
                 // Skip next 3 pixels
                 offset += 4;
