@@ -160,6 +160,11 @@ namespace xivModdingFramework.Textures.FileTypes
             uint dwPitchOrLinearSize, pfFlags;
             var header = new List<byte>();
 
+            if(layers <= 0)
+            {
+                layers = 1;
+            }
+
             // DDS header magic number
             const uint dwMagic = 0x20534444;
             header.AddRange(BitConverter.GetBytes(dwMagic));
