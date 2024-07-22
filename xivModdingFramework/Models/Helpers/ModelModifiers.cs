@@ -22,6 +22,8 @@ using System.Diagnostics;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Materials.FileTypes;
+using System.Security.AccessControl;
+using xivModdingFramework.Models.Enums;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -1640,13 +1642,6 @@ namespace xivModdingFramework.Models.Helpers
                 loggingFunction = NoOp;
             }
 
-            // Calculate Tangents if needed - BEFORE flipping UVs.
-            // Skip this is we're just reconverting back, to avoid any potential issues and save time.
-            if (!reconvert)
-            {
-                CalculateTangents(model, loggingFunction);
-            }
-
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
             {
@@ -1795,8 +1790,8 @@ namespace xivModdingFramework.Models.Helpers
             if(p.Vertices.Any(x => x.Binormal != Vector3.Zero))
             {
                 // Faster function.
-                CalculateTangentsFromBinormalsForPart(p);
-                return;
+                //CalculateTangentsFromBinormalsForPart(p);
+                //return;
             }
 
             // Compile lists of connected vertices.
@@ -1841,7 +1836,7 @@ namespace xivModdingFramework.Models.Helpers
 
             for (int oIdx = 0; oIdx < p.Vertices.Count; oIdx++)
             {
-                var oVertex = p.Vertices[oIdx];
+                var oVertex = (TTVertex) p.Vertices[oIdx].Clone();
                 var idx = -1;
                 for (int nIdx = 0; nIdx < tempVertices.Count; nIdx++)
                 {
@@ -1935,6 +1930,14 @@ namespace xivModdingFramework.Models.Helpers
             var bitangents = new List<Vector3>(tempVertices.Count);
             bitangents.AddRange(Enumerable.Repeat(Vector3.Zero, tempVertices.Count));
 
+            foreach(var v in tempVertices)
+            {
+
+                // We need to use the SE style addressing mode here.
+                v.UV1.Y = (-1 * v.UV1.Y) + 1;
+
+            }
+
             // Calculate Tangent, Bitangent/Binormal and Handedness.
 
             // This loops for each TRI, building up the sum
@@ -1996,29 +1999,33 @@ namespace xivModdingFramework.Models.Helpers
                 var b = bitangents[vertexId];
 
                 // Calculate tangent vector
-                var tangent = t - (n * Vector3.Dot(n, t));
-                tangent = Vector3.Normalize(tangent);
+                //var tangent = t - (n * Vector3.Dot(n, t));
+                //tangent = Vector3.Normalize(tangent);
 
                 // Compute binormal
-                var binormal = Vector3.Cross(n, tangent);
-                binormal.Normalize();
+                var binormal = Vector3.Cross(n, Vector3.Normalize(t));
+                var tangent = Vector3.Cross(n, Vector3.Normalize(binormal));
+                //binormal.Normalize();
 
                 // Compute handedness
-                int handedness = Vector3.Dot(Vector3.Cross(t, b), n) > 0 ? 1 : -1;
+                int bHandedness = Vector3.Dot(Vector3.Normalize(binormal), b) >= 0 ? 1 : -1;
 
                 // Apply handedness
-                binormal *= handedness;
-                // FFXIV actually tracks BINORMAL handedness, not TANGENT handeness, so we have to reverse this.
-                var boolHandedness = !(handedness < 0 ? true : false);
+                binormal *= bHandedness;
+                ///tangent *= tHandedness;
+
+                var boolHandedness = !(bHandedness < 0 ? true : false);
 
                 foreach (var vIdx in oVertices)
                 {
                     var v = p.Vertices[vIdx];
-                    v.Tangent = tangent;
-                    v.Binormal = binormal;
+                    v.Tangent = tangent.Normalized();
+                    v.Binormal = binormal.Normalized();
                     v.Handedness = boolHandedness;
                 }
             }
+
+            //CalculateTangentsFromBinormalsForPart(p);
 
             CopyShapeTangentsForPart(p);
         }
@@ -2044,10 +2051,24 @@ namespace xivModdingFramework.Models.Helpers
             {
 
                 var tangent = Vector3.Cross(v.Normal, v.Binormal);
-                tangent *= (v.Handedness == true ? -1 : 1);
+                //tangent *= (v.Handedness == true ? -1 : 1);
                 v.Tangent = tangent;
             }
             CopyShapeTangentsForPart(p);
+        }
+
+
+        public static void MergeFlags(TTModel model, XivMdl flagSource)
+        {
+            if (flagSource == null) return;
+
+            model.AnisotropicLightingEnabled = false;
+            foreach (var mdl in flagSource.LoDList[0].MeshDataList)
+            {
+                model.AnisotropicLightingEnabled |= mdl.VertexDataStructList.Any(x => x.DataUsage == VertexUsageType.Tangent);
+            }
+
+            model.Flags = flagSource.ModelData.Flags1;
         }
 
 

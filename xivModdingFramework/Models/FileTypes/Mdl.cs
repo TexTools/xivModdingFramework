@@ -1991,11 +1991,12 @@ namespace xivModdingFramework.Models.FileTypes
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
-                loggingFunction(false, "Merging in existing Attribute & Material Data...");
+                loggingFunction(false, "Merging in existing Model Settings...");
 
                 // Apply our Model Modifier options to the model.
                 await options.Apply(ttModel, currentMdl, originalMdl, tx);
 
+                ModelModifiers.MergeFlags(ttModel, currentMdl);
 
                 // Call the user function, if one was provided.
                 if (options.IntermediaryFunction != null)
@@ -2448,13 +2449,9 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
 
-
-            // Debug Code
-            /*
-            var root = XivCache.GetFilePathRoot(ogMdl.MdlPath);
-            var race = IOUtil.GetRaceFromPath(ogMdl.MdlPath);
-            var skel = Sklb.GetBones(root.Info, race).Result;
-            */
+            // Always calculate tangents as the final step, to ensure no more UV modification is happening.
+            // The tangent function will internally shift the referenced UVs into SE-UV Addressing space as needed.
+            ModelModifiers.CalculateTangents(ttModel, loggingFunction, true);
 
             ttModel.MdlVersion = mdlVersion;
 
@@ -2472,11 +2469,12 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction = NoOp;
             }
 
+            var useTangents = ttModel.AnisotropicLightingEnabled;
             try
             {
                 var usageInfo = ttModel.GetUsageInfo();
 
-                var vertexSize = 52;
+                var vertexSize = 48;
                 if (usageInfo.NeedsEightWeights)
                 {
                     vertexSize += 8;
@@ -2492,6 +2490,10 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
                 if (usageInfo.UsesVColor2)
+                {
+                    vertexSize += 4;
+                }
+                if (useTangents)
                 {
                     vertexSize += 4;
                 }
@@ -2614,15 +2616,15 @@ namespace xivModdingFramework.Models.FileTypes
                     });
 
                     // Optional/Situational Elements
-                    if (upgradePrecision)
+                    if (upgradePrecision && useTangents)
                     {
-                        /*
+                        
                         AddVertexHeader(source, new VertexDataStruct()
                         {
                             DataBlock = 1,
                             DataType = VertexDataType.Ubyte4n,
                             DataUsage = VertexUsageType.Tangent
-                        });*/
+                        });
                     }
 
                     AddVertexHeader(source, new VertexDataStruct()
@@ -3920,7 +3922,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var bytes = new List<byte>(4);
             var vec = normal;
-            vec.Normalize();
+            //vec.Normalize();
 
 
             // The possible range of -1 to 1 Vector X/Y/Z Values are compressed

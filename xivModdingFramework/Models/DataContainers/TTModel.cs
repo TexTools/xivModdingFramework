@@ -685,6 +685,10 @@ namespace xivModdingFramework.Models.DataContainers
 
         public HashSet<string> ActiveShapes = new HashSet<string>();
 
+        public bool AnisotropicLightingEnabled;
+
+        public EMeshFlags1 Flags;
+
         public object Clone()
         {
             var model = (TTModel) MemberwiseClone();
@@ -2584,6 +2588,7 @@ namespace xivModdingFramework.Models.DataContainers
 
             ModelModifiers.FixUpSkinReferences(ttModel, rawMdl.MdlPath);
 
+            ModelModifiers.MergeFlags(ttModel, rawMdl);
             return ttModel;
         }
 

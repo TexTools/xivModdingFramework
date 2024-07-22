@@ -1133,6 +1133,7 @@ namespace xivModdingFramework.Mods
                     page.Groups.Add(await WizardGroupEntry.FromPMPGroup(g, unzipPath));
                 }
             }
+            data.ClearNulls();
             return data;
         }
 
