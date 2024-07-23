@@ -1746,9 +1746,6 @@ namespace xivModdingFramework.Models.Helpers
             }
             if (model == null) return;
 
-            // DEBUG ASDF
-            forceRecalculation = true;
-
 
             var anyMissingData = AnyMissingTangentData(model);
             if (!anyMissingData && !forceRecalculation)
