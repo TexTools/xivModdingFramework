@@ -300,7 +300,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
-            var ttModel = TTModel.FromRaw(mdl);
+            var ttModel = await TTModel.FromRaw(mdl);
             return ttModel;
         }
 
@@ -314,14 +314,14 @@ namespace xivModdingFramework.Models.FileTypes
         public static async Task<TTModel> GetTTModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
-            var ttModel = TTModel.FromRaw(mdl);
+            var ttModel = await TTModel.FromRaw(mdl);
             return ttModel;
         }
 
-        public static TTModel GetTTModel(byte[] mdlData, string mdlPath = "")
+        public static async Task<TTModel> GetTTModel(byte[] mdlData, string mdlPath = "")
         {
             var mdl = GetXivMdl(mdlData, mdlPath);
-            var ttModel = TTModel.FromRaw(mdl);
+            var ttModel = await TTModel.FromRaw(mdl);
             return ttModel;
         }
 
@@ -1849,7 +1849,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 // Kind of clunky to have to convert this back off bytes, but w/e.
                 // This codepath is basically unused at this point anyways.
-                var ttm = Mdl.GetTTModel(bytes, internalFile);
+                var ttm = await Mdl.GetTTModel(bytes, internalFile);
                 await FillMissingMaterials(ttm, options.ReferenceItem, options.SourceApplication, tx);
             }
 
@@ -1998,7 +1998,7 @@ namespace xivModdingFramework.Models.FileTypes
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
-                    var oldModel = TTModel.FromRaw(originalMdl);
+                    var oldModel = await TTModel.FromRaw(originalMdl);
                     bool cont = await options.IntermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
@@ -2051,14 +2051,14 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 // Raw already converted DB file, just load it.
                 loggingFunction(false, "Loading intermediate file...");
-                ttModel = TTModel.LoadFromFile(externalPath, loggingFunction, options);
+                ttModel = await TTModel.LoadFromFile(externalPath, loggingFunction, options);
             }
             else
             {
                 // External Importer converts the file to .db format.
                 var dbFile = await RunExternalImporter(suffix, externalPath, loggingFunction);
                 loggingFunction(false, "Loading intermediate file...");
-                ttModel = TTModel.LoadFromFile(dbFile, loggingFunction, options);
+                ttModel = await TTModel.LoadFromFile(dbFile, loggingFunction, options);
             }
 
             if(ttModel == null)
@@ -2443,10 +2443,6 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
 
-            // Always calculate tangents as the final step, to ensure no more UV modification is happening.
-            // The tangent function will internally shift the referenced UVs into SE-UV Addressing space as needed.
-            ModelModifiers.CalculateTangents(ttModel, loggingFunction, true);
-
             ttModel.MdlVersion = mdlVersion;
 
             byte _LoDCount = 1;
@@ -2463,7 +2459,7 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction = NoOp;
             }
 
-            var useTangents = ttModel.AnisotropicLightingEnabled;
+            var useFlowData = ttModel.AnisotropicLightingEnabled;
             try
             {
                 var usageInfo = ttModel.GetUsageInfo();
@@ -2487,7 +2483,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {
                     vertexSize += 4;
                 }
-                if (useTangents)
+                if (useFlowData)
                 {
                     vertexSize += 4;
                 }
@@ -2610,14 +2606,14 @@ namespace xivModdingFramework.Models.FileTypes
                     });
 
                     // Optional/Situational Elements
-                    if (upgradePrecision && useTangents)
+                    if (upgradePrecision && useFlowData)
                     {
                         
                         AddVertexHeader(source, new VertexDataStruct()
                         {
                             DataBlock = 1,
                             DataType = VertexDataType.Ubyte4n,
-                            DataUsage = VertexUsageType.Tangent
+                            DataUsage = VertexUsageType.Flow
                         });
                     }
 
@@ -3978,9 +3974,10 @@ namespace xivModdingFramework.Models.FileTypes
                     value = v.Binormal;
                     handedness = v.Handedness;
                     break;
-                case VertexUsageType.Tangent:
-                    value = v.Tangent;
-                    handedness = v.Handedness;
+                case VertexUsageType.Flow:
+                    value = v.FlowDirection;
+                    // Unused
+                    handedness = true;
                     break;
                 default:
                     return false;
@@ -4082,7 +4079,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Normal, v);
             WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Binormal, v);
-            WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Tangent, v);
+            WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Flow, v);
 
 
             if (vertexInfoList.ContainsKey(VertexUsageType.Color))
@@ -4200,7 +4197,7 @@ namespace xivModdingFramework.Models.FileTypes
             var modlist = await tx.GetModList();
 
             var ogMdl = await GetXivMdl(mdlPath, false, tx);
-            var ttMdl = TTModel.FromRaw(ogMdl);
+            var ttMdl = await TTModel.FromRaw(ogMdl);
 
             bool anyChanges = false;
             anyChanges = SkinCheckBibo(ttMdl, index);
@@ -4783,7 +4780,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var modlist = await tx.GetModList();
 
                 var xMdl = await GetXivMdl(originalPath, false, tx);
-                var model = TTModel.FromRaw(xMdl);
+                var model = await TTModel.FromRaw(xMdl);
 
 
                 if (model == null)
@@ -4974,10 +4971,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var modlist = await tx.GetModList();
 
                 var xMdl = await GetXivMdl(mergeIn, false, tx);
-                var mergeInModel = TTModel.FromRaw(xMdl);
+                var mergeInModel = await TTModel.FromRaw(xMdl);
 
                 var xMdl2 = await GetXivMdl(primaryModel, false, tx);
-                var mainModel = TTModel.FromRaw(xMdl2);
+                var mainModel = await TTModel.FromRaw(xMdl2);
 
 
                 if (mergeInModel == null)
@@ -5255,7 +5252,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {0x2, VertexUsageType.BoneIndex },
                 {0x3, VertexUsageType.Normal },
                 {0x4, VertexUsageType.TextureCoordinate },
-                {0x5, VertexUsageType.Tangent },
+                {0x5, VertexUsageType.Flow },
                 {0x6, VertexUsageType.Binormal },
                 {0x7, VertexUsageType.Color }
             };

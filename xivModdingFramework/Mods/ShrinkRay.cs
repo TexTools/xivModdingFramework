@@ -104,7 +104,7 @@ namespace xivModdingFramework.Mods
             {
                 var data = await TransactionDataHandler.GetUncompressedFile(model);
                 var raw = Mdl.GetXivMdl(data, path);
-                var ttm = TTModel.FromRaw(raw);
+                var ttm = await TTModel.FromRaw(raw);
                 ttm.MdlVersion = 6;
 
                 var res = Mdl.MakeUncompressedMdlFile(ttm, raw);

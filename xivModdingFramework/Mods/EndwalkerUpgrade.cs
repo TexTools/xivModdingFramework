@@ -192,7 +192,7 @@ namespace xivModdingFramework.Mods
             var uncomp = await TransactionDataHandler.GetUncompressedFile(file);
 
             var mdl = Mdl.GetXivMdl(uncomp);
-            var ttm = TTModel.FromRaw(mdl);
+            var ttm = await TTModel.FromRaw(mdl);
 
             uncomp = Mdl.MakeUncompressedMdlFile(ttm, mdl);
 

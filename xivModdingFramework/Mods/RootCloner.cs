@@ -270,7 +270,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
                     var xmdl = await Mdl.GetXivMdl(src, false, tx);
-                    var tmdl = TTModel.FromRaw(xmdl);
+                    var tmdl = await TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
                         continue;

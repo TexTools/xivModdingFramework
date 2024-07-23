@@ -86,6 +86,10 @@ CREATE TABLE "vertices" (
 	"bone_7_weight"		REAL,
 	"bone_8_id"			INTEGER,
 	"bone_8_weight"		REAL,
+	
+	-- Flow Info
+	"flow_u"	REAL NOT NULL,
+	"flow_v"	REAL NOT NULL,
 
 	PRIMARY KEY("mesh","part","vertex_id")
 );

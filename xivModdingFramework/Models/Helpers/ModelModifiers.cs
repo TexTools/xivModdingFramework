@@ -198,7 +198,7 @@ namespace xivModdingFramework.Models.Helpers
                     throw new Exception("Cannot auto-scale without base model loaded.");
                 }
 
-                var oldModel = TTModel.FromRaw(originalMdl);
+                var oldModel = await TTModel.FromRaw(originalMdl);
                 ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, LoggingFunction);
             }
 
@@ -498,6 +498,17 @@ namespace xivModdingFramework.Models.Helpers
                         {
                             ttVert.Binormal = baseMesh.VertexData.BiNormals[oldVertexId];
                         }
+
+                        if (baseMesh.VertexData.FlowDirections.Count > oldVertexId)
+                        {
+                            ttVert.FlowDirection = baseMesh.VertexData.FlowDirections[oldVertexId];
+                            if (baseMesh.VertexData.FlowHandedness[oldVertexId] == 255)
+                            {
+                                // Not sure this is actually used.
+                                //ttVert.FlowDirection *= -1;
+                            }
+                        }
+
                         if (baseMesh.VertexData.Colors.Count > oldVertexId)
                         {
                             ttVert.VertexColor[0] = baseMesh.VertexData.Colors[oldVertexId].R;
@@ -515,10 +526,6 @@ namespace xivModdingFramework.Models.Helpers
                         if (baseMesh.VertexData.BiNormalHandedness.Count > oldVertexId)
                         {
                             ttVert.Handedness = baseMesh.VertexData.BiNormalHandedness[oldVertexId] == 0 ? false : true;
-                        }
-                        if (baseMesh.VertexData.Tangents.Count > oldVertexId)
-                        {
-                            ttVert.Tangent = baseMesh.VertexData.Tangents[oldVertexId];
                         }
                         if (baseMesh.VertexData.TextureCoordinates0.Count > oldVertexId)
                         {
@@ -772,7 +779,7 @@ namespace xivModdingFramework.Models.Helpers
                                     var vert = new TTVertex();
                                     vert.Position = ogGroup.VertexData.Positions.Count > vId ? ogGroup.VertexData.Positions[vId] : new Vector3();
                                     vert.Normal = ogGroup.VertexData.Normals.Count > vId ? ogGroup.VertexData.Normals[vId] : new Vector3();
-                                    vert.Tangent = ogGroup.VertexData.Tangents.Count > vId ? ogGroup.VertexData.Tangents[vId] : new Vector3();
+                                    vert.FlowDirection = ogGroup.VertexData.FlowDirections.Count > vId ? ogGroup.VertexData.FlowDirections[vId] : new Vector3();
                                     vert.Binormal = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormals[vId] : new Vector3();
                                     vert.Handedness = ogGroup.VertexData.BiNormalHandedness.Count > vId ? ogGroup.VertexData.BiNormalHandedness[vId] == 0 ? false : true : false;
                                     vert.UV1 = ogGroup.VertexData.TextureCoordinates0.Count > vId ? ogGroup.VertexData.TextureCoordinates0[vId] : new Vector2();
@@ -1674,6 +1681,42 @@ namespace xivModdingFramework.Models.Helpers
             model.UVState = TTModel.UVAddressingSpace.SE_Space;
         }
 
+        internal static async Task ConvertFlowData(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+
+            var tasks = new List<Task>();
+            foreach(var m in model.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    tasks.Add(Task.Run(() =>
+                    {
+                        foreach(var v in p.Vertices)
+                        {
+                            var f = new float[3];
+
+                            f[0] = v.FlowDirection[0];
+                            f[1] = v.FlowDirection[1];
+
+                            var worldFlow = new Vector3(v.TangentToWorld(f)).Normalized();
+                            v.FlowDirection[0] = worldFlow[0];
+                            v.FlowDirection[1] = worldFlow[1];
+                            v.FlowDirection[2] = worldFlow[2];
+                        }
+
+                    }));
+                }
+            }
+
+
+            await Task.WhenAll(tasks);
+        }
+
         /// <summary>
         /// This function shifts the UV Space on the model to the Bottom-Left addressing style most external formats/applications expect.
         /// </summary>
@@ -1717,7 +1760,7 @@ namespace xivModdingFramework.Models.Helpers
         /// Convenience function for calculating tangent data for a TTModel.
         /// </summary>
         /// <param name="model"></param>
-        public static void CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null, bool forceRecalculation = false)
+        public static async Task CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null, bool forceRecalculation = false)
         {
             if(loggingFunction == null)
             {
@@ -1747,10 +1790,12 @@ namespace xivModdingFramework.Models.Helpers
             }
             ModelModifiers.ApplyShapes(model, new List<string>(), true, loggingFunction);
 
+            var tasks = new List<Task>();
             foreach (var m in model.MeshGroups)
             {
-                CalculateTangentsForMesh(m);
+                tasks.Add(Task.Run(() => { CalculateTangentsForMesh(m, forceRecalculation); }));
             }
+            await Task.WhenAll(tasks);
 
             if(resetShapes.Count > 0)
             {
@@ -1862,7 +1907,7 @@ namespace xivModdingFramework.Models.Helpers
             return (finalIndices, vertexTable);
         }
 
-        private static void CalculateTangentsForMesh(TTMeshGroup m)
+        private static void CalculateTangentsForMesh(TTMeshGroup m, bool force = false)
         {
 
             // Make sure there's actually data to use...
@@ -1871,15 +1916,33 @@ namespace xivModdingFramework.Models.Helpers
                 return;
             }
 
-
-            if (m.Parts.Any(p => p.Vertices.Any(x => x.Binormal != Vector3.Zero))) 
+            var anyMissing = false;
+            foreach(var p in m.Parts)
             {
-                // Faster function.
-                foreach (var p in m.Parts)
+                if(p.Vertices.Any(x => x.Tangent == Vector3.Zero || x.Binormal == Vector3.Zero))
                 {
-                    CalculateTangentsFromBinormalsForPart(p);
+                    anyMissing = true;
+                    break;
                 }
+            }
+            if (!force && !anyMissing)
+            {
+                // No need.
                 return;
+            }
+
+
+            if (!force)
+            {
+                if (m.Parts.Any(p => p.Vertices.Any(x => x.Binormal != Vector3.Zero)))
+                {
+                    // Faster function.
+                    foreach (var p in m.Parts)
+                    {
+                        CalculateTangentsFromBinormalsForPart(p);
+                    }
+                    return;
+                }
             }
 
             var weldData = GetWeldedMeshData(m);
@@ -1944,6 +2007,8 @@ namespace xivModdingFramework.Models.Helpers
                 bitangents[vertexId3] += tdir;
             }
 
+
+
             // Loop the VERTEXES now to calculate the end tangent/bitangents based on the summed data for each VERTEX
             for (var vertexId = 0; vertexId < vertices.Count; ++vertexId)
             {
@@ -1952,30 +2017,22 @@ namespace xivModdingFramework.Models.Helpers
                 // using the other results before.  Better to kill the previous computations and use these numbers
                 // for everything to avoid minor differences causing errors.
 
-                //var posIdx = vDict[a];
                 var vertex = vertices[vertexId][0];
-                //List<TTVertex> oVertices = new List<TTVertex>();
 
                 var n = vertex.Normal;
 
                 var t = tangents[vertexId];
                 var b = bitangents[vertexId];
 
-                // Calculate tangent vector
-                //var tangent = t - (n * Vector3.Dot(n, t));
-                //tangent = Vector3.Normalize(tangent);
-
                 // Compute binormal
-                var binormal = Vector3.Cross(n, Vector3.Normalize(t));
-                var tangent = Vector3.Cross(n, Vector3.Normalize(binormal));
-                //binormal.Normalize();
+                var binormal = Vector3.Cross(n, Vector3.Normalize(t)).Normalized();
+                var tangent = Vector3.Cross(n, binormal).Normalized();
 
                 // Compute handedness
                 int bHandedness = Vector3.Dot(Vector3.Normalize(binormal), b) >= 0 ? 1 : -1;
 
                 // Apply handedness
                 binormal *= bHandedness;
-                ///tangent *= tHandedness;
 
                 var boolHandedness = !(bHandedness < 0 ? true : false);
 
@@ -1992,6 +2049,7 @@ namespace xivModdingFramework.Models.Helpers
             {
                 CopyShapeTangentsForPart(p);
             }
+
         }
 
         private static void CopyShapeTangentsForPart(TTMeshPart p)
@@ -2013,7 +2071,6 @@ namespace xivModdingFramework.Models.Helpers
         {
             foreach (var v in p.Vertices)
             {
-
                 var tangent = Vector3.Cross(v.Normal, v.Binormal);
                 tangent *= (v.Handedness == true ? -1 : 1);
                 v.Tangent = tangent;
@@ -2029,7 +2086,7 @@ namespace xivModdingFramework.Models.Helpers
             model.AnisotropicLightingEnabled = false;
             foreach (var mdl in flagSource.LoDList[0].MeshDataList)
             {
-                model.AnisotropicLightingEnabled |= mdl.VertexDataStructList.Any(x => x.DataUsage == VertexUsageType.Tangent);
+                model.AnisotropicLightingEnabled |= mdl.VertexDataStructList.Any(x => x.DataUsage == VertexUsageType.Flow);
             }
 
             model.Flags = flagSource.ModelData.Flags1;

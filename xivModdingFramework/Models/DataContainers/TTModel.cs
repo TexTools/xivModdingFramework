@@ -25,6 +25,7 @@ using xivModdingFramework.Models.ModelTextures;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
+using MathNet.Numerics.LinearAlgebra;
 
 namespace xivModdingFramework.Models.DataContainers
 {
@@ -88,6 +89,7 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector3 Normal = new Vector3(0, 0, 0);
         public Vector3 Binormal = new Vector3(0, 0, 0);
         public Vector3 Tangent = new Vector3(0, 0, 0);
+        public Vector3 FlowDirection = new Vector3(0, 0, 0);
 
         // This is Technically BINORMAL handedness in FFXIV.
         // A values of TRUE indicates we need to flip the Tangent when generated. (-1)
@@ -107,6 +109,64 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] BoneIds = new byte[_BONE_ARRAY_LENGTH];
         public byte[] Weights = new byte[_BONE_ARRAY_LENGTH];
 
+        public Vector3 GetTangentSpaceFlow()
+        {
+            var flow = WorldToTangent(FlowDirection.ToArray());
+            return new Vector3(flow[0], flow[1], 0).Normalized();
+        }
+
+        public float[] WorldToTangent(float[] vector)
+        {
+            var mat = Matrix<float>.Build.Dense(3, 3);
+
+            var n = Normal.Normalized();
+            var b = Binormal.Normalized();
+            var t = Tangent.Normalized();
+
+            mat[0, 0] = t[0];
+            mat[0, 1] = t[1];
+            mat[0, 2] = t[2];
+
+            mat[1, 0] = b[0];
+            mat[1, 1] = b[1];
+            mat[1, 2] = b[2];
+
+            mat[2, 0] = n[0];
+            mat[2, 1] = n[1];
+            mat[2, 2] = n[2];
+            var vec = Vector<float>.Build.Dense(vector);
+
+            var flow = mat * vec;
+            return flow.AsArray();
+        }
+
+        public float[] TangentToWorld(float[] vector)
+        {
+            var mat = Matrix<float>.Build.Dense(3, 3);
+
+            var n = Normal.Normalized();
+            var b = Binormal.Normalized();
+            var t = Tangent.Normalized();
+
+            mat[0, 0] = t[0];
+            mat[0, 1] = t[1];
+            mat[0, 2] = t[2];
+
+            mat[1, 0] = b[0];
+            mat[1, 1] = b[1];
+            mat[1, 2] = b[2];
+
+            mat[2, 0] = n[0];
+            mat[2, 1] = n[1];
+            mat[2, 2] = n[2];
+            var vec = Vector<float>.Build.Dense(vector);
+
+            mat = mat.Transpose();
+
+            var flow = mat * vec;
+            return flow.AsArray();
+        }
+
         public static List<TTVertex> CloneVertexList(List<TTVertex> verts)
         {
             var newVerts = new List<TTVertex>(verts.Count);
@@ -124,6 +184,7 @@ namespace xivModdingFramework.Models.DataContainers
             if (a.Normal != b.Normal) return false;
             if (a.Binormal != b.Binormal) return false;
             if (a.Handedness != b.Handedness) return false;
+            if (a.FlowDirection != b.FlowDirection) return false;
             if (a.UV1 != b.UV1) return false;
             if (a.UV2 != b.UV2) return false;
             if (a.UV2 != b.UV3) return false;
@@ -1385,7 +1446,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFunction = null, ModelImportOptions settings = null)
+        public static async Task<TTModel> LoadFromFile(string filePath, Action<bool, string> loggingFunction = null, ModelImportOptions settings = null)
         {
             if (loggingFunction == null)
             {
@@ -1583,6 +1644,10 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.Weights[6] = (byte)(Math.Round(reader.GetFloat("bone_7_weight") * 255));
                             vertex.Weights[7] = (byte)(Math.Round(reader.GetFloat("bone_8_weight") * 255));
 
+
+                            vertex.FlowDirection[0] = reader.GetFloat("flow_u");
+                            vertex.FlowDirection[1] = reader.GetFloat("flow_v");
+
                             return vertex;
                         });
 
@@ -1651,6 +1716,10 @@ namespace xivModdingFramework.Models.DataContainers
             // Convert the model to FFXIV's internal weirdness.
             ModelModifiers.MakeImportReady(model, settings.ShiftImportUV, loggingFunction);
 
+            await ModelModifiers.CalculateTangents(model, loggingFunction);
+
+            await ModelModifiers.ConvertFlowData(model, loggingFunction);
+
             ModelModifiers.CleanWeights(model, loggingFunction);
 
             return model;
@@ -1662,6 +1731,7 @@ namespace xivModdingFramework.Models.DataContainers
             Version version = null;
 
             bool hasUv3 = false;
+            bool hasFlow = false;
             var query = @"PRAGMA table_info(vertices);";
             using (var cmd = new SQLiteCommand(query, db))
             {
@@ -1673,6 +1743,10 @@ namespace xivModdingFramework.Models.DataContainers
                         if(name == "uv_3_u")
                         {
                             hasUv3 = true;
+                        }
+                        if (name == "flow_u")
+                        {
+                            hasFlow = true;
                         }
                     }
 
@@ -1691,6 +1765,20 @@ namespace xivModdingFramework.Models.DataContainers
                     cmd.ExecuteScalar();
                 }
                 query = "ALTER TABLE vertices ADD COLUMN uv_3_v INTEGER NOT NULL DEFAULT 0;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+            }
+
+            if (!hasFlow)
+            {
+                query = "ALTER TABLE vertices ADD COLUMN flow_u REAL NOT NULL DEFAULT 0;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+                query = "ALTER TABLE vertices ADD COLUMN flow_v REAL NOT NULL DEFAULT 0;";
                 using (var cmd = new SQLiteCommand(query, db))
                 {
                     cmd.ExecuteScalar();
@@ -2389,8 +2477,8 @@ namespace xivModdingFramework.Models.DataContainers
 
         private static void WriteVertex(TTVertex v, SQLiteConnection db, int meshIdx, int partIdx, int vIdx)
         {
-            var query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight,  uv_3_u,  uv_3_v) 
-                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b,  $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight, $uv_3_u, $uv_3_v);";
+            var query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight,  uv_3_u,  uv_3_v,  flow_u,  flow_v) 
+                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b,  $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight, $uv_3_u, $uv_3_v, $flow_u, $flow_v);";
             using (var cmd = new SQLiteCommand(query, db))
             {
                 cmd.Parameters.AddWithValue("part", partIdx);
@@ -2453,6 +2541,11 @@ namespace xivModdingFramework.Models.DataContainers
 
                 cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
                 cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
+
+
+                var flow = v.GetTangentSpaceFlow();
+                cmd.Parameters.AddWithValue("flow_u", flow.X);
+                cmd.Parameters.AddWithValue("flow_v", flow.Y);
 
                 cmd.ExecuteScalar();
             }
@@ -2545,7 +2638,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="rawMdl"></param>
         /// <returns></returns>
-        public static TTModel FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
+        public static async Task<TTModel> FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
         {
             if(rawMdl == null)
             {
@@ -2578,6 +2671,7 @@ namespace xivModdingFramework.Models.DataContainers
 
             ttModel.UVState = UVAddressingSpace.SE_Space;
 
+            await ModelModifiers.CalculateTangents(ttModel);
             return ttModel;
         }
 
