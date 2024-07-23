@@ -1607,6 +1607,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         transaction.Commit();
                     }
+
                 }
             }
             catch
@@ -1615,14 +1616,33 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        /// <summary>
-        /// Retrieves simplified material info for ALL Materials in the entire game.
-        /// Used to collect data to store into SQLite DB or JSON.
-        /// 
-        /// Not Transaction Safe
-        /// </summary>
-        /// <returns></returns>
-        public static async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
+
+        public static async Task ShrinkShaderDB()
+        {
+            const string _ShaderDbFilePath = "./Resources/DB/shader_info.db";
+            const string _ShrinkDbScript = "ShrinkShaderCache.sql";
+            var connectionString = "Data Source=" + _ShaderDbFilePath + ";Pooling=False;";
+            using (var db = new SQLiteConnection(connectionString))
+            {
+                db.Open();
+                var lines = File.ReadAllLines("Resources\\SQL\\" + _ShrinkDbScript);
+                var sqlCmd = String.Join("\n", lines);
+
+                using (var cmd = new SQLiteCommand(sqlCmd, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+            }
+        }
+
+            /// <summary>
+            /// Retrieves simplified material info for ALL Materials in the entire game.
+            /// Used to collect data to store into SQLite DB or JSON.
+            /// 
+            /// Not Transaction Safe
+            /// </summary>
+            /// <returns></returns>
+            public static async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
         {
             if(ModTransaction.ActiveTransaction != null)
             {

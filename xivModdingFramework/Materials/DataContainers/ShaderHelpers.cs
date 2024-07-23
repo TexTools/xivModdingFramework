@@ -356,6 +356,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyValueName(shKv.Key, 0x380CAED0, 0xF5673524, "PART_FACE");
                 UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x2BDB45F1, "PART_BODY");
                 UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x57FF3B64, "PART_BODY_HRO");
+                UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x72E697CD, "EMISSIVE");
 
                 // Hair Values
                 UpdateKeyValueName(shKv.Key, 0x24826489, 0xF7B8956E, "PART_HAIR");
