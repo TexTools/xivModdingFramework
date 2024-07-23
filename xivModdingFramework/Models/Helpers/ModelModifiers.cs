@@ -1861,6 +1861,7 @@ namespace xivModdingFramework.Models.Helpers
                 vertices.AddRange(p.Vertices);
             }
 
+            Dictionary<int, List<int>> weldHashes = new Dictionary<int, List<int>>();
             Dictionary<int, int> oldToNewVertex = new Dictionary<int, int>();
             List<TTVertex> newVertices = new List<TTVertex>(vertices.Count);
             var vertexTable = new Dictionary<int, List<TTVertex>>();
@@ -1869,19 +1870,24 @@ namespace xivModdingFramework.Models.Helpers
             for (int i = 0; i < vertices.Count; i++)
             {
                 var ov = vertices[i];
+                var hash = ov.GetWeldHash();
                 var found = false;
-                for(var ni = 0; ni < newVertices.Count; ni++)
+                if (weldHashes.ContainsKey(hash))
                 {
-                    var nv = newVertices[ni];
-
-                    if(nv.UV1 == ov.UV1
-                        && nv.Position == ov.Position
-                        && nv.Normal == ov.Normal)
+                    var entries = weldHashes[hash];
+                    for (var ni = 0; ni < entries.Count; ni++)
                     {
-                        oldToNewVertex.Add(i, ni);
-                        vertexTable[ni].Add(ov);
-                        found = true;
-                        break;
+                        var nv = vertices[entries[ni]];
+
+                        if (nv.UV1 == ov.UV1
+                            && nv.Position == ov.Position
+                            && nv.Normal == ov.Normal)
+                        {
+                            oldToNewVertex.Add(i, ni);
+                            vertexTable[ni].Add(ov);
+                            found = true;
+                            break;
+                        }
                     }
                 }
 
@@ -1892,6 +1898,14 @@ namespace xivModdingFramework.Models.Helpers
                     vertexTable.Add(ni, new List<TTVertex>());
                     vertexTable[ni].Add(ov);
                     newVertices.Add(ov);
+                    if (weldHashes.ContainsKey(hash))
+                    {
+                        weldHashes[hash].Add(i);
+                    }
+                    else
+                    {
+                        weldHashes.Add(hash, new List<int>() { i });
+                    }
                 }
             }
 

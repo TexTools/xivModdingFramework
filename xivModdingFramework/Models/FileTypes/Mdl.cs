@@ -1981,6 +1981,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
+                ttModel.Source = internalPath;
 
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass

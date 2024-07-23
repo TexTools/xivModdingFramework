@@ -109,6 +109,18 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] BoneIds = new byte[_BONE_ARRAY_LENGTH];
         public byte[] Weights = new byte[_BONE_ARRAY_LENGTH];
 
+        public int GetWeldHash()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + Position.GetHashCode();
+                hash = hash * 31 + UV1.GetHashCode();
+                hash = hash * 31 + Normal.GetHashCode();
+                return hash;
+            }
+        }
+
         public Vector3 GetTangentSpaceFlow()
         {
             var flow = WorldToTangent(FlowDirection.ToArray());
