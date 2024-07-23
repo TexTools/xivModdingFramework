@@ -154,6 +154,11 @@ namespace xivModdingFramework.Models.DataContainers
 
         public float[] TangentToWorld(float[] vector)
         {
+            if(vector.Length == 2)
+            {
+                vector = new float[3] { vector[0], vector[1], 0 };
+            }
+
             var mat = Matrix<float>.Build.Dense(3, 3);
 
             var n = Normal.Normalized();
@@ -171,6 +176,7 @@ namespace xivModdingFramework.Models.DataContainers
             mat[2, 0] = n[0];
             mat[2, 1] = n[1];
             mat[2, 2] = n[2];
+
             var vec = Vector<float>.Build.Dense(vector);
 
             mat = mat.Transpose();

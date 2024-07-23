@@ -35,12 +35,8 @@ namespace xivModdingFramework.Models.Helpers
     {
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
-        public bool UseOriginalShapeData { get; set; }
         public bool ShiftImportUV { get; set; }
-        public bool ClearUV2 { get; set; }
         public bool CloneUV2 { get; set; }
-        public bool ClearVColor { get; set; }
-        public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
         public bool UseImportedTangents { get; set; }
         public XivRace SourceRace { get; set; }
@@ -75,13 +71,9 @@ namespace xivModdingFramework.Models.Helpers
         {
             CopyAttributes = true;
             CopyMaterials = true;
-            UseOriginalShapeData = false;
             UseImportedTangents = false;
             ShiftImportUV = true;
-            ClearUV2 = false;
             CloneUV2 = false;
-            ClearVColor = false;
-            ClearVAlpha = false;
             AutoScale = true;
             ValidateMaterials = true;
             SourceRace = XivRace.All_Races;
@@ -133,24 +125,9 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.MergeMaterialData(ttModel, currentMdl, LoggingFunction);
             }
 
-            if (ClearUV2)
-            {
-                ModelModifiers.ClearUV2(ttModel, LoggingFunction);
-            }
-
             if (CloneUV2)
             {
                 ModelModifiers.CloneUV2(ttModel, LoggingFunction);
-            }
-
-            if (ClearVColor)
-            {
-                ModelModifiers.ClearVColor(ttModel, LoggingFunction);
-            }
-
-            if (ClearVAlpha)
-            {
-                ModelModifiers.ClearVAlpha(ttModel, LoggingFunction);
             }
 
             if(SourceRace != XivRace.All_Races && SourceRace != TargetRace)
@@ -171,24 +148,6 @@ namespace xivModdingFramework.Models.Helpers
                 }
 
                 await ModelModifiers.RaceConvertRecursive(ttModel, TargetRace, SourceRace, LoggingFunction, tx);
-            }
-
-            // We need to load the original unmodified model to get the shape data.
-            if (UseOriginalShapeData && originalMdl != null)
-            {
-                if (originalMdl == null)
-                {
-                    throw new Exception("Cannot copy settings from null MDL.");
-                }
-                ModelModifiers.ClearShapeData(ttModel, LoggingFunction);
-                try
-                {
-                    ModelModifiers.MergeShapeData(ttModel, originalMdl, LoggingFunction);
-                }
-                catch
-                {
-                    throw new Exception("Failed to apply the original shape data.\nThis is likely due to changes to the original model without preserving the vertices' order.");
-                }
             }
 
             if (AutoScale && originalMdl != null)
@@ -988,6 +947,23 @@ namespace xivModdingFramework.Models.Helpers
             }
             UpdateShapeParts(p);
         }
+        public static void ClearFlow_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.FlowDirection = Vector3.Zero;
+            }
+            UpdateShapeParts(p);
+        }
+
+        public static void SetFlow_Part(TTMeshPart p, Vector2 tangentDirection)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.FlowDirection = new Vector3(v.TangentToWorld(tangentDirection.ToArray()));
+            }
+            UpdateShapeParts(p);
+        }
 
         // Resets Vertex Color to White(c1)/Black(c2)
         public static void ClearVColor(TTModel model, Action<bool, string> loggingFunction = null)
@@ -1199,7 +1175,9 @@ namespace xivModdingFramework.Models.Helpers
                 // The model is still added but no deforms are applied
                 if (loggingFunction != null)
                 {
-                    loggingFunction(true, "Unable to convert racial model.");
+                    loggingFunction(true, "Unable to convert racial model:" + ex.Message);
+                    var tempLog = Path.Combine(IOUtil.GetFrameworkTempFolder(), "race_convert_log.txt");
+                    File.WriteAllText(tempLog, ex.StackTrace);
                 } else
                 {
                     throw;
