@@ -146,6 +146,9 @@
     <None Update="Resources\SQL\CreateShaderDB.sql">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Resources\SQL\ShrinkShaderCache.sql">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
