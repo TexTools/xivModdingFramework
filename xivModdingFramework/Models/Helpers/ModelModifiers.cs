@@ -1628,19 +1628,16 @@ namespace xivModdingFramework.Models.Helpers
         }
 
         /// <summary>
-        /// This function does all the minor adjustments to a Model that makes it
-        /// ready for injection into the SE filesystem.  Such as flipping the 
-        /// UVs, calculating tangents, and applying the global level size multiplier.
-        /// Likewise, MakeExportReady() undoes this process.
-        /// 
-        /// Weight check skip lets us avoid some calculation in cases where we already know they're fine.
+        /// This function shifts the UV Space on the model to the Top-Left addressing style FFXIV expects.
         /// </summary>
-        public static void MakeImportReady(TTModel model, Action<bool, string> loggingFunction = null, bool reconvert = false)
+        internal static void MakeImportReady(TTModel model, bool shiftUv = true, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
+
+            if (model.UVState == TTModel.UVAddressingSpace.SE_Space) return;
 
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
@@ -1655,6 +1652,14 @@ namespace xivModdingFramework.Models.Helpers
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
+                        v.UV3[1] *= -1;
+
+                        if (shiftUv)
+                        {
+                            v.UV1[1] += 1;
+                            v.UV2[1] += 1;
+                            v.UV3[1] += 1;
+                        }
                         vIdx++;
                     }
                     pIdx++;
@@ -1665,19 +1670,21 @@ namespace xivModdingFramework.Models.Helpers
 
             // Update the base shape data to match our base model.
             model.UpdateShapeData();
+
+            model.UVState = TTModel.UVAddressingSpace.SE_Space;
         }
 
         /// <summary>
-        /// This process undoes all the strange minor adjustments to a model
-        /// that FFXIV expects in the SE filesystem, such as flipping the UVs,
-        /// and having tiny ass models.
+        /// This function shifts the UV Space on the model to the Bottom-Left addressing style most external formats/applications expect.
         /// </summary>
-        public static void MakeExportReady(TTModel model, Action<bool, string> loggingFunction = null)
+        internal static void MakeExportReady(TTModel model, bool shiftUv = true, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
+
+            if (model.UVState == TTModel.UVAddressingSpace.Standard) return;
 
             foreach (var m in model.MeshGroups)
             {
@@ -1688,12 +1695,22 @@ namespace xivModdingFramework.Models.Helpers
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
+                        v.UV3[1] *= -1;
+
+                        if (shiftUv)
+                        {
+                            v.UV1[1] += 1;
+                            v.UV2[1] += 1;
+                            v.UV3[1] += 1;
+                        }
                     }
                 }
             }
 
             // Update the base shape data to match our base model.
             model.UpdateShapeData();
+
+            model.UVState = TTModel.UVAddressingSpace.Standard;
         }
 
         /// <summary>
@@ -1708,6 +1725,7 @@ namespace xivModdingFramework.Models.Helpers
             }
             if (model == null) return;
 
+
             var anyMissingData = AnyMissingTangentData(model);
             if (!anyMissingData && !forceRecalculation)
             {
@@ -1715,6 +1733,12 @@ namespace xivModdingFramework.Models.Helpers
                 return;
             }
             loggingFunction(false, "Calculating Tangents...");
+
+            if(model.UVState != TTModel.UVAddressingSpace.SE_Space)
+            {
+                throw new Exception("Cannot calculate tangents on model when it is not in SE-style UV space.");
+            }
+
 
             var resetShapes = new List<string>();
             if(model.ActiveShapes.Count != 0)
@@ -2321,68 +2345,5 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
-        public static void ShiftExportUV(TTModel model, Action<bool, string> loggingFunction = null)
-        {
-            if (loggingFunction == null)
-            {
-                loggingFunction = ModelModifiers.NoOp;
-            }
-
-            loggingFunction(false, "Shifting Exported UV Map...");
-
-
-            foreach (var mg in model.MeshGroups)
-            {
-                foreach (var p in mg.Parts)
-                {
-                    ShiftExportUV_Part(p);
-                }
-            }
-
-        }
-
-        public static void ShiftImportUV(TTModel model, Action<bool, string> loggingFunction = null)
-        {
-            if (loggingFunction == null)
-            {
-                loggingFunction = ModelModifiers.NoOp;
-            }
-
-            loggingFunction(false, "Shifting Imported UV Map...");
-
-
-            foreach(var mg in model.MeshGroups)
-            {
-                foreach(var p in mg.Parts)
-                {
-                    ShiftImportUV_Part(p);
-                }
-            }
-
-        }
-
-        public static void ShiftImportUV_Part(TTMeshPart p)
-        {
-            foreach(var v in p.Vertices)
-            {
-                v.UV1[1] -= 1;
-                v.UV2[1] -= 1;
-                v.UV3[1] -= 1;
-            }
-
-            UpdateShapeParts(p);
-        }
-
-        public static void ShiftExportUV_Part(TTMeshPart p)
-        {
-            foreach (var v in p.Vertices)
-            {
-                v.UV1[1] += 1;
-                v.UV2[1] += 1;
-                v.UV3[1] += 1;
-            }
-
-            UpdateShapeParts(p);
-        }
     }
 }

@@ -1457,11 +1457,11 @@ namespace xivModdingFramework.Models.FileTypes
             // both the bone and material exports at the same time.
 
             // Pop the textures out so the exporters can reference them.
-            if (settings.IncludeTextures && model.IsInternal)
+            if (settings.IncludeTextures && model.HasPath)
             {
                 // Fix up our skin references in the model before exporting, to ensure
                 // we supply the right material names to the exporters down-chain.
-                if (model.IsInternal)
+                if (model.HasPath)
                 {
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
@@ -1476,18 +1476,12 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
 
-            if (settings.ShiftUVs && fileFormat != "mdl" && fileFormat != "db")
-            {
-                // This is not a typo.  Because we haven't flipped the UV yet, we need to -1, not +1.
-                ModelModifiers.ShiftImportUV(model);
-            }
-
             // Save the DB file.
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
-            model.SaveToFile(dbPath, outputFilePath, null, tx);
+            model.SaveToFile(dbPath, settings.ShiftUVs, outputFilePath, null, tx);
 
 
             if (fileFormat == "db")
@@ -2057,7 +2051,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 // Raw already converted DB file, just load it.
                 loggingFunction(false, "Loading intermediate file...");
-                ttModel = TTModel.LoadFromFile(externalPath, loggingFunction);
+                ttModel = TTModel.LoadFromFile(externalPath, loggingFunction, options);
             }
             else
             {

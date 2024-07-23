@@ -677,6 +677,17 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public ushort MdlVersion;
 
+        internal enum UVAddressingSpace
+        {
+            // Top-Left is 0,0 addressed space.
+            SE_Space,
+
+            // Bottom-left is 0,0 addressed space
+            Standard,
+        }
+
+        internal UVAddressingSpace UVState = UVAddressingSpace.SE_Space;
+
 
         /// <summary>
         /// The Mesh groups and parts of this mesh.
@@ -735,13 +746,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Is this TTModel populated from an internal file, or external?
         /// </summary>
-        public bool IsInternal
+        public bool HasPath
         {
             get
             {
-                var regex = new Regex("\\.mdl$");
-                var match = regex.Match(Source);
-                return match.Success;
+                return IOUtil.IsFFXIVInternalPath(Source);
             }
         }
 
@@ -1389,7 +1398,6 @@ namespace xivModdingFramework.Models.DataContainers
 
             var connectionString = "Data Source=" + filePath + ";Pooling=True;";
             TTModel model = new TTModel();
-            model.Source = filePath;
 
             // Spawn a DB connection to do the raw queries.
             using (var db = new SQLiteConnection(connectionString))
@@ -1638,13 +1646,10 @@ namespace xivModdingFramework.Models.DataContainers
 
             XivCache.WaitForSqlCleanup();
 
-            if (settings != null && settings.ShiftImportUV)
-            {
-                ModelModifiers.ShiftImportUV(model, loggingFunction);
-            }
+            model.UVState = UVAddressingSpace.Standard;
 
             // Convert the model to FFXIV's internal weirdness.
-            ModelModifiers.MakeImportReady(model, loggingFunction);
+            ModelModifiers.MakeImportReady(model, settings.ShiftImportUV, loggingFunction);
 
             ModelModifiers.CleanWeights(model, loggingFunction);
 
@@ -1700,7 +1705,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public void SaveToFile(string filePath, string texturePath = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
+        public void SaveToFile(string filePath, bool shiftUv = true, string texturePath = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -1715,37 +1720,35 @@ namespace xivModdingFramework.Models.DataContainers
                 textureDirectory = Path.GetDirectoryName(texturePath);
             }
 
-            ModelModifiers.MakeExportReady(this, loggingFunction);
+            ModelModifiers.MakeExportReady(this, shiftUv, loggingFunction);
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
-            try
+            var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
+            var bones = useAllBones ? null : Bones;
+
+            var boneDict = new Dictionary<string, SkeletonData>();
+            if (HasPath && Bones.Count > 0)
             {
-                var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
-                var bones = useAllBones ? null : Bones;
-
-                var boneDict = new Dictionary<string, SkeletonData>();
-                if (IsInternal && Bones.Count > 0)
+                boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction, tx);
+            } else if(Bones.Count > 0)
+            {
+                var i = 0;
+                foreach(var bone in Bones)
                 {
-                    boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction, tx);
-                } else if(Bones.Count > 0)
-                {
-                    var i = 0;
-                    foreach(var bone in Bones)
+                    boneDict.Add(bone, new SkeletonData()
                     {
-                        boneDict.Add(bone, new SkeletonData()
-                        {
-                            BoneName = bone,
-                            BoneNumber = i,
-                            BoneParent = 0,
-                        });
-                        i++;
-                    }
+                        BoneName = bone,
+                        BoneNumber = i,
+                        BoneParent = 0,
+                    });
+                    i++;
                 }
+            }
 
-                const string creationScript = "CreateImportDB.sql";
-                // Spawn a DB connection to do the raw queries.
-                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
-                using (var db = new SQLiteConnection(connectionString))
+            const string creationScript = "CreateImportDB.sql";
+            // Spawn a DB connection to do the raw queries.
+            // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+            using (var db = new SQLiteConnection(connectionString))
                 {
                     db.Open();
 
@@ -1987,14 +1990,6 @@ namespace xivModdingFramework.Models.DataContainers
                         transaction.Commit();
                     }
                 }
-            } catch(Exception Ex)
-            {
-                ModelModifiers.MakeImportReady(this, loggingFunction);
-                throw;
-            }
-
-            // Undo the export ready at the start.
-            ModelModifiers.MakeImportReady(this, loggingFunction);
         }
 
         public static Dictionary<string, SkeletonData> ResolveFullBoneHeirarchy(XivRace race, List<string> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
@@ -2103,7 +2098,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
+        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null, bool shiftUv = true)
         {
             if (loggingFunction == null)
             {
@@ -2125,14 +2120,12 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             foreach (var model in models)
             {
-                try
-                {
-                    ModelModifiers.MakeExportReady(model, loggingFunction);
+                ModelModifiers.MakeExportReady(model, shiftUv, loggingFunction);
 
 
-                    // Spawn a DB connection to do the raw queries.
-                    // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
-                    using (var db = new SQLiteConnection(connectionString))
+                // Spawn a DB connection to do the raw queries.
+                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+                using (var db = new SQLiteConnection(connectionString))
                     {
                         db.Open();
 
@@ -2391,13 +2384,6 @@ namespace xivModdingFramework.Models.DataContainers
                             transaction.Commit();
                         }
                     }
-                }
-                catch (Exception Ex)
-                {
-                    ModelModifiers.MakeImportReady(model, loggingFunction);
-                    throw Ex;
-                }
-                ModelModifiers.MakeImportReady(model, loggingFunction);
             }
         }
 
@@ -2589,6 +2575,9 @@ namespace xivModdingFramework.Models.DataContainers
             ModelModifiers.FixUpSkinReferences(ttModel, rawMdl.MdlPath);
 
             ModelModifiers.MergeFlags(ttModel, rawMdl);
+
+            ttModel.UVState = UVAddressingSpace.SE_Space;
+
             return ttModel;
         }
 
@@ -2637,7 +2626,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             if (roots == null || roots.Count == 0)
             {
-                if (!IsInternal)
+                if (!HasPath)
                 {
                     throw new Exception("Cannot dynamically resolve bone heirarchy for external model.");
                 }
