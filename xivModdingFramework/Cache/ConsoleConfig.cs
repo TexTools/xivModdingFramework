@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
+using xivModdingFramework.Helpers;
 
 namespace xivModdingFramework.Cache
 {
@@ -80,6 +81,10 @@ namespace xivModdingFramework.Cache
                 throw new ArgumentException("Console Config file does not have a valid FFXIV File path configured.");
             }
             await XivCache.SetGameInfo(new DirectoryInfo(c.XivPath), c.XivLanguage, runWorker);
+
+            // Set a unique temp path.
+            var tempDir = IOUtil.GetUniqueSubfolder(Path.GetTempPath(), "xivct");
+            XivCache.FrameworkSettings.TempDirectory = tempDir;
         }
     }
 }
