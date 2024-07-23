@@ -87,11 +87,11 @@ namespace xivModdingFramework.Models.FileTypes
                 var r = ReadByteVector(br, type);
                 data.BiNormals.Add(r.Vector);
                 data.BiNormalHandedness.Add(r.Handedness);
-            } else if(usage == VertexUsageType.Tangent)
+            } else if(usage == VertexUsageType.Flow)
             {
                 var r = ReadByteVector(br, type);
-                data.Tangents.Add(r.Vector);
-                data.TangentHandedness.Add(r.Handedness);
+                data.FlowDirections.Add(r.Vector);
+                data.FlowHandedness.Add(r.Handedness);
             } else if(usage == VertexUsageType.Normal)
             {
                 data.Normals.Add(ReadVector3(br, type));

@@ -26,7 +26,7 @@ namespace xivModdingFramework.Models.Enums
         BoneIndex         = 0x2,
         Normal            = 0x3,
         TextureCoordinate = 0x4,
-        Tangent           = 0x5,
+        Flow           = 0x5,
         Binormal          = 0x6,
         Color             = 0x7
     }

@@ -25,6 +25,7 @@ using xivModdingFramework.Models.ModelTextures;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Textures.Enums;
 using static xivModdingFramework.Cache.XivCache;
+using MathNet.Numerics.LinearAlgebra;
 
 namespace xivModdingFramework.Models.DataContainers
 {
@@ -88,6 +89,7 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector3 Normal = new Vector3(0, 0, 0);
         public Vector3 Binormal = new Vector3(0, 0, 0);
         public Vector3 Tangent = new Vector3(0, 0, 0);
+        public Vector3 FlowDirection = new Vector3(0, 0, 0);
 
         // This is Technically BINORMAL handedness in FFXIV.
         // A values of TRUE indicates we need to flip the Tangent when generated. (-1)
@@ -107,6 +109,82 @@ namespace xivModdingFramework.Models.DataContainers
         public byte[] BoneIds = new byte[_BONE_ARRAY_LENGTH];
         public byte[] Weights = new byte[_BONE_ARRAY_LENGTH];
 
+        public int GetWeldHash()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + Position.GetHashCode();
+                hash = hash * 31 + UV1.GetHashCode();
+                hash = hash * 31 + Normal.GetHashCode();
+                return hash;
+            }
+        }
+
+        public Vector3 GetTangentSpaceFlow()
+        {
+            var flow = WorldToTangent(FlowDirection.ToArray());
+            return new Vector3(flow[0], flow[1], 0).Normalized();
+        }
+
+        public float[] WorldToTangent(float[] vector)
+        {
+            var mat = Matrix<float>.Build.Dense(3, 3);
+
+            var n = Normal.Normalized();
+            var b = Binormal.Normalized();
+            var t = Tangent.Normalized();
+
+            mat[0, 0] = t[0];
+            mat[0, 1] = t[1];
+            mat[0, 2] = t[2];
+
+            mat[1, 0] = b[0];
+            mat[1, 1] = b[1];
+            mat[1, 2] = b[2];
+
+            mat[2, 0] = n[0];
+            mat[2, 1] = n[1];
+            mat[2, 2] = n[2];
+            var vec = Vector<float>.Build.Dense(vector);
+
+            var flow = mat * vec;
+            return flow.AsArray();
+        }
+
+        public float[] TangentToWorld(float[] vector)
+        {
+            if(vector.Length == 2)
+            {
+                vector = new float[3] { vector[0], vector[1], 0 };
+            }
+
+            var mat = Matrix<float>.Build.Dense(3, 3);
+
+            var n = Normal.Normalized();
+            var b = Binormal.Normalized();
+            var t = Tangent.Normalized();
+
+            mat[0, 0] = t[0];
+            mat[0, 1] = t[1];
+            mat[0, 2] = t[2];
+
+            mat[1, 0] = b[0];
+            mat[1, 1] = b[1];
+            mat[1, 2] = b[2];
+
+            mat[2, 0] = n[0];
+            mat[2, 1] = n[1];
+            mat[2, 2] = n[2];
+
+            var vec = Vector<float>.Build.Dense(vector);
+
+            mat = mat.Transpose();
+
+            var flow = mat * vec;
+            return flow.AsArray();
+        }
+
         public static List<TTVertex> CloneVertexList(List<TTVertex> verts)
         {
             var newVerts = new List<TTVertex>(verts.Count);
@@ -124,6 +202,7 @@ namespace xivModdingFramework.Models.DataContainers
             if (a.Normal != b.Normal) return false;
             if (a.Binormal != b.Binormal) return false;
             if (a.Handedness != b.Handedness) return false;
+            if (a.FlowDirection != b.FlowDirection) return false;
             if (a.UV1 != b.UV1) return false;
             if (a.UV2 != b.UV2) return false;
             if (a.UV2 != b.UV3) return false;
@@ -677,6 +756,17 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public ushort MdlVersion;
 
+        internal enum UVAddressingSpace
+        {
+            // Top-Left is 0,0 addressed space.
+            SE_Space,
+
+            // Bottom-left is 0,0 addressed space
+            Standard,
+        }
+
+        internal UVAddressingSpace UVState = UVAddressingSpace.SE_Space;
+
 
         /// <summary>
         /// The Mesh groups and parts of this mesh.
@@ -684,6 +774,10 @@ namespace xivModdingFramework.Models.DataContainers
         public List<TTMeshGroup> MeshGroups = new List<TTMeshGroup>();
 
         public HashSet<string> ActiveShapes = new HashSet<string>();
+
+        public bool AnisotropicLightingEnabled;
+
+        public EMeshFlags1 Flags;
 
         public object Clone()
         {
@@ -731,13 +825,11 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Is this TTModel populated from an internal file, or external?
         /// </summary>
-        public bool IsInternal
+        public bool HasPath
         {
             get
             {
-                var regex = new Regex("\\.mdl$");
-                var match = regex.Match(Source);
-                return match.Success;
+                return IOUtil.IsFFXIVInternalPath(Source);
             }
         }
 
@@ -1372,7 +1464,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public static TTModel LoadFromFile(string filePath, Action<bool, string> loggingFunction = null, ModelImportOptions settings = null)
+        public static async Task<TTModel> LoadFromFile(string filePath, Action<bool, string> loggingFunction = null, ModelImportOptions settings = null)
         {
             if (loggingFunction == null)
             {
@@ -1385,7 +1477,6 @@ namespace xivModdingFramework.Models.DataContainers
 
             var connectionString = "Data Source=" + filePath + ";Pooling=True;";
             TTModel model = new TTModel();
-            model.Source = filePath;
 
             // Spawn a DB connection to do the raw queries.
             using (var db = new SQLiteConnection(connectionString))
@@ -1571,6 +1662,10 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.Weights[6] = (byte)(Math.Round(reader.GetFloat("bone_7_weight") * 255));
                             vertex.Weights[7] = (byte)(Math.Round(reader.GetFloat("bone_8_weight") * 255));
 
+
+                            vertex.FlowDirection[0] = reader.GetFloat("flow_u");
+                            vertex.FlowDirection[1] = reader.GetFloat("flow_v");
+
                             return vertex;
                         });
 
@@ -1634,13 +1729,14 @@ namespace xivModdingFramework.Models.DataContainers
 
             XivCache.WaitForSqlCleanup();
 
-            if (settings != null && settings.ShiftImportUV)
-            {
-                ModelModifiers.ShiftImportUV(model, loggingFunction);
-            }
+            model.UVState = UVAddressingSpace.Standard;
 
             // Convert the model to FFXIV's internal weirdness.
-            ModelModifiers.MakeImportReady(model, loggingFunction);
+            ModelModifiers.MakeImportReady(model, settings.ShiftImportUV, loggingFunction);
+
+            await ModelModifiers.CalculateTangents(model, loggingFunction);
+
+            await ModelModifiers.ConvertFlowData(model, loggingFunction);
 
             ModelModifiers.CleanWeights(model, loggingFunction);
 
@@ -1653,6 +1749,7 @@ namespace xivModdingFramework.Models.DataContainers
             Version version = null;
 
             bool hasUv3 = false;
+            bool hasFlow = false;
             var query = @"PRAGMA table_info(vertices);";
             using (var cmd = new SQLiteCommand(query, db))
             {
@@ -1664,6 +1761,10 @@ namespace xivModdingFramework.Models.DataContainers
                         if(name == "uv_3_u")
                         {
                             hasUv3 = true;
+                        }
+                        if (name == "flow_u")
+                        {
+                            hasFlow = true;
                         }
                     }
 
@@ -1688,6 +1789,20 @@ namespace xivModdingFramework.Models.DataContainers
                 }
             }
 
+            if (!hasFlow)
+            {
+                query = "ALTER TABLE vertices ADD COLUMN flow_u REAL NOT NULL DEFAULT 0;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+                query = "ALTER TABLE vertices ADD COLUMN flow_v REAL NOT NULL DEFAULT 0;";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+            }
+
         }
 
 
@@ -1696,7 +1811,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public void SaveToFile(string filePath, string texturePath = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
+        public void SaveToFile(string filePath, bool shiftUv = true, string texturePath = null, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             if (loggingFunction == null)
             {
@@ -1711,37 +1826,35 @@ namespace xivModdingFramework.Models.DataContainers
                 textureDirectory = Path.GetDirectoryName(texturePath);
             }
 
-            ModelModifiers.MakeExportReady(this, loggingFunction);
+            ModelModifiers.MakeExportReady(this, shiftUv, loggingFunction);
 
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
-            try
+            var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
+            var bones = useAllBones ? null : Bones;
+
+            var boneDict = new Dictionary<string, SkeletonData>();
+            if (HasPath && Bones.Count > 0)
             {
-                var useAllBones = XivCache.GetMetaValueBoolean(_SETTINGS_KEY_EXPORT_ALL_BONES);
-                var bones = useAllBones ? null : Bones;
-
-                var boneDict = new Dictionary<string, SkeletonData>();
-                if (IsInternal && Bones.Count > 0)
+                boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction, tx);
+            } else if(Bones.Count > 0)
+            {
+                var i = 0;
+                foreach(var bone in Bones)
                 {
-                    boneDict = ResolveBoneHeirarchy(null, XivRace.All_Races, bones, loggingFunction, tx);
-                } else if(Bones.Count > 0)
-                {
-                    var i = 0;
-                    foreach(var bone in Bones)
+                    boneDict.Add(bone, new SkeletonData()
                     {
-                        boneDict.Add(bone, new SkeletonData()
-                        {
-                            BoneName = bone,
-                            BoneNumber = i,
-                            BoneParent = 0,
-                        });
-                        i++;
-                    }
+                        BoneName = bone,
+                        BoneNumber = i,
+                        BoneParent = 0,
+                    });
+                    i++;
                 }
+            }
 
-                const string creationScript = "CreateImportDB.sql";
-                // Spawn a DB connection to do the raw queries.
-                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
-                using (var db = new SQLiteConnection(connectionString))
+            const string creationScript = "CreateImportDB.sql";
+            // Spawn a DB connection to do the raw queries.
+            // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+            using (var db = new SQLiteConnection(connectionString))
                 {
                     db.Open();
 
@@ -1983,14 +2096,6 @@ namespace xivModdingFramework.Models.DataContainers
                         transaction.Commit();
                     }
                 }
-            } catch(Exception Ex)
-            {
-                ModelModifiers.MakeImportReady(this, loggingFunction);
-                throw;
-            }
-
-            // Undo the export ready at the start.
-            ModelModifiers.MakeImportReady(this, loggingFunction);
         }
 
         public static Dictionary<string, SkeletonData> ResolveFullBoneHeirarchy(XivRace race, List<string> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
@@ -2099,7 +2204,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="filePath"></param>
         /// <param name="loggingFunction"></param>
-        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
+        public static void SaveFullToFile(string filePath, XivRace race, List<TTModel> models, Action<bool, string> loggingFunction = null, ModTransaction tx = null, bool shiftUv = true)
         {
             if (loggingFunction == null)
             {
@@ -2121,14 +2226,12 @@ namespace xivModdingFramework.Models.DataContainers
             var connectionString = "Data Source=" + filePath + ";Pooling=False;";
             foreach (var model in models)
             {
-                try
-                {
-                    ModelModifiers.MakeExportReady(model, loggingFunction);
+                ModelModifiers.MakeExportReady(model, shiftUv, loggingFunction);
 
 
-                    // Spawn a DB connection to do the raw queries.
-                    // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
-                    using (var db = new SQLiteConnection(connectionString))
+                // Spawn a DB connection to do the raw queries.
+                // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
+                using (var db = new SQLiteConnection(connectionString))
                     {
                         db.Open();
 
@@ -2387,20 +2490,13 @@ namespace xivModdingFramework.Models.DataContainers
                             transaction.Commit();
                         }
                     }
-                }
-                catch (Exception Ex)
-                {
-                    ModelModifiers.MakeImportReady(model, loggingFunction);
-                    throw Ex;
-                }
-                ModelModifiers.MakeImportReady(model, loggingFunction);
             }
         }
 
         private static void WriteVertex(TTVertex v, SQLiteConnection db, int meshIdx, int partIdx, int vIdx)
         {
-            var query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight,  uv_3_u,  uv_3_v) 
-                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b,  $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight, $uv_3_u, $uv_3_v);";
+            var query = @"insert into vertices ( mesh,  part,  vertex_id,  position_x,  position_y,  position_z,  normal_x,  normal_y,  normal_z,  binormal_x,  binormal_y,  binormal_z,  tangent_x,  tangent_y,  tangent_z,  color_r,  color_g,  color_b,   color_a,  color2_r,  color2_g,  color2_b,  color2_a,  uv_1_u,  uv_1_v,  uv_2_u,  uv_2_v,  bone_1_id,  bone_1_weight,  bone_2_id,  bone_2_weight,  bone_3_id,  bone_3_weight,  bone_4_id,  bone_4_weight,  bone_5_id,  bone_5_weight,  bone_6_id,  bone_6_weight,  bone_7_id,  bone_7_weight,  bone_8_id,  bone_8_weight,  uv_3_u,  uv_3_v,  flow_u,  flow_v) 
+                                        values ($mesh, $part, $vertex_id, $position_x, $position_y, $position_z, $normal_x, $normal_y, $normal_z, $binormal_x, $binormal_y, $binormal_z, $tangent_x, $tangent_y, $tangent_z, $color_r, $color_g, $color_b,  $color_a, $color2_r, $color2_g, $color2_b, $color2_a, $uv_1_u, $uv_1_v, $uv_2_u, $uv_2_v, $bone_1_id, $bone_1_weight, $bone_2_id, $bone_2_weight, $bone_3_id, $bone_3_weight, $bone_4_id, $bone_4_weight, $bone_5_id, $bone_5_weight, $bone_6_id, $bone_6_weight, $bone_7_id, $bone_7_weight, $bone_8_id, $bone_8_weight, $uv_3_u, $uv_3_v, $flow_u, $flow_v);";
             using (var cmd = new SQLiteCommand(query, db))
             {
                 cmd.Parameters.AddWithValue("part", partIdx);
@@ -2463,6 +2559,11 @@ namespace xivModdingFramework.Models.DataContainers
 
                 cmd.Parameters.AddWithValue("bone_8_id", v.BoneIds[7]);
                 cmd.Parameters.AddWithValue("bone_8_weight", v.Weights[7] / 255f);
+
+
+                var flow = v.GetTangentSpaceFlow();
+                cmd.Parameters.AddWithValue("flow_u", flow.X);
+                cmd.Parameters.AddWithValue("flow_v", flow.Y);
 
                 cmd.ExecuteScalar();
             }
@@ -2555,7 +2656,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         /// <param name="rawMdl"></param>
         /// <returns></returns>
-        public static TTModel FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
+        public static async Task<TTModel> FromRaw(XivMdl rawMdl, Action<bool, string> loggingFunction = null)
         {
             if(rawMdl == null)
             {
@@ -2584,6 +2685,11 @@ namespace xivModdingFramework.Models.DataContainers
 
             ModelModifiers.FixUpSkinReferences(ttModel, rawMdl.MdlPath);
 
+            ModelModifiers.MergeFlags(ttModel, rawMdl);
+
+            ttModel.UVState = UVAddressingSpace.SE_Space;
+
+            await ModelModifiers.CalculateTangents(ttModel);
             return ttModel;
         }
 
@@ -2632,7 +2738,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             if (roots == null || roots.Count == 0)
             {
-                if (!IsInternal)
+                if (!HasPath)
                 {
                     throw new Exception("Cannot dynamically resolve bone heirarchy for external model.");
                 }

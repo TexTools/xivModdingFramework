@@ -765,7 +765,8 @@ namespace xivModdingFramework.Models.ModelTextures
                         else
                         {
                             // Arbitrary estimation for SE-gloss to inverse roughness.
-                            roughness *= (1 - row[3] / 16);
+                            var roughPixel = (1 - row[3] / 16);
+                            roughness = 1 - ((1 - roughness) * (1 - roughPixel));
                         }
 
                         if (!settings.GeneratePbrMaps)
@@ -773,12 +774,16 @@ namespace xivModdingFramework.Models.ModelTextures
                             // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
                             specular *= _MetalFloor + (metalness * _MetalMultiplier);
 
-                            if(mtrl.ShaderPack != EShaderPack.CharacterLegacy)
+                            if (mtrl.ShaderPack != EShaderPack.CharacterLegacy)
                             {
                                 // As metalness rises, the diffuse/specular colors merge.
                                 diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
                                 specPixel = Color4.Lerp(specPixel, diffusePixel * specPixel, metalness);
                             }
+                        }
+                        else
+                        {
+                            metalness = 0;
                         }
 
                         diffuse *= diffusePixel;

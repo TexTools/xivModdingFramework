@@ -22,6 +22,8 @@ using System.Diagnostics;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Cache;
 using xivModdingFramework.Materials.FileTypes;
+using System.Security.AccessControl;
+using xivModdingFramework.Models.Enums;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -33,12 +35,8 @@ namespace xivModdingFramework.Models.Helpers
     {
         public bool CopyAttributes { get; set; }
         public bool CopyMaterials { get; set; }
-        public bool UseOriginalShapeData { get; set; }
         public bool ShiftImportUV { get; set; }
-        public bool ClearUV2 { get; set; }
         public bool CloneUV2 { get; set; }
-        public bool ClearVColor { get; set; }
-        public bool ClearVAlpha { get; set; }
         public bool AutoScale { get; set; }
         public bool UseImportedTangents { get; set; }
         public XivRace SourceRace { get; set; }
@@ -73,13 +71,9 @@ namespace xivModdingFramework.Models.Helpers
         {
             CopyAttributes = true;
             CopyMaterials = true;
-            UseOriginalShapeData = false;
             UseImportedTangents = false;
             ShiftImportUV = true;
-            ClearUV2 = false;
             CloneUV2 = false;
-            ClearVColor = false;
-            ClearVAlpha = false;
             AutoScale = true;
             ValidateMaterials = true;
             SourceRace = XivRace.All_Races;
@@ -131,24 +125,9 @@ namespace xivModdingFramework.Models.Helpers
                 ModelModifiers.MergeMaterialData(ttModel, currentMdl, LoggingFunction);
             }
 
-            if (ClearUV2)
-            {
-                ModelModifiers.ClearUV2(ttModel, LoggingFunction);
-            }
-
             if (CloneUV2)
             {
                 ModelModifiers.CloneUV2(ttModel, LoggingFunction);
-            }
-
-            if (ClearVColor)
-            {
-                ModelModifiers.ClearVColor(ttModel, LoggingFunction);
-            }
-
-            if (ClearVAlpha)
-            {
-                ModelModifiers.ClearVAlpha(ttModel, LoggingFunction);
             }
 
             if(SourceRace != XivRace.All_Races && SourceRace != TargetRace)
@@ -171,24 +150,6 @@ namespace xivModdingFramework.Models.Helpers
                 await ModelModifiers.RaceConvertRecursive(ttModel, TargetRace, SourceRace, LoggingFunction, tx);
             }
 
-            // We need to load the original unmodified model to get the shape data.
-            if (UseOriginalShapeData && originalMdl != null)
-            {
-                if (originalMdl == null)
-                {
-                    throw new Exception("Cannot copy settings from null MDL.");
-                }
-                ModelModifiers.ClearShapeData(ttModel, LoggingFunction);
-                try
-                {
-                    ModelModifiers.MergeShapeData(ttModel, originalMdl, LoggingFunction);
-                }
-                catch
-                {
-                    throw new Exception("Failed to apply the original shape data.\nThis is likely due to changes to the original model without preserving the vertices' order.");
-                }
-            }
-
             if (AutoScale && originalMdl != null)
             {
                 if (originalMdl == null)
@@ -196,7 +157,7 @@ namespace xivModdingFramework.Models.Helpers
                     throw new Exception("Cannot auto-scale without base model loaded.");
                 }
 
-                var oldModel = TTModel.FromRaw(originalMdl);
+                var oldModel = await TTModel.FromRaw(originalMdl);
                 ModelModifiers.AutoScaleModel(ttModel, oldModel, 0.3, LoggingFunction);
             }
 
@@ -496,6 +457,17 @@ namespace xivModdingFramework.Models.Helpers
                         {
                             ttVert.Binormal = baseMesh.VertexData.BiNormals[oldVertexId];
                         }
+
+                        if (baseMesh.VertexData.FlowDirections.Count > oldVertexId)
+                        {
+                            ttVert.FlowDirection = baseMesh.VertexData.FlowDirections[oldVertexId];
+                            if (baseMesh.VertexData.FlowHandedness[oldVertexId] == 255)
+                            {
+                                // Not sure this is actually used.
+                                //ttVert.FlowDirection *= -1;
+                            }
+                        }
+
                         if (baseMesh.VertexData.Colors.Count > oldVertexId)
                         {
                             ttVert.VertexColor[0] = baseMesh.VertexData.Colors[oldVertexId].R;
@@ -513,10 +485,6 @@ namespace xivModdingFramework.Models.Helpers
                         if (baseMesh.VertexData.BiNormalHandedness.Count > oldVertexId)
                         {
                             ttVert.Handedness = baseMesh.VertexData.BiNormalHandedness[oldVertexId] == 0 ? false : true;
-                        }
-                        if (baseMesh.VertexData.Tangents.Count > oldVertexId)
-                        {
-                            ttVert.Tangent = baseMesh.VertexData.Tangents[oldVertexId];
                         }
                         if (baseMesh.VertexData.TextureCoordinates0.Count > oldVertexId)
                         {
@@ -770,7 +738,7 @@ namespace xivModdingFramework.Models.Helpers
                                     var vert = new TTVertex();
                                     vert.Position = ogGroup.VertexData.Positions.Count > vId ? ogGroup.VertexData.Positions[vId] : new Vector3();
                                     vert.Normal = ogGroup.VertexData.Normals.Count > vId ? ogGroup.VertexData.Normals[vId] : new Vector3();
-                                    vert.Tangent = ogGroup.VertexData.Tangents.Count > vId ? ogGroup.VertexData.Tangents[vId] : new Vector3();
+                                    vert.FlowDirection = ogGroup.VertexData.FlowDirections.Count > vId ? ogGroup.VertexData.FlowDirections[vId] : new Vector3();
                                     vert.Binormal = ogGroup.VertexData.BiNormals.Count > vId ? ogGroup.VertexData.BiNormals[vId] : new Vector3();
                                     vert.Handedness = ogGroup.VertexData.BiNormalHandedness.Count > vId ? ogGroup.VertexData.BiNormalHandedness[vId] == 0 ? false : true : false;
                                     vert.UV1 = ogGroup.VertexData.TextureCoordinates0.Count > vId ? ogGroup.VertexData.TextureCoordinates0[vId] : new Vector2();
@@ -976,6 +944,23 @@ namespace xivModdingFramework.Models.Helpers
             foreach (var v in p.Vertices)
             {
                 v.UV2 = Vector2.Zero;
+            }
+            UpdateShapeParts(p);
+        }
+        public static void ClearFlow_Part(TTMeshPart p)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.FlowDirection = Vector3.Zero;
+            }
+            UpdateShapeParts(p);
+        }
+
+        public static void SetFlow_Part(TTMeshPart p, Vector2 tangentDirection)
+        {
+            foreach (var v in p.Vertices)
+            {
+                v.FlowDirection = new Vector3(v.TangentToWorld(tangentDirection.ToArray()));
             }
             UpdateShapeParts(p);
         }
@@ -1190,7 +1175,9 @@ namespace xivModdingFramework.Models.Helpers
                 // The model is still added but no deforms are applied
                 if (loggingFunction != null)
                 {
-                    loggingFunction(true, "Unable to convert racial model.");
+                    loggingFunction(true, "Unable to convert racial model:" + ex.Message);
+                    var tempLog = Path.Combine(IOUtil.GetFrameworkTempFolder(), "race_convert_log.txt");
+                    File.WriteAllText(tempLog, ex.StackTrace);
                 } else
                 {
                     throw;
@@ -1626,26 +1613,16 @@ namespace xivModdingFramework.Models.Helpers
         }
 
         /// <summary>
-        /// This function does all the minor adjustments to a Model that makes it
-        /// ready for injection into the SE filesystem.  Such as flipping the 
-        /// UVs, calculating tangents, and applying the global level size multiplier.
-        /// Likewise, MakeExportReady() undoes this process.
-        /// 
-        /// Weight check skip lets us avoid some calculation in cases where we already know they're fine.
+        /// This function shifts the UV Space on the model to the Top-Left addressing style FFXIV expects.
         /// </summary>
-        public static void MakeImportReady(TTModel model, Action<bool, string> loggingFunction = null, bool reconvert = false)
+        internal static void MakeImportReady(TTModel model, bool shiftUv = true, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
 
-            // Calculate Tangents if needed - BEFORE flipping UVs.
-            // Skip this is we're just reconverting back, to avoid any potential issues and save time.
-            if (!reconvert)
-            {
-                CalculateTangents(model, loggingFunction);
-            }
+            if (model.UVState == TTModel.UVAddressingSpace.SE_Space) return;
 
             var mIdx = 0;
             foreach (var m in model.MeshGroups)
@@ -1660,6 +1637,14 @@ namespace xivModdingFramework.Models.Helpers
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
+                        v.UV3[1] *= -1;
+
+                        if (shiftUv)
+                        {
+                            v.UV1[1] += 1;
+                            v.UV2[1] += 1;
+                            v.UV3[1] += 1;
+                        }
                         vIdx++;
                     }
                     pIdx++;
@@ -1670,19 +1655,57 @@ namespace xivModdingFramework.Models.Helpers
 
             // Update the base shape data to match our base model.
             model.UpdateShapeData();
+
+            model.UVState = TTModel.UVAddressingSpace.SE_Space;
         }
 
-        /// <summary>
-        /// This process undoes all the strange minor adjustments to a model
-        /// that FFXIV expects in the SE filesystem, such as flipping the UVs,
-        /// and having tiny ass models.
-        /// </summary>
-        public static void MakeExportReady(TTModel model, Action<bool, string> loggingFunction = null)
+        internal static async Task ConvertFlowData(TTModel model, Action<bool, string> loggingFunction = null)
         {
             if (loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
+
+
+            var tasks = new List<Task>();
+            foreach(var m in model.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    tasks.Add(Task.Run(() =>
+                    {
+                        foreach(var v in p.Vertices)
+                        {
+                            var f = new float[3];
+
+                            f[0] = v.FlowDirection[0];
+                            f[1] = v.FlowDirection[1];
+
+                            var worldFlow = new Vector3(v.TangentToWorld(f)).Normalized();
+                            v.FlowDirection[0] = worldFlow[0];
+                            v.FlowDirection[1] = worldFlow[1];
+                            v.FlowDirection[2] = worldFlow[2];
+                        }
+
+                    }));
+                }
+            }
+
+
+            await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// This function shifts the UV Space on the model to the Bottom-Left addressing style most external formats/applications expect.
+        /// </summary>
+        internal static void MakeExportReady(TTModel model, bool shiftUv = true, Action<bool, string> loggingFunction = null)
+        {
+            if (loggingFunction == null)
+            {
+                loggingFunction = NoOp;
+            }
+
+            if (model.UVState == TTModel.UVAddressingSpace.Standard) return;
 
             foreach (var m in model.MeshGroups)
             {
@@ -1693,25 +1716,36 @@ namespace xivModdingFramework.Models.Helpers
                         // UV Flipping
                         v.UV1[1] *= -1;
                         v.UV2[1] *= -1;
+                        v.UV3[1] *= -1;
+
+                        if (shiftUv)
+                        {
+                            v.UV1[1] += 1;
+                            v.UV2[1] += 1;
+                            v.UV3[1] += 1;
+                        }
                     }
                 }
             }
 
             // Update the base shape data to match our base model.
             model.UpdateShapeData();
+
+            model.UVState = TTModel.UVAddressingSpace.Standard;
         }
 
         /// <summary>
         /// Convenience function for calculating tangent data for a TTModel.
         /// </summary>
         /// <param name="model"></param>
-        public static void CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null, bool forceRecalculation = false)
+        public static async Task CalculateTangents(TTModel model, Action<bool, string> loggingFunction = null, bool forceRecalculation = false)
         {
             if(loggingFunction == null)
             {
                 loggingFunction = NoOp;
             }
             if (model == null) return;
+
 
             var anyMissingData = AnyMissingTangentData(model);
             if (!anyMissingData && !forceRecalculation)
@@ -1721,6 +1755,12 @@ namespace xivModdingFramework.Models.Helpers
             }
             loggingFunction(false, "Calculating Tangents...");
 
+            if(model.UVState != TTModel.UVAddressingSpace.SE_Space)
+            {
+                throw new Exception("Cannot calculate tangents on model when it is not in SE-style UV space.");
+            }
+
+
             var resetShapes = new List<string>();
             if(model.ActiveShapes.Count != 0)
             {
@@ -1728,13 +1768,12 @@ namespace xivModdingFramework.Models.Helpers
             }
             ModelModifiers.ApplyShapes(model, new List<string>(), true, loggingFunction);
 
+            var tasks = new List<Task>();
             foreach (var m in model.MeshGroups)
             {
-                foreach (var p in m.Parts)
-                {
-                    CalculateTangentsForPart(p);
-                }
+                tasks.Add(Task.Run(() => { CalculateTangentsForMesh(m, forceRecalculation); }));
             }
+            await Task.WhenAll(tasks);
 
             if(resetShapes.Count > 0)
             {
@@ -1783,171 +1822,235 @@ namespace xivModdingFramework.Models.Helpers
             return false;
         }
 
-        private static void CalculateTangentsForPart(TTMeshPart p)
+        private static (List<int> Indices, List<List<TTVertex>> VertexTable) GetWeldedMeshData(TTMeshGroup m, bool weldMirrors = false)
         {
+            List<int> indices = new List<int>(m.Parts.Sum(x => x.TriangleIndices.Count));
+            List<TTVertex> vertices = new List<TTVertex>(m.Parts.Sum(x => x.Vertices.Count));
 
-            // Make sure there's actually data to use...
-            if (p.Vertices.Count == 0 || p.TriangleIndices.Count == 0)
+            // Calculate the index list and combine vertex arrays.
+            var offset = 0;
+            foreach(var p in m.Parts)
             {
-                return;
-            }
-
-            if(p.Vertices.Any(x => x.Binormal != Vector3.Zero))
-            {
-                // Faster function.
-                CalculateTangentsFromBinormalsForPart(p);
-                return;
+                foreach(var i in p.TriangleIndices)
+                {
+                    indices.Add(i + offset);
+                }
+                offset += p.Vertices.Count;
+                vertices.AddRange(p.Vertices);
             }
 
             // Compile lists of connected vertices.
             Dictionary<int, HashSet<int>> connectedVertices = new Dictionary<int, HashSet<int>>();
-            for (int i = 0; i < p.TriangleIndices.Count; i += 3)
+            if (!weldMirrors)
             {
-                var t0 = p.TriangleIndices[i];
-                var t1 = p.TriangleIndices[i + 1];
-                var t2 = p.TriangleIndices[i + 2];
+                for (int i = 0; i < indices.Count; i += 3)
+                {
+                    var v0 = indices[i];
+                    var v1 = indices[i + 1];
+                    var v2 = indices[i + 2];
 
-                if (!connectedVertices.ContainsKey(t0))
-                {
-                    connectedVertices.Add(t0, new HashSet<int>());
-                }
-                if (!connectedVertices.ContainsKey(t1))
-                {
-                    connectedVertices.Add(t1, new HashSet<int>());
-                }
-                if (!connectedVertices.ContainsKey(t2))
-                {
-                    connectedVertices.Add(t2, new HashSet<int>());
-                }
+                    if (!connectedVertices.ContainsKey(v0))
+                    {
+                        connectedVertices.Add(v0, new HashSet<int>());
+                    }
+                    if (!connectedVertices.ContainsKey(v1))
+                    {
+                        connectedVertices.Add(v1, new HashSet<int>());
+                    }
+                    if (!connectedVertices.ContainsKey(v2))
+                    {
+                        connectedVertices.Add(v2, new HashSet<int>());
+                    }
 
-                connectedVertices[t0].Add(t1);
-                connectedVertices[t0].Add(t2);
-                connectedVertices[t1].Add(t0);
-                connectedVertices[t1].Add(t2);
-                connectedVertices[t2].Add(t0);
-                connectedVertices[t2].Add(t1);
+                    connectedVertices[v0].Add(v1);
+                    connectedVertices[v0].Add(v2);
+                    connectedVertices[v1].Add(v0);
+                    connectedVertices[v1].Add(v2);
+                    connectedVertices[v2].Add(v0);
+                    connectedVertices[v2].Add(v1);
+                }
             }
 
+            // Weld Hash => List of original Vertex Ids
+            Dictionary<int, List<int>> weldHashes = new Dictionary<int, List<int>>();
 
-            // Compute the welded vertices list and the translation table.
-            List<TTVertex> tempVertices = new List<TTVertex>();
+            // Original Vertex Id => New (Welded) Vertex Id
+            Dictionary<int, int> oldToNewVertex = new Dictionary<int, int>();
 
-            // Original Vertex ID => Temp Vertex ID
-            Dictionary<int, int> vertTranslation = new Dictionary<int, int>();
+            // New Vertex Id => List of Vertex IDs welded into it.
+            var vertexIdTable = new List<List<int>>();
 
-            // Welded Groups
-            Dictionary<int, List<int>> weldedVerts = new Dictionary<int, List<int>>();
+            // New Vertex Id => List of Vertex Classes welded into it.
+            var vertexTable = new List<List<TTVertex>>();
 
-
-            for (int oIdx = 0; oIdx < p.Vertices.Count; oIdx++)
+            // Perform vertex welding.
+            for (int i = 0; i < vertices.Count; i++)
             {
-                var oVertex = p.Vertices[oIdx];
-                var idx = -1;
-                for (int nIdx = 0; nIdx < tempVertices.Count; nIdx++)
+                var ov = vertices[i];
+                var hash = ov.GetWeldHash();
+                var found = false;
+                if (weldHashes.ContainsKey(hash))
                 {
-                    var nVertex = tempVertices[nIdx];
-
-
-                    // The only things that matter in tangent calculation are the 
-                    // UV1, Pos, and Normal.  Any other differences don't matter and we can reweld them.
-                    if (nVertex.Position == oVertex.Position
-                        && nVertex.UV1 == oVertex.UV1
-                        && nVertex.Normal == oVertex.Normal)
+                    var entries = weldHashes[hash];
+                    for (var ti = 0; ti < entries.Count; ti++)
                     {
+                        var oi = entries[ti];
+                        var ni = oldToNewVertex[oi];
+                        var nv = vertices[oi];
 
-                        // Calculate the set of already connected vertices.
-                        var alreadyMergedVerts = weldedVerts[nIdx];
-                        HashSet<int> alreadyConnectedOldVerts = new HashSet<int>();
-                        foreach (var amIdx in alreadyMergedVerts)
+                        if (nv.UV1 == ov.UV1
+                            && nv.Position == ov.Position
+                            && nv.Normal == ov.Normal)
                         {
-                            foreach (var cv in connectedVertices[amIdx])
+                            bool isMirror = false;
+                            if (!weldMirrors)
                             {
-                                alreadyConnectedOldVerts.Add(cv);
-                            }
-                        }
-
-                        // Get my connected vertices.
-                        var myConnectedVerts = connectedVertices[oIdx];
-
-                        // If this vertex is a mirror point along a UV seam we can't merge them.
-                        // Mirror-point check involves looking at the connected vertices of the two
-                        // points to be welded, and investigating if any point has an identical UV, but differing position.
-
-                        // Note - Under certain circumstances where you have n-poles in the model at the same point where you have
-                        // a mirror seam and a UV2 or VColor mirror seam, it's possible this could still fail depending on the exact order
-                        // of the indices/vertices, however, this case should be exceedingly rare, and easily fixable from a modeling standpoint.
-
-                        // Further addendum - Should Tangents be calculated with the entire mesh group welded together, as that is most likely
-                        // how SE Handles it?
-
-                        bool isMirror = false;
-                        foreach (var weldedConnection in alreadyConnectedOldVerts)
-                        {
-                            var wcVert = p.Vertices[weldedConnection];
-                            foreach (var newConnection in myConnectedVerts)
-                            {
-                                var ncVert = p.Vertices[newConnection];
-
-                                if (ncVert.UV1 == wcVert.UV1 &&
-                                    ncVert.Position != wcVert.Position)
+                                var alreadyConnectedVertices = new HashSet<int>();
+                                foreach (var vi in vertexIdTable[ni])
                                 {
-                                    isMirror = true;
-                                    break;
+                                    alreadyConnectedVertices.UnionWith(connectedVertices[vi]);
+                                }
+
+                                // We need to determine if we are a weld point.
+                                // Get my connected vertices.
+                                var myConnectedVerts = connectedVertices[i];
+
+                                // If this vertex is a mirror point along a UV seam we can't merge them.
+                                // Mirror-point check involves looking at the connected vertices of the two
+                                // points to be welded, and investigating if any point has an identical UV, but differing position.
+
+                                // Note - Under certain circumstances where you have n-poles in the model at the same point where you have
+                                // a mirror seam and a UV2 or VColor mirror seam, it's possible this could still fail depending on the exact order
+                                // of the indices/vertices, however, this case should be exceedingly rare, and easily fixable from a modeling standpoint.
+
+                                foreach (var weldedConnection in alreadyConnectedVertices)
+                                {
+                                    var wcVert = vertices[weldedConnection];
+                                    foreach (var newConnection in myConnectedVerts)
+                                    {
+                                        var ncVert = vertices[newConnection];
+
+                                        if (ncVert.UV1 == wcVert.UV1 &&
+                                            ncVert.Position != wcVert.Position)
+                                        {
+                                            isMirror = true;
+                                            break;
+                                        }
+                                    }
+                                    if (isMirror)
+                                    {
+                                        break;
+                                    }
                                 }
                             }
-                            if (isMirror)
+
+                            if (!isMirror)
                             {
+                                oldToNewVertex.Add(i, ni);
+                                vertexTable[ni].Add(ov);
+                                vertexIdTable[ni].Add(i);
+                                found = true;
                                 break;
                             }
-                        }
-
-                        if (!isMirror)
-                        {
-                            idx = nIdx;
-                            break;
                         }
                     }
                 }
 
-                if (idx == -1)
+                if (!found)
                 {
-                    tempVertices.Add(oVertex);
-                    idx = tempVertices.Count - 1;
-                    weldedVerts.Add(idx, new List<int>());
+                    var ni = vertexTable.Count;
+                    vertexTable.Add(new List<TTVertex>());
+                    vertexIdTable.Add(new List<int>());
+
+                    oldToNewVertex.Add(i, ni);
+                    vertexTable[ni].Add(ov);
+                    vertexIdTable[ni].Add(i);
+
+                    if (weldHashes.ContainsKey(hash))
+                    {
+                        weldHashes[hash].Add(i);
+                    }
+                    else
+                    {
+                        weldHashes.Add(hash, new List<int>() { i });
+                    }
                 }
-
-                weldedVerts[idx].Add(oIdx);
-                vertTranslation.Add(oIdx, idx);
             }
 
-            // Compute the new triangle indices using the translation table
-            List<int> tempIndices = new List<int>();
-            for (int i = 0; i < p.TriangleIndices.Count; i++)
+            // Create translated index table.
+            var finalIndices = new List<int>(indices.Count);
+            for (int i = 0; i < indices.Count; i++)
             {
-                var oldVert = p.TriangleIndices[i];
-                var newVert = vertTranslation[oldVert];
-                tempIndices.Add(newVert);
+                var ov = indices[i];
+                var nv = oldToNewVertex[ov];
+                finalIndices.Add(nv);
             }
+
+            return (finalIndices, vertexTable);
+        }
+
+        private static void CalculateTangentsForMesh(TTMeshGroup m, bool force = false)
+        {
+
+            // Make sure there's actually data to use...
+            if (m.VertexCount == 0 || m.IndexCount == 0)
+            {
+                return;
+            }
+
+            var anyMissing = false;
+            foreach(var p in m.Parts)
+            {
+                if(p.Vertices.Any(x => x.Tangent == Vector3.Zero || x.Binormal == Vector3.Zero))
+                {
+                    anyMissing = true;
+                    break;
+                }
+            }
+            if (!force && !anyMissing)
+            {
+                // No need.
+                return;
+            }
+
+
+            if (!force)
+            {
+                if (m.Parts.Any(p => p.Vertices.Any(x => x.Binormal != Vector3.Zero)))
+                {
+                    // Faster function.
+                    foreach (var p in m.Parts)
+                    {
+                        CalculateTangentsFromBinormalsForPart(p);
+                    }
+                    return;
+                }
+            }
+
+            var weldData = GetWeldedMeshData(m);
+
+            var indices = weldData.Indices;
+            var vertices = weldData.VertexTable;
 
             // Interim arrays for calculations
-            var tangents = new List<Vector3>(tempVertices.Count);
-            tangents.AddRange(Enumerable.Repeat(Vector3.Zero, tempVertices.Count));
-            var bitangents = new List<Vector3>(tempVertices.Count);
-            bitangents.AddRange(Enumerable.Repeat(Vector3.Zero, tempVertices.Count));
+            var tangents = new List<Vector3>(vertices.Count);
+            tangents.AddRange(Enumerable.Repeat(Vector3.Zero, vertices.Count));
+            var bitangents = new List<Vector3>(vertices.Count);
+            bitangents.AddRange(Enumerable.Repeat(Vector3.Zero, vertices.Count));
 
             // Calculate Tangent, Bitangent/Binormal and Handedness.
 
             // This loops for each TRI, building up the sum
             // tangent/bitangent angles at each VERTEX.
-            for (var a = 0; a < tempIndices.Count; a += 3)
+            for (var a = 0; a < indices.Count; a += 3)
             {
-                var vertexId1 = tempIndices[a];
-                var vertexId2 = tempIndices[a + 1];
-                var vertexId3 = tempIndices[a + 2];
+                var vertexId1 = indices[a];
+                var vertexId2 = indices[a + 1];
+                var vertexId3 = indices[a + 2];
 
-                var vertex1 = tempVertices[vertexId1];
-                var vertex2 = tempVertices[vertexId2];
-                var vertex3 = tempVertices[vertexId3];
+                var vertex1 = vertices[vertexId1][0];
+                var vertex2 = vertices[vertexId2][0];
+                var vertex3 = vertices[vertexId3][0];
 
                 var deltaX1 = vertex2.Position.X - vertex1.Position.X;
                 var deltaX2 = vertex3.Position.X - vertex1.Position.X;
@@ -1958,11 +2061,20 @@ namespace xivModdingFramework.Models.Helpers
                 var deltaZ1 = vertex2.Position.Z - vertex1.Position.Z;
                 var deltaZ2 = vertex3.Position.Z - vertex1.Position.Z;
 
-                var deltaU1 = vertex2.UV1.X - vertex1.UV1.X;
-                var deltaU2 = vertex3.UV1.X - vertex1.UV1.X;
+                var v1uv = vertex1.UV1;
+                var v2uv = vertex2.UV1;
+                var v3uv = vertex3.UV1;
 
-                var deltaV1 = vertex2.UV1.Y - vertex1.UV1.Y;
-                var deltaV2 = vertex3.UV1.Y - vertex1.UV1.Y;
+                // Adjust to top-left addressing space.
+                v1uv.Y = (v1uv.Y * -1) + 1;
+                v2uv.Y = (v2uv.Y * -1) + 1;
+                v3uv.Y = (v3uv.Y * -1) + 1;
+
+                var deltaU1 = v2uv.X - v1uv.X;
+                var deltaU2 = v3uv.X - v1uv.X;
+
+                var deltaV1 = v2uv.Y - v1uv.Y;
+                var deltaV2 = v3uv.Y - v1uv.Y;
 
                 var r = 1.0f / (deltaU1 * deltaV2 - deltaU2 * deltaV1);
                 var sdir = new Vector3((deltaV2 * deltaX1 - deltaV1 * deltaX2) * r, (deltaV2 * deltaY1 - deltaV1 * deltaY2) * r, (deltaV2 * deltaZ1 - deltaV1 * deltaZ2) * r);
@@ -1975,52 +2087,56 @@ namespace xivModdingFramework.Models.Helpers
                 bitangents[vertexId1] += tdir;
                 bitangents[vertexId2] += tdir;
                 bitangents[vertexId3] += tdir;
-            }
+                }
+
+
 
             // Loop the VERTEXES now to calculate the end tangent/bitangents based on the summed data for each VERTEX
-            for (var vertexId = 0; vertexId < tempVertices.Count; ++vertexId)
+            for (var vertexId = 0; vertexId < vertices.Count; ++vertexId)
             {
                 // Reference: https://marti.works/posts/post-calculating-tangents-for-your-mesh/post/
                 // We were already doing these calculations to establish handedness, but we weren't actually
                 // using the other results before.  Better to kill the previous computations and use these numbers
                 // for everything to avoid minor differences causing errors.
 
-                //var posIdx = vDict[a];
-                var vertex = tempVertices[vertexId];
-                //List<TTVertex> oVertices = new List<TTVertex>();
-                var oVertices = vertTranslation.Where(x => x.Value == vertexId).Select(x => x.Key).ToList();
+                var vertex = vertices[vertexId][0];
 
                 var n = vertex.Normal;
 
                 var t = tangents[vertexId];
                 var b = bitangents[vertexId];
 
-                // Calculate tangent vector
-                var tangent = t - (n * Vector3.Dot(n, t));
-                tangent = Vector3.Normalize(tangent);
-
                 // Compute binormal
-                var binormal = Vector3.Cross(n, tangent);
-                binormal.Normalize();
+                var binormal = Vector3.Cross(n, Vector3.Normalize(t)).Normalized();
+                var tangent = Vector3.Cross(n, binormal).Normalized();
+
 
                 // Compute handedness
-                int handedness = Vector3.Dot(Vector3.Cross(t, b), n) > 0 ? 1 : -1;
+                int bHandedness = Vector3.Dot(Vector3.Normalize(binormal), b) >= 0 ? 1 : -1;
 
                 // Apply handedness
-                binormal *= handedness;
-                // FFXIV actually tracks BINORMAL handedness, not TANGENT handeness, so we have to reverse this.
-                var boolHandedness = !(handedness < 0 ? true : false);
 
-                foreach (var vIdx in oVertices)
+                var boolHandedness = !(bHandedness < 0 ? true : false);
+
+                binormal *= bHandedness;
+                tangent *= -1;
+
+                var verts = vertices[vertexId];
+
+                // Assign results.
+                foreach (var v in vertices[vertexId])
                 {
-                    var v = p.Vertices[vIdx];
                     v.Tangent = tangent;
                     v.Binormal = binormal;
                     v.Handedness = boolHandedness;
                 }
             }
 
-            CopyShapeTangentsForPart(p);
+            foreach (var p in m.Parts)
+            {
+                CopyShapeTangentsForPart(p);
+            }
+
         }
 
         private static void CopyShapeTangentsForPart(TTMeshPart p)
@@ -2042,12 +2158,25 @@ namespace xivModdingFramework.Models.Helpers
         {
             foreach (var v in p.Vertices)
             {
-
                 var tangent = Vector3.Cross(v.Normal, v.Binormal);
                 tangent *= (v.Handedness == true ? -1 : 1);
                 v.Tangent = tangent;
             }
             CopyShapeTangentsForPart(p);
+        }
+
+
+        public static void MergeFlags(TTModel model, XivMdl flagSource)
+        {
+            if (flagSource == null) return;
+
+            model.AnisotropicLightingEnabled = false;
+            foreach (var mdl in flagSource.LoDList[0].MeshDataList)
+            {
+                model.AnisotropicLightingEnabled |= mdl.VertexDataStructList.Any(x => x.DataUsage == VertexUsageType.Flow);
+            }
+
+            model.Flags = flagSource.ModelData.Flags1;
         }
 
 
@@ -2300,68 +2429,5 @@ namespace xivModdingFramework.Models.Helpers
             }
         }
 
-        public static void ShiftExportUV(TTModel model, Action<bool, string> loggingFunction = null)
-        {
-            if (loggingFunction == null)
-            {
-                loggingFunction = ModelModifiers.NoOp;
-            }
-
-            loggingFunction(false, "Shifting Exported UV Map...");
-
-
-            foreach (var mg in model.MeshGroups)
-            {
-                foreach (var p in mg.Parts)
-                {
-                    ShiftExportUV_Part(p);
-                }
-            }
-
-        }
-
-        public static void ShiftImportUV(TTModel model, Action<bool, string> loggingFunction = null)
-        {
-            if (loggingFunction == null)
-            {
-                loggingFunction = ModelModifiers.NoOp;
-            }
-
-            loggingFunction(false, "Shifting Imported UV Map...");
-
-
-            foreach(var mg in model.MeshGroups)
-            {
-                foreach(var p in mg.Parts)
-                {
-                    ShiftImportUV_Part(p);
-                }
-            }
-
-        }
-
-        public static void ShiftImportUV_Part(TTMeshPart p)
-        {
-            foreach(var v in p.Vertices)
-            {
-                v.UV1[1] -= 1;
-                v.UV2[1] -= 1;
-                v.UV3[1] -= 1;
-            }
-
-            UpdateShapeParts(p);
-        }
-
-        public static void ShiftExportUV_Part(TTMeshPart p)
-        {
-            foreach (var v in p.Vertices)
-            {
-                v.UV1[1] += 1;
-                v.UV2[1] += 1;
-                v.UV3[1] += 1;
-            }
-
-            UpdateShapeParts(p);
-        }
     }
 }
