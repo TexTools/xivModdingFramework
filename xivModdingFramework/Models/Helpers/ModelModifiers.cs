@@ -1746,6 +1746,9 @@ namespace xivModdingFramework.Models.Helpers
             }
             if (model == null) return;
 
+            // DEBUG ASDF
+            forceRecalculation = true;
+
 
             var anyMissingData = AnyMissingTangentData(model);
             if (!anyMissingData && !forceRecalculation)
@@ -1822,7 +1825,7 @@ namespace xivModdingFramework.Models.Helpers
             return false;
         }
 
-        private static (List<int> Indices, Dictionary<int, List<TTVertex>> VertexTable) GetWeldedMeshData(TTMeshGroup m)
+        private static (List<int> Indices, List<List<TTVertex>> VertexTable) GetWeldedMeshData(TTMeshGroup m, bool weldMirrors = false)
         {
             List<int> indices = new List<int>(m.Parts.Sum(x => x.TriangleIndices.Count));
             List<TTVertex> vertices = new List<TTVertex>(m.Parts.Sum(x => x.Vertices.Count));
@@ -1839,10 +1842,49 @@ namespace xivModdingFramework.Models.Helpers
                 vertices.AddRange(p.Vertices);
             }
 
+            // Compile lists of connected vertices.
+            Dictionary<int, HashSet<int>> connectedVertices = new Dictionary<int, HashSet<int>>();
+            if (!weldMirrors)
+            {
+                for (int i = 0; i < indices.Count; i += 3)
+                {
+                    var v0 = indices[i];
+                    var v1 = indices[i + 1];
+                    var v2 = indices[i + 2];
+
+                    if (!connectedVertices.ContainsKey(v0))
+                    {
+                        connectedVertices.Add(v0, new HashSet<int>());
+                    }
+                    if (!connectedVertices.ContainsKey(v1))
+                    {
+                        connectedVertices.Add(v1, new HashSet<int>());
+                    }
+                    if (!connectedVertices.ContainsKey(v2))
+                    {
+                        connectedVertices.Add(v2, new HashSet<int>());
+                    }
+
+                    connectedVertices[v0].Add(v1);
+                    connectedVertices[v0].Add(v2);
+                    connectedVertices[v1].Add(v0);
+                    connectedVertices[v1].Add(v2);
+                    connectedVertices[v2].Add(v0);
+                    connectedVertices[v2].Add(v1);
+                }
+            }
+
+            // Weld Hash => List of original Vertex Ids
             Dictionary<int, List<int>> weldHashes = new Dictionary<int, List<int>>();
+
+            // Original Vertex Id => New (Welded) Vertex Id
             Dictionary<int, int> oldToNewVertex = new Dictionary<int, int>();
-            List<TTVertex> newVertices = new List<TTVertex>(vertices.Count);
-            var vertexTable = new Dictionary<int, List<TTVertex>>();
+
+            // New Vertex Id => List of Vertex IDs welded into it.
+            var vertexIdTable = new List<List<int>>();
+
+            // New Vertex Id => List of Vertex Classes welded into it.
+            var vertexTable = new List<List<TTVertex>>();
 
             // Perform vertex welding.
             for (int i = 0; i < vertices.Count; i++)
@@ -1853,29 +1895,80 @@ namespace xivModdingFramework.Models.Helpers
                 if (weldHashes.ContainsKey(hash))
                 {
                     var entries = weldHashes[hash];
-                    for (var ni = 0; ni < entries.Count; ni++)
+                    for (var ti = 0; ti < entries.Count; ti++)
                     {
-                        var nv = vertices[entries[ni]];
+                        var oi = entries[ti];
+                        var ni = oldToNewVertex[oi];
+                        var nv = vertices[oi];
 
                         if (nv.UV1 == ov.UV1
                             && nv.Position == ov.Position
                             && nv.Normal == ov.Normal)
                         {
-                            oldToNewVertex.Add(i, ni);
-                            vertexTable[ni].Add(ov);
-                            found = true;
-                            break;
+                            bool isMirror = false;
+                            if (!weldMirrors)
+                            {
+                                var alreadyConnectedVertices = new HashSet<int>();
+                                foreach (var vi in vertexIdTable[ni])
+                                {
+                                    alreadyConnectedVertices.UnionWith(connectedVertices[vi]);
+                                }
+
+                                // We need to determine if we are a weld point.
+                                // Get my connected vertices.
+                                var myConnectedVerts = connectedVertices[i];
+
+                                // If this vertex is a mirror point along a UV seam we can't merge them.
+                                // Mirror-point check involves looking at the connected vertices of the two
+                                // points to be welded, and investigating if any point has an identical UV, but differing position.
+
+                                // Note - Under certain circumstances where you have n-poles in the model at the same point where you have
+                                // a mirror seam and a UV2 or VColor mirror seam, it's possible this could still fail depending on the exact order
+                                // of the indices/vertices, however, this case should be exceedingly rare, and easily fixable from a modeling standpoint.
+
+                                foreach (var weldedConnection in alreadyConnectedVertices)
+                                {
+                                    var wcVert = vertices[weldedConnection];
+                                    foreach (var newConnection in myConnectedVerts)
+                                    {
+                                        var ncVert = vertices[newConnection];
+
+                                        if (ncVert.UV1 == wcVert.UV1 &&
+                                            ncVert.Position != wcVert.Position)
+                                        {
+                                            isMirror = true;
+                                            break;
+                                        }
+                                    }
+                                    if (isMirror)
+                                    {
+                                        break;
+                                    }
+                                }
+                            }
+
+                            if (!isMirror)
+                            {
+                                oldToNewVertex.Add(i, ni);
+                                vertexTable[ni].Add(ov);
+                                vertexIdTable[ni].Add(i);
+                                found = true;
+                                break;
+                            }
                         }
                     }
                 }
 
                 if (!found)
                 {
-                    var ni = newVertices.Count;
+                    var ni = vertexTable.Count;
+                    vertexTable.Add(new List<TTVertex>());
+                    vertexIdTable.Add(new List<int>());
+
                     oldToNewVertex.Add(i, ni);
-                    vertexTable.Add(ni, new List<TTVertex>());
                     vertexTable[ni].Add(ov);
-                    newVertices.Add(ov);
+                    vertexIdTable[ni].Add(i);
+
                     if (weldHashes.ContainsKey(hash))
                     {
                         weldHashes[hash].Add(i);
@@ -1997,7 +2090,7 @@ namespace xivModdingFramework.Models.Helpers
                 bitangents[vertexId1] += tdir;
                 bitangents[vertexId2] += tdir;
                 bitangents[vertexId3] += tdir;
-            }
+                }
 
 
 
@@ -2020,13 +2113,18 @@ namespace xivModdingFramework.Models.Helpers
                 var binormal = Vector3.Cross(n, Vector3.Normalize(t)).Normalized();
                 var tangent = Vector3.Cross(n, binormal).Normalized();
 
+
                 // Compute handedness
                 int bHandedness = Vector3.Dot(Vector3.Normalize(binormal), b) >= 0 ? 1 : -1;
 
                 // Apply handedness
-                binormal *= bHandedness;
 
                 var boolHandedness = !(bHandedness < 0 ? true : false);
+
+                binormal *= bHandedness;
+                tangent *= -1;
+
+                var verts = vertices[vertexId];
 
                 // Assign results.
                 foreach (var v in vertices[vertexId])
