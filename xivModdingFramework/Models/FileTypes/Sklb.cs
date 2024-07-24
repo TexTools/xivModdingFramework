@@ -49,7 +49,7 @@ namespace xivModdingFramework.Models.FileTypes
     /// </summary>
     public static class Sklb
     {
-        private const string SkeletonsFolder = "Skeletons";
+        public const string SkeletonsFolder = "Skeletons";
 
         /// <summary>
         /// Retrieves the base racial or body skeleton for a given model file, parsing it from the base

@@ -1131,6 +1131,11 @@ namespace xivModdingFramework.Models.Helpers
         /// <param name="loggingFunction"></param>
         public static async Task RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
+            await INTERNAL_RaceConvertRecursive(model, targetRace, originalRace, loggingFunction, tx);
+            await CalculateTangents(model, loggingFunction, true);
+        }
+        private static async Task INTERNAL_RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
+        { 
             try
             {
                 if (originalRace.IsDirectParentOf(targetRace))
