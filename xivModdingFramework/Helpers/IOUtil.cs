@@ -797,16 +797,27 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        public static string GetUniqueSubfolder(string basePath, string prefix = "")
+        public static string GetUniqueSubfolder(string basePath, string prefix = "", bool omitZero = false)
         {
             lock (_SubfolderLock)
             {
                 var id = 0;
                 var path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+                if (omitZero)
+                {
+                    path = Path.GetFullPath(Path.Combine(basePath, prefix));
+                }
                 while (Directory.Exists(path))
                 {
                     id++;
-                    path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+                    if (omitZero)
+                    {
+                        path = Path.GetFullPath(Path.Combine(basePath, prefix + " (" +id.ToString() +")"));
+                    }
+                    else
+                    {
+                        path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+                    }
                 }
                 Directory.CreateDirectory(path);
                 return path;
