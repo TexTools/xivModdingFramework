@@ -79,6 +79,14 @@ namespace xivModdingFramework.Mods
 
         public static bool ValidateModlist(string ffxivDirectory = null)
         {
+            if(ffxivDirectory == null && 
+                (XivCache.GameInfo == null 
+                    || XivCache.GameInfo.GameDirectory == null 
+                    || string.IsNullOrWhiteSpace(XivCache.GameInfo.GameDirectory.FullName)))
+            {
+                throw new InvalidDataException("Cannot validate modlist for NULL directory.");
+            }
+
             var dir = string.IsNullOrEmpty(ffxivDirectory) ? XivCache.GameInfo.GameDirectory.FullName : ffxivDirectory;
             dir = new DirectoryInfo(dir).Parent.Parent.FullName;
 
