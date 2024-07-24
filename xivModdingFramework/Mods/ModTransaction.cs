@@ -386,13 +386,13 @@ namespace xivModdingFramework.Mods
         {
             while (_LoadingIndexFiles)
             {
-                Thread.Sleep(1);
+                await Task.Delay(10);
             }
-            
-            if(!_IndexFiles.ContainsKey(dataFile))
+
+            _LoadingIndexFiles = true;
+            try
             {
-                _LoadingIndexFiles = true;
-                try
+                if (!_IndexFiles.ContainsKey(dataFile))
                 {
                     if (!_ReadOnly)
                     {
@@ -421,12 +421,12 @@ namespace xivModdingFramework.Mods
 
                     var idx = await Index.INTERNAL_GetIndexFile(dataFile, false, ReadOnly);
                     _IndexFiles.Add(dataFile, idx);
-                }
-                finally
-                {
-                    _LoadingIndexFiles = false;
-                }
 
+                }
+            }
+            finally
+            {
+                _LoadingIndexFiles = false;
             }
             return _IndexFiles[dataFile];
         }
