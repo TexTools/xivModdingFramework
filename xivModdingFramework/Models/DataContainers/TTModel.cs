@@ -124,7 +124,12 @@ namespace xivModdingFramework.Models.DataContainers
         public Vector3 GetTangentSpaceFlow()
         {
             var flow = WorldToTangent(FlowDirection.ToArray());
-            return new Vector3(flow[0], flow[1], 0).Normalized();
+            var ret = new Vector3(flow[0], flow[1], 0).Normalized();
+            if(float.IsNaN(ret.X) || float.IsNaN(ret.Y) || float.IsNaN(ret.Z))
+            {
+                return Vector3.Zero;
+            }
+            return ret;
         }
 
         public float[] WorldToTangent(float[] vector)
@@ -201,6 +206,7 @@ namespace xivModdingFramework.Models.DataContainers
             if (a.Position != b.Position) return false;
             if (a.Normal != b.Normal) return false;
             if (a.Binormal != b.Binormal) return false;
+            if (a.Tangent != b.Tangent) return false;
             if (a.Handedness != b.Handedness) return false;
             if (a.FlowDirection != b.FlowDirection) return false;
             if (a.UV1 != b.UV1) return false;

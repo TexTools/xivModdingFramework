@@ -2082,6 +2082,11 @@ namespace xivModdingFramework.Models.Helpers
                 var deltaV2 = v3uv.Y - v1uv.Y;
 
                 var r = 1.0f / (deltaU1 * deltaV2 - deltaU2 * deltaV1);
+                if(float.IsInfinity(r))
+                {
+                    r = 0;
+                }
+
                 var sdir = new Vector3((deltaV2 * deltaX1 - deltaV1 * deltaX2) * r, (deltaV2 * deltaY1 - deltaV1 * deltaY2) * r, (deltaV2 * deltaZ1 - deltaV1 * deltaZ2) * r);
                 var tdir = new Vector3((deltaU1 * deltaX2 - deltaU2 * deltaX1) * r, (deltaU1 * deltaY2 - deltaU2 * deltaY1) * r, (deltaU1 * deltaZ2 - deltaU2 * deltaZ1) * r);
 
@@ -2092,7 +2097,7 @@ namespace xivModdingFramework.Models.Helpers
                 bitangents[vertexId1] += tdir;
                 bitangents[vertexId2] += tdir;
                 bitangents[vertexId3] += tdir;
-                }
+            }
 
 
 
