@@ -781,7 +781,7 @@ namespace xivModdingFramework.Models.ModelTextures
                                 specPixel = Color4.Lerp(specPixel, diffusePixel * specPixel, metalness);
                             }
                         }
-                        else
+                        else if(mtrl.ShaderPack == EShaderPack.CharacterLegacy)
                         {
                             metalness = 0;
                         }
