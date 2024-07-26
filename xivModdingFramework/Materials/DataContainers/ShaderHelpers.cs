@@ -371,7 +371,6 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
                 UpdateConstantName(shKv.Key, 0x58DE06E2, "Limbal Color?");
-                UpdateConstantName(shKv.Key, 0x59BDA0B1, "Inverse Metalness?");
                 UpdateConstantName(shKv.Key, 0x141722D5, "Specular Color");
 
                 // Names based on analyzing shader code.
@@ -407,6 +406,12 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x3632401A, "g_LipRoughnessScale", true);
                 UpdateConstantName(shKv.Key, 0x7DABA471, "g_IrisRingEmissiveIntensity", true);
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "g_SpecularColorMask", true);
+                UpdateConstantName(shKv.Key, 0x59BDA0B1, "g_ShaderID", true);
+                UpdateConstantName(shKv.Key, 0x29253809, "g_ShaderID", true);
+                UpdateConstantName(shKv.Key, 0xDF15112D, "g_ToonIndex", true);
+                UpdateConstantName(shKv.Key, 0x00A680BC, "g_ToonSpecIndex", true);
+                UpdateConstantName(shKv.Key, 0x3CCE9E4C, "g_ToonLightScale", true);
+                UpdateConstantName(shKv.Key, 0xD96FAF7A, "g_ToonReflectionScale", true);
 
 
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "g_IrisAPrefersRg", true);
