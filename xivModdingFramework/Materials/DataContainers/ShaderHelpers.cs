@@ -376,9 +376,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 // Names based on analyzing shader code.
                 UpdateConstantName(shKv.Key, 0x62E44A4F, "Skin Fresnel");
                 UpdateConstantName(shKv.Key, 0x2E60B071, "Skin Tile Multiplier");
-                UpdateConstantName(shKv.Key, 0x2C2A34DD, "Skin Color");
-                UpdateConstantName(shKv.Key, 2569562539, "Skin Wetness Lerp");
-                UpdateConstantName(shKv.Key, 1112929012, "Skin Tile Material");
+                UpdateConstantName(shKv.Key, 0x992869AB, "Skin Wetness Lerp");
                 UpdateConstantName(shKv.Key, 0x59BDA9B1, "Subsurface/Fur Index", true);
 
                 // Brute-Forced CRCs
@@ -386,20 +384,20 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x2C2A34DD, "g_DiffuseColor", true);
                 UpdateConstantName(shKv.Key, 0x11C90091, "g_WhiteEyeColor", true);
                 UpdateConstantName(shKv.Key, 0x38A64362, "g_EmissiveColor", true);
-                UpdateConstantName(shKv.Key, 3086627810, "g_SSAOMask", true);
-                UpdateConstantName(shKv.Key, 1112929012, "g_TileIndex", true);
-                UpdateConstantName(shKv.Key, 778088561, "g_TileScale", true);
-                UpdateConstantName(shKv.Key, 315010207, "g_TileAlpha", true);
-                UpdateConstantName(shKv.Key, 3042205627, "g_NormalScale", true);
-                UpdateConstantName(shKv.Key, 2148459359, "g_SheenRate", true);
-                UpdateConstantName(shKv.Key, 522602647, "g_SheenTintRate", true);
-                UpdateConstantName(shKv.Key, 4103141230, "g_SheenAperture", true);
-                UpdateConstantName(shKv.Key, 1357081942, "g_IrisRingColor", true);
-                UpdateConstantName(shKv.Key, 1724464446, "g_IrisThickness", true);
-                UpdateConstantName(shKv.Key, 3593204584, "g_AlphaAperture", true);
-                UpdateConstantName(shKv.Key, 3497683557, "g_AlphaOffset", true);
-                UpdateConstantName(shKv.Key, 1648149758, "g_OutlineColor", true);
-                UpdateConstantName(shKv.Key, 2289092920, "g_OutlineWidth", true);
+                UpdateConstantName(shKv.Key, 0xB7FA33E2, "g_SSAOMask", true);
+                UpdateConstantName(shKv.Key, 0x4255F2F4, "g_TileIndex", true);
+                UpdateConstantName(shKv.Key, 0x2E60B071, "g_TileScale", true);
+                UpdateConstantName(shKv.Key, 0x12C6AC9F, "g_TileAlpha", true);
+                UpdateConstantName(shKv.Key, 0xB5545FBB, "g_NormalScale", true);
+                UpdateConstantName(shKv.Key, 0x800EE35F, "g_SheenRate", true);
+                UpdateConstantName(shKv.Key, 0x1F264897, "g_SheenTintRate", true);
+                UpdateConstantName(shKv.Key, 0xF490F76E, "g_SheenAperture", true);
+                UpdateConstantName(shKv.Key, 0x50E36D56, "g_IrisRingColor", true);
+                UpdateConstantName(shKv.Key, 0x66C93D3E, "g_IrisThickness", true);
+                UpdateConstantName(shKv.Key, 0xD62BF368, "g_AlphaAperture", true);
+                UpdateConstantName(shKv.Key, 0xD07A6A65, "g_AlphaOffset", true);
+                UpdateConstantName(shKv.Key, 0x623CC4FE, "g_OutlineColor", true);
+                UpdateConstantName(shKv.Key, 0x8870C938, "g_OutlineWidth", true);
                 UpdateConstantName(shKv.Key, 0x39551220, "g_TextureMipBias", true);
                 UpdateConstantName(shKv.Key, 0x7801E004, "g_GlassIOR", true);
                 UpdateConstantName(shKv.Key, 0xDF15112D, "g_ToonIndex", true);
@@ -413,9 +411,9 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x3CCE9E4C, "g_ToonLightScale", true);
                 UpdateConstantName(shKv.Key, 0xD96FAF7A, "g_ToonReflectionScale", true);
 
-
-                UpdateConstantName(shKv.Key, 0xCB0338DC, "g_IrisAPrefersRg", true);
-                UpdateConstantName(shKv.Key, 0xC4647F37, "g_GlassThicknessMax", true);
+                // Brute forced CRCs that may be wrong/hash-collisions.
+                UpdateConstantName(shKv.Key, 0xCB0338DC, "g_IrisAPrefersRg(?)", true);
+                UpdateConstantName(shKv.Key, 0xC4647F37, "g_GlassThicknessMax(?)", true);
             }
 
         }
