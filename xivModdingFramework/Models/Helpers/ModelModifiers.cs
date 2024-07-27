@@ -51,6 +51,8 @@ namespace xivModdingFramework.Models.Helpers
 
         public bool ClearEmptyMeshData { get; set; }
 
+        public bool AutoAssignHeels { get; set; }
+
         /// <summary>
         /// Logging output function.
         /// </summary>
@@ -83,6 +85,7 @@ namespace xivModdingFramework.Models.Helpers
             SourceApplication = "Unknown";
             ReferenceItem = null;
             ClearEmptyMeshData = false;
+            AutoAssignHeels = true;
         }
 
 
@@ -175,6 +178,11 @@ namespace xivModdingFramework.Models.Helpers
                         }
                     }
                 }
+            }
+
+            if (AutoAssignHeels)
+            {
+                ModelModifiers.AssignHeelAttribute(ttModel, LoggingFunction);
             }
 
             // Ensure shape data is updated with our various changes.
@@ -290,14 +298,14 @@ namespace xivModdingFramework.Models.Helpers
                 0.00254D,
             };
 
-            foreach(var conversion in possibleConversions)
+            foreach (var conversion in possibleConversions)
             {
                 var nSize = NewModelSize * conversion;
                 var diff = (OldModelSize - nSize) / OldModelSize;
 
-                if(Math.Abs(diff) < tolerance)
+                if (Math.Abs(diff) < tolerance)
                 {
-                    if(conversion != 1.0D)
+                    if (conversion != 1.0D)
                     {
                         loggingFunction(true, "Correcting Scaling Error: Rescaling model by " + conversion);
                         ScaleModel(ttModel, conversion, loggingFunction);
@@ -325,7 +333,7 @@ namespace xivModdingFramework.Models.Helpers
 
             foreach (var m in ttModel.MeshGroups)
             {
-                foreach(var p in m.Parts)
+                foreach (var p in m.Parts)
                 {
                     foreach (var v in p.Vertices)
                     {
@@ -349,7 +357,7 @@ namespace xivModdingFramework.Models.Helpers
             var meshIdx = 0;
             foreach (var baseMesh in rawMdl.LoDList[0].MeshDataList)
             {
-                if(meshIdx >= ttModel.MeshGroups.Count)
+                if (meshIdx >= ttModel.MeshGroups.Count)
                 {
                     continue;
                 }
@@ -374,7 +382,7 @@ namespace xivModdingFramework.Models.Helpers
 
             var meshIdx = 0;
             var totalPartIdx = 0;
-            foreach(var baseMesh in rawMdl.LoDList[0].MeshDataList)
+            foreach (var baseMesh in rawMdl.LoDList[0].MeshDataList)
             {
                 var ttMesh = new TTMeshGroup();
                 ttModel.MeshGroups.Add(ttMesh);
@@ -409,7 +417,7 @@ namespace xivModdingFramework.Models.Helpers
                     totalParts = 1;
                 }
 
-                for(var pi = 0; pi < totalParts; pi++)
+                for (var pi = 0; pi < totalParts; pi++)
                 {
 
                     var ttPart = new TTMeshPart();
@@ -426,7 +434,7 @@ namespace xivModdingFramework.Models.Helpers
                     // Get the Vertices unique to this part.
                     var uniqueVertexIdSet = new SortedSet<int>(indices); // Maximum possible amount is # of indices, though likely it is less.
 
-                    foreach(var ind in indices)
+                    foreach (var ind in indices)
                     {
                         uniqueVertexIdSet.Add(ind);
                     }
@@ -439,7 +447,7 @@ namespace xivModdingFramework.Models.Helpers
 
                     // Now we need to loop through, copy over the vertex data, keeping track of the new vertex IDs.
                     ttPart.Vertices = new List<TTVertex>(uniqueVertexIds.Count);
-                    for(var i = 0; i < uniqueVertexIds.Count; i++)
+                    for (var i = 0; i < uniqueVertexIds.Count; i++)
                     {
                         var oldVertexId = uniqueVertexIds[i];
                         var ttVert = new TTVertex();
@@ -499,7 +507,7 @@ namespace xivModdingFramework.Models.Helpers
                                 ttVert.UV2.X = 0;
                             }
 
-                            if(float.IsNaN(ttVert.UV2.Y))
+                            if (float.IsNaN(ttVert.UV2.Y))
                             {
                                 ttVert.UV2.Y = 0;
                             }
@@ -523,11 +531,11 @@ namespace xivModdingFramework.Models.Helpers
 
                         var vertexBoneArrayLength = baseMesh.VertexBoneArraySize;
                         // Now for the fun part, establishing bones.
-                        for(var bIdx = 0; bIdx < vertexBoneArrayLength; bIdx++)
+                        for (var bIdx = 0; bIdx < vertexBoneArrayLength; bIdx++)
                         {
                             // Vertex doesn't have weights.
                             if (baseMesh.VertexData.BoneWeights.Count <= oldVertexId) break;
-                            
+
                             // No more weights for this vertex.
                             if (baseMesh.VertexData.BoneIndices[oldVertexId].Length <= bIdx) break;
 
@@ -541,8 +549,8 @@ namespace xivModdingFramework.Models.Helpers
                             // These seem to actually be irrelevant, and the bone ID is just routed directly to the mesh level identifier.
                             // var partBoneSet = rawMdl.PartBoneSets.BoneIndices.GetRange(basePart.BoneStartOffset, basePart.BoneCount);
 
-                            ttVert.BoneIds[bIdx] = (byte) boneId;
-                            ttVert.Weights[bIdx] = (byte) Math.Round(weight * 255);
+                            ttVert.BoneIds[bIdx] = (byte)boneId;
+                            ttVert.Weights[bIdx] = (byte)Math.Round(weight * 255);
                         }
 
                         ttPart.Vertices.Add(ttVert);
@@ -732,7 +740,7 @@ namespace xivModdingFramework.Models.Helpers
                                         badPart = true;
                                         break;
                                     }
-                                        
+
                                     vertexReplacements.Add(ogGroup.VertexData.Indices[d.BaseIndex], vId);
 
                                     var vert = new TTVertex();
@@ -780,18 +788,18 @@ namespace xivModdingFramework.Models.Helpers
                                     vertices.Add(vId, vert);
                                 }
 
-                                if(badPart)
+                                if (badPart)
                                 {
                                     continue;
                                 }
 
                                 // Now we need to go through and create the shape part objects for each part.
                                 Dictionary<int, TTShapePart> shapeParts = new Dictionary<int, TTShapePart>();
-                                foreach(var kv in vertexReplacements)
+                                foreach (var kv in vertexReplacements)
                                 {
                                     // For every vertex which was replaced, we need to identify what part owned it.
                                     var info = ttMesh.GetPartRelevantVertexInformation(kv.Key);
-                                    if(!shapeParts.ContainsKey(info.PartId))
+                                    if (!shapeParts.ContainsKey(info.PartId))
                                     {
                                         var tempShp = new TTShapePart();
                                         tempShp.Name = shp.ShapeName;
@@ -807,10 +815,10 @@ namespace xivModdingFramework.Models.Helpers
                                 }
 
                                 // Now just add the shapes to the associated TTParts
-                                foreach(var kv in shapeParts)
+                                foreach (var kv in shapeParts)
                                 {
                                     if (kv.Key == -1) continue;
-                                    if(ttMesh.Parts[kv.Key].ShapeParts.Count == 0)
+                                    if (ttMesh.Parts[kv.Key].ShapeParts.Count == 0)
                                     {
                                         // Pretty janky, but a simple enough way to guarantee we can always
                                         // restore back to the original shape.
@@ -860,9 +868,9 @@ namespace xivModdingFramework.Models.Helpers
             }
 
             loggingFunction(false, "Forcing UV1 to [1,-1]...");
-            foreach(var m in model.MeshGroups)
+            foreach (var m in model.MeshGroups)
             {
-                foreach(var p in m.Parts)
+                foreach (var p in m.Parts)
                 {
                     bool anyNegativeX = p.Vertices.Any(x => x.UV1.X < 0);
                     bool anyPositiveY = p.Vertices.Any(x => x.UV1.Y > 0);
@@ -883,7 +891,7 @@ namespace xivModdingFramework.Models.Helpers
                         // The extra [anyPositive/negative] values check is to avoid potentially
                         // shifting values at exactly 0 if 0 is effectively the "top" of the
                         // used UV space.
-                        
+
                         // The goal here is to allow the user to have used any exact quadrant in the [-1 - 1, -1 - 1] range
                         // and maintain the UV correctly, even if they used exactly [1,1] as a coordinate, for example.
 
@@ -1076,7 +1084,7 @@ namespace xivModdingFramework.Models.Helpers
                 {
                     var shpVertex = shpKv.Value.Vertices[vKv.Value];
                     var pVertex = p.Vertices[vKv.Key];
-                    var newVert = (TTVertex) pVertex.Clone();
+                    var newVert = (TTVertex)pVertex.Clone();
                     newVert.Position = shpVertex.Position;
                     shpKv.Value.Vertices[vKv.Value] = newVert;
                 }
@@ -1135,7 +1143,7 @@ namespace xivModdingFramework.Models.Helpers
             await CalculateTangents(model, loggingFunction, true);
         }
         private static async Task INTERNAL_RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
-        { 
+        {
             try
             {
                 if (originalRace.IsDirectParentOf(targetRace))
@@ -1250,12 +1258,12 @@ namespace xivModdingFramework.Models.Helpers
                             var parent = dict.FirstOrDefault(x => x.Value.BoneNumber == dict[bone].BoneParent).Value;
 
                             // Walk up the tree until we find a parent with a deform.
-                            while(parent != null && !def.Deformations.ContainsKey(parent.BoneName))
+                            while (parent != null && !def.Deformations.ContainsKey(parent.BoneName))
                             {
                                 parent = dict.FirstOrDefault(x => x.Value.BoneNumber == parent.BoneParent).Value;
                             }
 
-                            if(parent != null)
+                            if (parent != null)
                             {
                                 // Found a parent? use that bone's deforms.
                                 def.Deformations[bone] = def.Deformations[parent.BoneName];
@@ -1426,7 +1434,7 @@ namespace xivModdingFramework.Models.Helpers
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 throw;
             }
@@ -1444,9 +1452,9 @@ namespace xivModdingFramework.Models.Helpers
         private static Vector3 MatrixTransform(Vector3 vector, Matrix transform)
         {
             var result = new Vector3(
-                (vector.X * transform[0]) +  (vector.Y * transform[1])  + (vector.Z * transform[2])  + (1.0f * transform[3]),
-                (vector.X * transform[4]) +  (vector.Y * transform[5])  + (vector.Z * transform[6])  + (1.0f * transform[7]),
-                (vector.X * transform[8]) +  (vector.Y * transform[9])  + (vector.Z * transform[10]) + (1.0f * transform[11]));
+                (vector.X * transform[0]) + (vector.Y * transform[1]) + (vector.Z * transform[2]) + (1.0f * transform[3]),
+                (vector.X * transform[4]) + (vector.Y * transform[5]) + (vector.Z * transform[6]) + (1.0f * transform[7]),
+                (vector.X * transform[8]) + (vector.Y * transform[9]) + (vector.Z * transform[10]) + (1.0f * transform[11]));
 
             return result;
         }
@@ -1494,7 +1502,7 @@ namespace xivModdingFramework.Models.Helpers
 
             int boneSum = 0;
             var sum = v.Weights.Select(x => (int)x).Aggregate((sum, x) => sum + x);
-            if(sum == 255)
+            if (sum == 255)
             {
                 return false;
             }
@@ -1589,7 +1597,7 @@ namespace xivModdingFramework.Models.Helpers
                     foreach (var v in p.Vertices)
                     {
                         bool majorCorrection = false;
-                        if(usage.NeedsEightWeights)
+                        if (usage.NeedsEightWeights)
                         {
                             majorCorrection = CleanWeight(v, 8, loggingFunction);
                         } else
@@ -1673,13 +1681,13 @@ namespace xivModdingFramework.Models.Helpers
 
 
             var tasks = new List<Task>();
-            foreach(var m in model.MeshGroups)
+            foreach (var m in model.MeshGroups)
             {
-                foreach(var p in m.Parts)
+                foreach (var p in m.Parts)
                 {
                     tasks.Add(Task.Run(() =>
                     {
-                        foreach(var v in p.Vertices)
+                        foreach (var v in p.Vertices)
                         {
                             var f = new float[3];
 
@@ -1737,6 +1745,60 @@ namespace xivModdingFramework.Models.Helpers
             model.UpdateShapeData();
 
             model.UVState = TTModel.UVAddressingSpace.Standard;
+        }
+
+        public static string AssignHeelAttribute(TTModel model, Action<bool, string> loggingFunction = null)
+        {
+            if (model == null || !model.HasPath)
+            {
+                return "";
+            }
+            loggingFunction ??= NoOp;
+
+            if (!model.Source.EndsWith("_top.mdl")
+                && !model.Source.EndsWith("_dwn.mdl")
+                && !model.Source.EndsWith("_sho.mdl")) {
+                return "";
+            }
+            const string _Prefix = "heels_offset=";
+
+            loggingFunction?.Invoke(false, "Assigning Heel Attributes...");
+
+            var max = float.MaxValue;
+            TTMeshPart first = null;
+            foreach(var m in model.MeshGroups)
+            {
+                foreach(var p in m.Parts)
+                {
+                    foreach(var v in p.Vertices)
+                    {
+                        if(v.Position.Y < max)
+                        {
+                            max = v.Position.Y;
+                        }
+                    }
+
+                    first ??= p;
+                }
+            }
+
+            if (max < 0)
+            {
+                foreach (var m in model.MeshGroups)
+                {
+                    foreach (var p in m.Parts)
+                    {
+                        p.Attributes.RemoveWhere(x => x.StartsWith(_Prefix));
+                    }
+                }
+
+                // Offset is inverted, since it's bringing the character to 0.
+                max *= -1;
+                var atr = _Prefix + max.ToString("0.0000");
+                first.Attributes.Add(atr);
+                return atr;
+            }
+            return "";
         }
 
         /// <summary>
