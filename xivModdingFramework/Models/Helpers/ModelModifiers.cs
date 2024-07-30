@@ -24,6 +24,8 @@ using xivModdingFramework.Cache;
 using xivModdingFramework.Materials.FileTypes;
 using System.Security.AccessControl;
 using xivModdingFramework.Models.Enums;
+using MathNet.Numerics.LinearAlgebra;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -1140,7 +1142,6 @@ namespace xivModdingFramework.Models.Helpers
         public static async Task RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
             await INTERNAL_RaceConvertRecursive(model, targetRace, originalRace, loggingFunction, tx);
-            await CalculateTangents(model, loggingFunction, true);
         }
         private static async Task INTERNAL_RaceConvertRecursive(TTModel model, XivRace targetRace, XivRace originalRace, Action<bool, string> loggingFunction = null, ModTransaction tx = null)
         {
@@ -1357,6 +1358,7 @@ namespace xivModdingFramework.Models.Helpers
                             Vector3 normal = Vector3.Zero;
                             Vector3 binormal = Vector3.Zero;
                             Vector3 tangent = Vector3.Zero;
+                            Vector3 flow = Vector3.Zero;
 
                             // And each bone in that vertex.
                             for (var b = 0; b < v.Weights.Length; b++)
@@ -1379,14 +1381,19 @@ namespace xivModdingFramework.Models.Helpers
 
                                 position += MatrixTransform(v.Position, matrix) * boneWeight;
                                 normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
-                                binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
-                                tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
+                                binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
+                                tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                if (v.FlowDirection != Vector3.Zero)
+                                {
+                                    flow += MatrixTransform(v.FlowDirection, matrix) * boneWeight;
+                                }
                             }
 
                             v.Position = position;
                             v.Normal = normal;
                             v.Binormal = binormal;
                             v.Tangent = tangent;
+                            v.FlowDirection = flow;
                         }
 
                         // Same thing, but for the Shape Data parts.
@@ -1398,6 +1405,7 @@ namespace xivModdingFramework.Models.Helpers
                                 Vector3 normal = Vector3.Zero;
                                 Vector3 binormal = Vector3.Zero;
                                 Vector3 tangent = Vector3.Zero;
+                                Vector3 flow = Vector3.Zero;
 
                                 // And each bone in that vertex.
                                 for (var b = 0; b < v.Weights.Length; b++)
@@ -1420,14 +1428,19 @@ namespace xivModdingFramework.Models.Helpers
 
                                     position += MatrixTransform(v.Position, matrix) * boneWeight;
                                     normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
-                                    binormal += MatrixTransform(v.Binormal, normalMatrix) * boneWeight;
-                                    tangent += MatrixTransform(v.Tangent, normalMatrix) * boneWeight;
+                                    binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
+                                    tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                    if (v.FlowDirection != Vector3.Zero)
+                                    {
+                                        flow += MatrixTransform(v.FlowDirection, matrix) * boneWeight;
+                                    }
                                 }
 
                                 v.Position = position;
                                 v.Normal = normal;
                                 v.Binormal = binormal;
                                 v.Tangent = tangent;
+                                v.FlowDirection = flow;
                             }
                         }
 
@@ -1438,6 +1451,34 @@ namespace xivModdingFramework.Models.Helpers
             {
                 throw;
             }
+        }
+
+        private static Vector3 MulVec(Matrix<float> mat, Vector3 v, float lastCol = 1.0f)
+        {
+            var r = Vector3.Zero;
+            var vec = Vector<float>.Build.Dense(4);
+            vec[0] = v.X;
+            vec[1] = v.Y;
+            vec[2] = v.Z;
+            vec[3] = lastCol;
+            var res = mat * vec;
+            r.X += res[0];
+            r.Y += res[1];
+            r.Z += res[2];
+            return r;
+        }
+
+        private static Matrix<float> ConvertMatrix(Matrix m)
+        {
+            var pMatrix = Matrix<float>.Build.Dense(4, 4);
+            for (int i = 0; i < 16; i++)
+            {
+                var x = i / 4;
+                var y = (i % 4);
+                var v = m[i];
+                pMatrix[x, y] = v;
+            }
+            return pMatrix;
         }
 
 
