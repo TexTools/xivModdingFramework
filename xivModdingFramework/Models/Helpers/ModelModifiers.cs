@@ -25,6 +25,7 @@ using xivModdingFramework.Materials.FileTypes;
 using System.Security.AccessControl;
 using xivModdingFramework.Models.Enums;
 using MathNet.Numerics.LinearAlgebra;
+using System.Security.Cryptography;
 
 namespace xivModdingFramework.Models.Helpers
 {
@@ -1357,6 +1358,7 @@ namespace xivModdingFramework.Models.Helpers
                             Vector3 normal = Vector3.Zero;
                             Vector3 binormal = Vector3.Zero;
                             Vector3 tangent = Vector3.Zero;
+                            Vector3 flow = Vector3.Zero;
 
                             // And each bone in that vertex.
                             for (var b = 0; b < v.Weights.Length; b++)
@@ -1381,12 +1383,17 @@ namespace xivModdingFramework.Models.Helpers
                                 normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
                                 binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
                                 tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                if (v.FlowDirection != Vector3.Zero)
+                                {
+                                    flow += MatrixTransform(v.FlowDirection, matrix) * boneWeight;
+                                }
                             }
 
                             v.Position = position;
                             v.Normal = normal;
                             v.Binormal = binormal;
                             v.Tangent = tangent;
+                            v.FlowDirection = flow;
                         }
 
                         // Same thing, but for the Shape Data parts.
@@ -1398,6 +1405,7 @@ namespace xivModdingFramework.Models.Helpers
                                 Vector3 normal = Vector3.Zero;
                                 Vector3 binormal = Vector3.Zero;
                                 Vector3 tangent = Vector3.Zero;
+                                Vector3 flow = Vector3.Zero;
 
                                 // And each bone in that vertex.
                                 for (var b = 0; b < v.Weights.Length; b++)
@@ -1422,12 +1430,17 @@ namespace xivModdingFramework.Models.Helpers
                                     normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
                                     binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
                                     tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                    if (v.FlowDirection != Vector3.Zero)
+                                    {
+                                        flow += MatrixTransform(v.FlowDirection, matrix) * boneWeight;
+                                    }
                                 }
 
                                 v.Position = position;
                                 v.Normal = normal;
                                 v.Binormal = binormal;
                                 v.Tangent = tangent;
+                                v.FlowDirection = flow;
                             }
                         }
 
