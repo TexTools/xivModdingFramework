@@ -909,7 +909,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 var defMod = pmp.DefaultMod as PmpStandardOptionJson;
                 PmpStandardOptionJson option = null;
-                if (defMod != null && (defMod.FileSwaps.Count > 0 || defMod.Manipulations.Count > 0 || defMod.Files.Count > 0))
+
+                if (defMod != null && (defMod.FileSwaps.Count > 0 || defMod.Manipulations.Count > 0 || defMod.Files.Count > 0) && pmp.Groups.Count == 0)
                 {
                     // Valid Default Mod Option
                     option = defMod;

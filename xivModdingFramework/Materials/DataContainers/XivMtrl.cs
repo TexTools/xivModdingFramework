@@ -84,7 +84,6 @@ namespace xivModdingFramework.Materials.DataContainers
     public class XivMtrl : ICloneable
     {
         public const string ItemPathToken = "{item_folder}";
-        public const string MaterialSetToken = "{version}";
         public const string TextureNameToken = "{default_name}";
         public const string CommonPathToken = "{shared_folder}";
 
@@ -559,12 +558,6 @@ namespace xivModdingFramework.Materials.DataContainers
             path = path.Replace(commonPath, XivMtrl.CommonPathToken);
 
 
-            var version = GetVariantString();
-            if (version != "")
-            {
-                path = path.Replace(version, XivMtrl.MaterialSetToken);
-            }
-
             //var texName = GetDefaultTexureName(usage, false);
             //path = path.Replace(texName, XivMtrl.TextureNameToken);
             return path;
@@ -590,7 +583,6 @@ namespace xivModdingFramework.Materials.DataContainers
 
 
             path = path.Replace(ItemPathToken, rootPath);
-            path = path.Replace(MaterialSetToken, variantString);
             path = path.Replace(CommonPathToken, GetCommonTextureDirectory());
             return path;
         }
