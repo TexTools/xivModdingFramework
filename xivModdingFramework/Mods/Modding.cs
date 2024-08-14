@@ -101,6 +101,10 @@ namespace xivModdingFramework.Mods
                     if (res != null)
                     {
                         return true;
+                    } else
+                    {
+                        // Modlist failed to parse.
+                        return false;
                     }
                 }
                 catch (Exception ex)
@@ -193,7 +197,7 @@ namespace xivModdingFramework.Mods
             }
             catch(Exception ex)
             {
-                throw new FileNotFoundException("Failedto find or parse modlist file.\n\n" + ex.Message);
+                throw new FileNotFoundException("Failed to find or parse modlist file.\n\n" + ex.Message);
             }
             finally
             {

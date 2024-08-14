@@ -1672,6 +1672,19 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.FlowDirection[0] = reader.GetFloat("flow_u");
                             vertex.FlowDirection[1] = reader.GetFloat("flow_v");
 
+                            if(vertex.Binormal != Vector3.Zero)
+                            {
+                                var tangent = Vector3.Cross(vertex.Normal, vertex.Binormal).Normalized();
+                                var dot = Vector3.Dot(tangent, vertex.Tangent);
+                                if(dot < 0.5f)
+                                {
+                                    vertex.Handedness = true;
+                                } else
+                                {
+                                    vertex.Handedness = false;
+                                }
+                            }
+
                             return vertex;
                         });
 
