@@ -1337,6 +1337,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public PmpIdentifierJson Identifier;
         public bool AllVariants;
+        public bool OnlyAttributes;
 
         public XivDependencyRoot GetRoot()
         {
