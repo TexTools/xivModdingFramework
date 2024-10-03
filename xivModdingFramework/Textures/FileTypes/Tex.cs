@@ -82,14 +82,14 @@ namespace xivModdingFramework.Textures.FileTypes
             public ushort Depth;
 
             public byte MipCount;
-            public bool MipFlag;
+            public byte MipFlag;
 
             public byte ArraySize;
 
             // 3 Ints, representing which MipMaps to use at each LoD level.
-            uint[] LoDMips;
+            public uint[] LoDMips;
 
-            uint[] MipMapOffsets;
+            public uint[] MipMapOffsets;
 
             /// <summary>
             /// Reads a .tex file header (80 bytes) from the given stream.
@@ -111,7 +111,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 header.Depth = br.ReadUInt16();
                 header.MipCount = br.ReadByte();
-                header.MipFlag = (header.MipCount & 8) > 0;
+                header.MipFlag = (byte)(header.MipCount >> 4);
                 header.MipCount = (byte)(header.MipCount & 0xF);
                 header.ArraySize = br.ReadByte();
 
@@ -127,6 +127,39 @@ namespace xivModdingFramework.Textures.FileTypes
                     header.MipMapOffsets[i] = br.ReadUInt32();
                 }
                 return header;
+            }
+
+            /// <summary>
+            /// Writes a .tex file header from this.
+            /// </summary>
+            /// <returns>Byte array containing the header data.</returns>
+            internal byte[] ToBytes()
+            {
+                if (this.LoDMips[1] < this.LoDMips[0] || this.LoDMips[2] < this.LoDMips[1])
+                    throw new InvalidOperationException("LoDMips is not in non-descending order.");
+                if (this.LoDMips[2] >= this.MipCount)
+                    throw new InvalidOperationException("All LoDMips must be strictly lesser than MipCount.");
+                if (this.MipFlag > 15)
+                    throw new InvalidOperationException("MipFlag must be strictly lesser than 16.");
+                if (this.MipCount > 13)
+                    throw new InvalidOperationException("MipCount must be strictly lesser than 14.");
+
+                var res = new byte[_TexHeaderSize];
+                var bw = new BinaryWriter(new MemoryStream(res, true));
+                bw.Write(this.Attributes);
+                bw.Write(this.TextureFormat);
+                bw.Write(this.Width);
+                bw.Write(this.Height);
+                bw.Write(this.Depth);
+                bw.Write((byte)((this.MipFlag << 4) | this.MipCount));
+                bw.Write(this.ArraySize);
+                foreach (var x in this.LoDMips)
+                    bw.Write(x);
+                foreach (var x in this.MipMapOffsets)
+                    bw.Write(x);
+
+                Debug.Assert(bw.BaseStream.Position == _TexHeaderSize, "Data was not fully written.");
+                return res;
             }
         }
 
@@ -1244,13 +1277,21 @@ namespace xivModdingFramework.Textures.FileTypes
                 var uncompLength = lengthIncludingHeader - _TexHeaderSize;
 
 
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                br.BaseStream.Seek(offset + _TexHeaderSize, SeekOrigin.Begin);
 
                 // Type 4 Header
                 newTex.AddRange(Dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
 
                 // Texture file header.
-                newTex.AddRange(br.ReadBytes((int)_TexHeaderSize));
+                // CompressDDSBody call above alters individual mipmap sizes, ending up changing the offsets.
+                // Calculate those again here.
+                header.MipMapOffsets[0] = _TexHeaderSize;
+                for (var i = 1; i < header.MipCount; i++)
+                    header.MipMapOffsets[i] = header.MipMapOffsets[i - 1] + (uint)ddsParts[i - 1].Count;
+                header.LoDMips[0] = Math.Min(header.MipCount - 1u, header.LoDMips[0]);
+                header.LoDMips[1] = Math.Min(header.MipCount - 1u, Math.Max(header.LoDMips[0], header.LoDMips[1]));
+                header.LoDMips[2] = Math.Min(header.MipCount - 1u, Math.Max(header.LoDMips[1], header.LoDMips[2]));
+                newTex.AddRange(header.ToBytes());
 
                 // Compressed pixel data.
                 foreach (var mip in ddsParts)
