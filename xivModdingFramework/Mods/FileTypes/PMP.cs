@@ -165,7 +165,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         foreach (var kv in op.Files)
                         {
                             var zipPath = kv.Value;
-                            allPmpFiles.Add(zipPath);
+                            allPmpFiles.Add(zipPath.ToLower());
                         }
                     }
                 }
@@ -178,7 +178,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 foreach (var kv in defOp.Files)
                 {
                     var zipPath = kv.Value;
-                    allPmpFiles.Add(zipPath);
+                    allPmpFiles.Add(zipPath.ToLower());
                 }
             }
 
@@ -193,8 +193,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     return file.EndsWith(".png");
                 });
             }
-
-
 
             return (pmp, path, image);
         }
