@@ -767,7 +767,7 @@ namespace xivModdingFramework.Helpers
             {
                 path = "\\\\?\\" + path;
             }
-            return path;
+            return path.Replace("/", "\\");
         }
 
         public static byte[] GetImageSharpPixels(Image<Bgra32> img)
