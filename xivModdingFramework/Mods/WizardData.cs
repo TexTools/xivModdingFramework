@@ -1088,30 +1088,26 @@ namespace xivModdingFramework.Mods
             data.ModPack = mp;
             data.RawSource = pmp;
 
-            var def = pmp.DefaultMod as PmpStandardOptionJson;
-            if (def != null)
+            var defMod = pmp.DefaultMod as PmpStandardOptionJson;
+            if (defMod != null && !defMod.IsEmptyOption)
             {
-                var anyData = (def.Manipulations != null && def.Manipulations.Count > 0) || def.FileSwaps.Count > 0 || def.Files.Count > 0;
-                if (anyData)
+                // Just drum up a basic group containing the default option.
+                var fakeGroup = new PMPGroupJson();
+                fakeGroup.Name = "Default";
+                fakeGroup.Options = new List<PMPOptionJson>() { pmp.DefaultMod };
+                fakeGroup.SelectedSettings = 1;
+                fakeGroup.Type = "Single";
+
+                if (string.IsNullOrWhiteSpace(pmp.DefaultMod.Name))
                 {
-                    // Just drum up a basic group containing the default option.
-                    var fakeGroup = new PMPGroupJson();
-                    fakeGroup.Name = "Default";
-                    fakeGroup.Options = new List<PMPOptionJson>() { pmp.DefaultMod };
-                    fakeGroup.SelectedSettings = 1;
-                    fakeGroup.Type = "Single";
-
-                    if (string.IsNullOrWhiteSpace(pmp.DefaultMod.Name))
-                    {
-                        pmp.DefaultMod.Name = "Default";
-                    }
-
-                    var page = new WizardPageEntry();
-                    page.Name = "Page 1";
-                    page.Groups = new List<WizardGroupEntry>();
-                    page.Groups.Add(await WizardGroupEntry.FromPMPGroup(fakeGroup, unzipPath));
-                    data.DataPages.Add(page);
+                    pmp.DefaultMod.Name = "Default";
                 }
+
+                var page = new WizardPageEntry();
+                page.Name = "Page 1";
+                page.Groups = new List<WizardGroupEntry>();
+                page.Groups.Add(await WizardGroupEntry.FromPMPGroup(fakeGroup, unzipPath));
+                data.DataPages.Add(page);
             }
 
             if (pmp.Groups.Count > 0)

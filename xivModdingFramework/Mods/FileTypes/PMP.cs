@@ -165,7 +165,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         foreach (var kv in op.Files)
                         {
                             var zipPath = kv.Value;
-                            allPmpFiles.Add(zipPath);
+                            allPmpFiles.Add(zipPath.ToLower());
                         }
                     }
                 }
@@ -178,7 +178,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 foreach (var kv in defOp.Files)
                 {
                     var zipPath = kv.Value;
-                    allPmpFiles.Add(zipPath);
+                    allPmpFiles.Add(zipPath.ToLower());
                 }
             }
 
@@ -193,8 +193,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     return file.EndsWith(".png");
                 });
             }
-
-
 
             return (pmp, path, image);
         }
@@ -316,124 +314,124 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 tx.ModPack = modPack;
 
-                if (pmp.Groups == null || pmp.Groups.Count == 0)
+                var defMod = pmp.DefaultMod as PmpStandardOptionJson;
+
+                // Default option is always selected and always applied first, if it is present
+                if (defMod != null && !defMod.IsEmptyOption)
                 {
-                    // No options, just default.
                     var groupRes = await ImportOption(pmp.DefaultMod, unzippedPath, tx, progress);
                     UnionDict(imported, groupRes.Imported);
                     notImported.UnionWith(groupRes.NotImported);
                 }
-                else
+
+                // Order groups by Priority, Lowest => Highest, tiebreaker default order
+                var orderedGroups = pmp.Groups.OrderBy(x => x.Priority).ToList();
+                var groupIdx = 0;
+                foreach (var group in orderedGroups)
                 {
-                    // Order groups by Priority, Lowest => Highest, tiebreaker default order
-                    var orderedGroups = pmp.Groups.OrderBy(x => x.Priority).ToList();
-                    var groupIdx = 0;
-                    foreach (var group in orderedGroups)
+                    if (group.Options == null || group.Options.Count == 0)
                     {
-                        if (group.Options == null || group.Options.Count == 0)
-                        {
-                            // No valid options.
-                            groupIdx++;
-                            continue;
-                        }
-                        var optionIdx = 0;
-
-                        // Get Default selection.
-                        var selected = group.DefaultSettings;
-
-                        // If the user selected custom settings, use those.
-                        if (group.SelectedSettings >= 0)
-                        {
-                            selected = group.SelectedSettings;
-                        }
-
-                        if (group.Type == "Single")
-                        {
-                            if (selected < 0 || selected >= group.Options.Count)
-                            {
-                                selected = 0;
-                            }
-                            var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, groupIdx, optionIdx);
-                            UnionDict(imported, groupRes.Imported);
-                            notImported.UnionWith(groupRes.NotImported);
-                        }
-                        else if(group.Type == "Multi")
-                        {
-                            var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority).ToList();
-
-                            // Bitmask options.  Install in priority order.
-                            foreach(var op in ordered)
-                            {
-                                var i = group.Options.IndexOf(op);
-                                var value = 1 << i;
-                                if ((selected & value) > 0)
-                                {
-                                    var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, groupIdx, optionIdx);
-                                    UnionDict(imported, groupRes.Imported);
-                                    notImported.UnionWith(groupRes.NotImported);
-                                    optionIdx++;
-                                }
-                            }
-
-                        } else if(group.Type == "Imc")
-                        {
-                            // Could do with popping this out to its own function.
-                            var imcGroup = group as PMPImcGroupJson;
-                            var xivImc = imcGroup.DefaultEntry.ToXivImc();
-
-                            bool disabled = false;
-                            // Bitmask options.
-                            for (int i = 0; i < group.Options.Count; i++)
-                            {
-                                var value = 1 << i;
-                                if ((selected & value) > 0)
-                                {
-                                    var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
-                                    if (disableOpt != null)
-                                    {
-                                        // No options allowed >:|
-                                        disabled = true;
-                                        break;
-                                    }
-
-                                    var opt = group.Options[i] as PmpImcOptionJson;
-                                    optionIdx++;
-
-                                    xivImc.AttributeMask |= opt.AttributeMask;
-                                }
-                            }
-
-                            if (!disabled)
-                            {
-                                var root = imcGroup.GetRoot();
-                                var metaData = await GetImportMetadata(imported, root, tx);
-                                if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
-                                {
-                                    while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
-                                    {
-                                        metaData.ImcEntries.Add((XivImc)xivImc.Clone());
-                                    }
-                                }
-                                else
-                                {
-                                    metaData.ImcEntries[(int)imcGroup.Identifier.Variant] = xivImc;
-                                }
-
-                                if (imcGroup.AllVariants)
-                                {
-                                    for (int i = 0; i < metaData.ImcEntries.Count; i++)
-                                    {
-                                        metaData.ImcEntries[i] = (XivImc)xivImc.Clone();
-                                    }
-                                }
-
-                                await ItemMetadata.SaveMetadata(metaData, _Source, tx);
-                                await ItemMetadata.ApplyMetadata(metaData, tx);
-
-                            }
-                        }
+                        // No valid options.
                         groupIdx++;
+                        continue;
                     }
+                    var optionIdx = 0;
+
+                    // Get Default selection.
+                    var selected = group.DefaultSettings;
+
+                    // If the user selected custom settings, use those.
+                    if (group.SelectedSettings >= 0)
+                    {
+                        selected = group.SelectedSettings;
+                    }
+
+                    if (group.Type == "Single")
+                    {
+                        if (selected < 0 || selected >= group.Options.Count)
+                        {
+                            selected = 0;
+                        }
+                        var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, groupIdx, optionIdx);
+                        UnionDict(imported, groupRes.Imported);
+                        notImported.UnionWith(groupRes.NotImported);
+                    }
+                    else if(group.Type == "Multi")
+                    {
+                        var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority).ToList();
+
+                        // Bitmask options.  Install in priority order.
+                        foreach(var op in ordered)
+                        {
+                            var i = group.Options.IndexOf(op);
+                            var value = 1 << i;
+                            if ((selected & value) > 0)
+                            {
+                                var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, groupIdx, optionIdx);
+                                UnionDict(imported, groupRes.Imported);
+                                notImported.UnionWith(groupRes.NotImported);
+                                optionIdx++;
+                            }
+                        }
+
+                    } else if(group.Type == "Imc")
+                    {
+                        // Could do with popping this out to its own function.
+                        var imcGroup = group as PMPImcGroupJson;
+                        var xivImc = imcGroup.DefaultEntry.ToXivImc();
+
+                        bool disabled = false;
+                        // Bitmask options.
+                        for (int i = 0; i < group.Options.Count; i++)
+                        {
+                            var value = 1 << i;
+                            if ((selected & value) > 0)
+                            {
+                                var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
+                                if (disableOpt != null)
+                                {
+                                    // No options allowed >:|
+                                    disabled = true;
+                                    break;
+                                }
+
+                                var opt = group.Options[i] as PmpImcOptionJson;
+                                optionIdx++;
+
+                                xivImc.AttributeMask |= opt.AttributeMask;
+                            }
+                        }
+
+                        if (!disabled)
+                        {
+                            var root = imcGroup.GetRoot();
+                            var metaData = await GetImportMetadata(imported, root, tx);
+                            if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
+                            {
+                                while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
+                                {
+                                    metaData.ImcEntries.Add((XivImc)xivImc.Clone());
+                                }
+                            }
+                            else
+                            {
+                                metaData.ImcEntries[(int)imcGroup.Identifier.Variant] = xivImc;
+                            }
+
+                            if (imcGroup.AllVariants)
+                            {
+                                for (int i = 0; i < metaData.ImcEntries.Count; i++)
+                                {
+                                    metaData.ImcEntries[i] = (XivImc)xivImc.Clone();
+                                }
+                            }
+
+                            await ItemMetadata.SaveMetadata(metaData, _Source, tx);
+                            await ItemMetadata.ApplyMetadata(metaData, tx);
+
+                        }
+                    }
+                    groupIdx++;
                 }
 
                 var preRootTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
@@ -910,28 +908,31 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var defMod = pmp.DefaultMod as PmpStandardOptionJson;
                 PmpStandardOptionJson option = null;
 
-                if (defMod != null && (defMod.FileSwaps.Count > 0 || defMod.Manipulations.Count > 0 || defMod.Files.Count > 0) && pmp.Groups.Count == 0)
+                // Default mod is always present, but may be void of any data
+                if (defMod != null && !defMod.IsEmptyOption)
                 {
                     // Valid Default Mod Option
                     option = defMod;
                 }
-                else
+
+                if (pmp.Groups.Count == 1)
                 {
-                    if (pmp.Groups.Count == 1)
+                    var group = pmp.Groups[0];
+                    if (group.Options.Count == 1)
                     {
-                        var group = pmp.Groups[0];
-                        if (group.Options.Count == 1)
-                        {
-                            option = group.Options[0] as PmpStandardOptionJson;
-                        }
-                        else if (group.Options.Count > 1)
-                        {
+                        // The default option was already found to be valid, leaving us with two valid options
+                        // Return null so it gets treated as a wizard modpack instead
+                        if (option != null)
                             return null;
-                        }
-                    } else if(pmp.Groups.Count > 1)
+                        option = group.Options[0] as PmpStandardOptionJson;
+                    }
+                    else if (group.Options.Count > 1)
                     {
                         return null;
                     }
+                } else if(pmp.Groups.Count > 1)
+                {
+                    return null;
                 }
 
                 if (option == null)
@@ -1402,6 +1403,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public Dictionary<string, string> FileSwaps;
         public List<PMPManipulationWrapperJson> Manipulations;
         public int Priority;
+
+        [JsonIgnore] public bool IsEmptyOption => !(
+            (FileSwaps != null && FileSwaps.Count > 0) ||
+            (Manipulations != null && Manipulations.Count > 0) ||
+            (Files != null && Files.Count > 0)
+        );
     }
 
     public class PmpDisableImcOptionJson : PMPOptionJson
