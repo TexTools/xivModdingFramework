@@ -970,7 +970,8 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else { 
                     if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
-                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8)
+                        && xivMdl.LoDList[1].VertexDataSize == 0)
                     {
 
                         var delta = (int)(xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
