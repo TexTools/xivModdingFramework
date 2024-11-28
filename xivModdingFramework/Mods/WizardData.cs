@@ -87,6 +87,7 @@ namespace xivModdingFramework.Mods
             "Est",
             "Gmp",
             "Rsp",
+            "Atch",
             "GlobalEqp"
         };
 
@@ -495,6 +496,12 @@ namespace xivModdingFramework.Mods
                         ModDataBytes = data,
                     };
                     mo.Mods.Add(path, mData);
+                }
+
+                if (manips.OtherManipulations.Count > 0)
+                {
+                    var manip0 = manips.OtherManipulations[0];
+                    throw new InvalidDataException("TTMP Does not support " + manip0.Type + " manipulations.");
                 }
             }
 
