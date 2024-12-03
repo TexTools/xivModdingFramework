@@ -398,7 +398,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                                 var opt = group.Options[i] as PmpImcOptionJson;
                                 optionIdx++;
 
-                                xivImc.AttributeMask |= opt.AttributeMask;
+                                xivImc.AttributeMask ^= opt.AttributeMask;
                             }
                         }
 
