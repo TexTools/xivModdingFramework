@@ -87,6 +87,7 @@ namespace xivModdingFramework.Mods
             "Est",
             "Gmp",
             "Rsp",
+            "Atch",
             "GlobalEqp"
         };
 
@@ -496,6 +497,12 @@ namespace xivModdingFramework.Mods
                     };
                     mo.Mods.Add(path, mData);
                 }
+
+                if (manips.OtherManipulations.Count > 0)
+                {
+                    var manip0 = manips.OtherManipulations[0];
+                    throw new InvalidDataException("TTMP Does not support " + manip0.Type + " manipulations.");
+                }
             }
 
 
@@ -546,6 +553,7 @@ namespace xivModdingFramework.Mods
         public ushort Variant;
         public XivImc BaseEntry = new XivImc();
         public bool AllVariants;
+        public bool OnlyAttributes;
     }
 
     /// <summary>
@@ -774,6 +782,7 @@ namespace xivModdingFramework.Mods
                     Root = imcGroup.Identifier.GetRoot(),
                     BaseEntry = imcGroup.DefaultEntry.ToXivImc(),
                     AllVariants = imcGroup.AllVariants,
+                    OnlyAttributes = imcGroup.OnlyAttributes,
                 };
             }
 
@@ -889,6 +898,7 @@ namespace xivModdingFramework.Mods
                 imcG.Identifier = PmpIdentifierJson.FromRoot(ImcData.Root.Info, ImcData.Variant);
                 imcG.DefaultEntry = PMPImcManipulationJson.PMPImcEntry.FromXivImc(ImcData.BaseEntry);
                 imcG.AllVariants = ImcData.AllVariants;
+                imcG.OnlyAttributes = ImcData.OnlyAttributes;
             }
             else
             {
