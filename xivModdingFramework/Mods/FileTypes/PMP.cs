@@ -125,10 +125,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
 
 
-            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath), new JsonSerializerSettings
+            var defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
             {
                 NullValueHandling = NullValueHandling.Ignore
             });
+            defaultOption.Name = "Default";
 
             var groups = new List<PMPGroupJson>();
 
@@ -368,12 +369,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
                     else if(group.Type == "Multi")
                     {
-                        var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority).ToList();
+                        var ordered = group.Options.OrderBy(x => ((PmpMultiOptionJson)x).Priority).ToList();
 
                         // Bitmask options.  Install in priority order.
                         foreach(var op in ordered)
                         {
-                            var i = group.Options.IndexOf(op);
+                            var multiGroup = group as PMPMultiGroupJson;
+                            var multiOpt = op as PmpMultiOptionJson;
+
+                            var i = multiGroup.OptionData.IndexOf(multiOpt);
                             var value = 1UL << i;
                             if ((selected & value) > 0)
                             {
@@ -750,13 +754,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 {
                     Meta = new PMPMetaJson(),
                     Groups = new List<PMPGroupJson>(),
-                    DefaultMod = new PMPOptionJson(),
+                    DefaultMod = new PmpDefaultMod(),
                 };
 
 
                 var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos);
 
-                pmp.DefaultMod = await CreatePmpStandardOption(workingPath, "Default", "The only option.", files, otherManipulations);
+                pmp.DefaultMod = new PmpDefaultMod();
+                await PopulatePmpStandardOption(pmp.DefaultMod, workingPath, files, otherManipulations);
 
                 pmp.Meta.Author = modpackMeta.Author;
                 pmp.Meta.Name = modpackMeta.Name;
@@ -823,17 +828,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
-        public static async Task<PmpStandardOptionJson> CreatePmpStandardOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, string imagePath = null, int priority = 0)
+        public static async Task PopulatePmpStandardOption(PmpStandardOptionJson opt, string workingPath, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null)
         {
-            var opt = new PmpStandardOptionJson()
-            {
-                Name = name,
-                Description = description,
-                Files = new Dictionary<string, string>(),
-                FileSwaps = new Dictionary<string, string>(),
-                Manipulations = new List<PMPManipulationWrapperJson>(),
-                Priority = priority,
-            };
+            opt.Files = new();
+            opt.FileSwaps = new();
+            opt.Manipulations = new();
 
             // TODO - Could paralell this? Unsure how big the gains would really be though,
             // since the primary tasks are already paralelled internally, and there's little else heavy going on.
@@ -886,7 +885,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     opt.Manipulations.Add(manip);
                 }
             }
-            return opt;
         }
 
 
@@ -1271,7 +1269,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PMPJson
     {
         public PMPMetaJson Meta { get; set; }
-        public PMPOptionJson DefaultMod { get; set; }
+        public PmpDefaultMod DefaultMod { get; set; }
         public List<PMPGroupJson> Groups { get; set; }
 
         [JsonIgnore]
@@ -1322,14 +1320,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
+    [JsonSubtypes.KnownSubType(typeof(PMPSingleGroupJson), "Single")]
+    [JsonSubtypes.KnownSubType(typeof(PMPMultiGroupJson), "Multi")]
     [JsonSubtypes.KnownSubType(typeof(PMPImcGroupJson), "Imc")]
     public class PMPGroupJson
     {
+        public int Version = 0;
         public string Name = "";
         public string Description = "";
-        public int Priority;
         public string Image = "";
         public int Page;
+        public int Priority;
 
         // "Multi", "Single", or "Imc"
         public string Type = "";
@@ -1340,7 +1341,24 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         // Either single Index or Bitflag.
         public ulong DefaultSettings;
         
-        public List<PMPOptionJson> Options = new List<PMPOptionJson>();
+        [JsonIgnore]
+        public virtual IReadOnlyList<PMPOptionJson> Options => throw new NotImplementedException($"Unimplemented PMP group type: {Type}");
+    }
+
+    public class PMPSingleGroupJson : PMPGroupJson
+    {
+        [JsonProperty(PropertyName = "Options", Order = 99)]
+        public List<PmpSingleOptionJson> OptionData = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
+    }
+
+    public class PMPMultiGroupJson : PMPGroupJson
+    {
+        [JsonProperty(PropertyName = "Options", Order = 99)]
+        public List<PmpMultiOptionJson> OptionData = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
     }
 
     public class PMPImcGroupJson : PMPGroupJson
@@ -1349,6 +1367,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public bool AllVariants;
         public bool OnlyAttributes;
+
+        [JsonProperty(PropertyName = "Options", Order = 99)]
+        public List<PmpImcOptionJson> OptionData = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
 
         public XivDependencyRoot GetRoot()
         {
@@ -1396,22 +1419,33 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
     }
 
-    [JsonConverter(typeof(JsonSubtypes))]
-    [JsonSubtypes.FallBackSubType(typeof(PmpStandardOptionJson))]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpImcOptionJson), "AttributeMask")]
+    // This type will not be deserialized directly, as the correct sub-type will be known in advance
     public class PMPOptionJson
     {
+        // For some reason the default order is that base class fields ordered last instead of first ...
+        // Manually specifying the order of a bunch of option-related fields to fix that
+        [JsonProperty(Order = -10)]
         public string Name = "";
+        [JsonProperty(Order = -10)]
         public string Description = "";
+        [JsonProperty(Order = -10)]
         public string Image = "";
+
+        // TexTools loads/saves default_mod.json as this type, but these fields should not be present in default_mod
+        [JsonIgnore] public virtual bool IsDataContainerOnly => false;
+
+        public bool ShouldSerializeName() { return !IsDataContainerOnly; }
+        public bool ShouldSerializeDescription() { return !IsDataContainerOnly; }
+        public bool ShouldSerializeImage() { return !IsDataContainerOnly; }
     }
 
     public class PmpStandardOptionJson : PMPOptionJson
     {
-        public int Priority = 0;
+        [JsonProperty(Order = 10)]
         public Dictionary<string, string> Files = new();
+        [JsonProperty(Order = 10)]
         public Dictionary<string, string> FileSwaps = new();
+        [JsonProperty(Order = 10)]
         public List<PMPManipulationWrapperJson> Manipulations = new();
 
         [JsonIgnore] public bool IsEmptyOption => !(
@@ -1419,12 +1453,39 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             (Manipulations != null && Manipulations.Count > 0) ||
             (Files != null && Files.Count > 0)
         );
+
+        // TODO: Comment this out in the future to mimic Penumbra's behavior
+        /*
+        public bool ShouldSerializeFiles() { return Files != null && Files.Count > 0; }
+        public bool ShouldSerializeFileSwaps() { return FileSwaps != null && FileSwaps.Count > 0; }
+        public bool ShouldSerializeManipulations() { return Manipulations != null && Manipulations.Count > 0; }
+        */
+    }
+
+    public class PmpDefaultMod : PmpStandardOptionJson
+    {
+        [JsonProperty(Order = -99)]
+        public int Version = 0;
+        [JsonIgnore] public override bool IsDataContainerOnly => true;
+    }
+
+    public class PmpSingleOptionJson : PmpStandardOptionJson
+    {
+    }
+
+    public class PmpMultiOptionJson : PmpStandardOptionJson
+    {
+        [JsonProperty(Order = 2)]
+        public int Priority = 0;
     }
 
     public class PmpDisableImcOptionJson : PMPOptionJson
     {
-        public bool IsDisableSubMod;
+        public bool IsDisableSubMod = true;
     }
+
+    [JsonConverter(typeof(JsonSubtypes))]
+    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
     public class PmpImcOptionJson : PMPOptionJson
     {
         public ushort AttributeMask;

@@ -221,9 +221,9 @@ namespace xivModdingFramework.Mods
     /// </summary>
     public class WizardOptionEntry : INotifyPropertyChanged
     {
-        public string Name { get; set; }
-        public string Description { get; set; }
-        public string Image { get; set; }
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Image { get; set; } = "";
         internal string FolderPath { get; set; }
 
         public string NoDataIndicator
@@ -518,7 +518,6 @@ namespace xivModdingFramework.Mods
                 {
                     var io = new PmpDisableImcOptionJson();
                     op = io;
-                    io.IsDisableSubMod = true;
                 }
                 else
                 {
@@ -526,17 +525,29 @@ namespace xivModdingFramework.Mods
                     op = io;
                     io.AttributeMask = ImcData.AttributeMask;
                 }
-                op.Name = Name;
-                op.Description = Description;
             }
             else
             {
+                PmpStandardOptionJson so;
+
+                if (OptionType == EOptionType.Multi)
+                {
+                    var mo = new PmpMultiOptionJson();
+                    so = mo;
+                    mo.Priority = StandardData.Priority;
+                }
+                else
+                {
+                    so = new PmpSingleOptionJson();
+                }
                 // This unpacks our deduplicated files as needed.
-                op = await PMP.CreatePmpStandardOption(tempFolder, Name, Description, identifiers, StandardData.Manipulations, null, StandardData.Priority);
+                await PMP.PopulatePmpStandardOption(so, tempFolder, identifiers, StandardData.Manipulations);
+                op = so;
             }
 
+            op.Name = Name ?? "";
+            op.Description = Description ?? "";
             op.Image = WizardHelpers.WriteImage(Image, tempFolder, imageName);
-
 
             return op;
         }
@@ -562,9 +573,9 @@ namespace xivModdingFramework.Mods
     /// </summary>
     public class WizardGroupEntry
     {
-        public string Name;
-        public string Description;
-        public string Image;
+        public string Name = "";
+        public string Description = "";
+        public string Image = "";
 
         internal string FolderPath;
 
@@ -809,10 +820,10 @@ namespace xivModdingFramework.Mods
                     var data = await PMP.UnpackPmpOption(o, null, unzipPath, false);
                     wizOp.StandardData.Files = data.Files;
                     wizOp.StandardData.Manipulations = data.OtherManipulations;
-                    var sop = o as PmpStandardOptionJson;
-                    if (sop != null)
+                    var mop = o as PmpMultiOptionJson;
+                    if (mop != null)
                     {
-                        wizOp.StandardData.Priority = sop.Priority;
+                        wizOp.StandardData.Priority = mop.Priority;
                     }
 
                 }
@@ -886,7 +897,10 @@ namespace xivModdingFramework.Mods
 
         public async Task<PMPGroupJson> ToPmpGroup(string tempFolder, Dictionary<string, List<FileIdentifier>> identifiers, int page, bool oneOption = false)
         {
-            var pg = new PMPGroupJson();
+            PMPGroupJson pg;
+            // We want to insert a type-erased PMPOptionJson, as returned by ToPmpOption(), in to a type-erased PMPGroupJson
+            // This is the alternative to creating a single-purpose virtual function on PMPGroupJson
+            Action<PMPOptionJson> addOptionFn;
 
             if (this.ImcData != null)
             {
@@ -898,21 +912,25 @@ namespace xivModdingFramework.Mods
                 imcG.DefaultEntry = PMPImcManipulationJson.PMPImcEntry.FromXivImc(ImcData.BaseEntry);
                 imcG.AllVariants = ImcData.AllVariants;
                 imcG.OnlyAttributes = ImcData.OnlyAttributes;
+                addOptionFn = (PMPOptionJson o) => imcG.OptionData.Add((PmpImcOptionJson)o);
             }
             else
             {
-                pg.Type = OptionType.ToString();
+                if (this.OptionType == EOptionType.Multi)
+                {
+                    var mg = new PMPMultiGroupJson();
+                    pg = mg;
+                    pg.Type = "Multi";
+                    addOptionFn = (PMPOptionJson o) => mg.OptionData.Add((PmpMultiOptionJson)o);
+                }
+                else
+                {
+                    var sg = new PMPSingleGroupJson();
+                    pg = sg;
+                    pg.Type = "Single";
+                    addOptionFn = (PMPOptionJson o) => sg.OptionData.Add((PmpSingleOptionJson)o);
+                }
             }
-
-            pg.Name = Name.Trim();
-            pg.Description = Description;
-            pg.Options = new List<PMPOptionJson>();
-            pg.Priority = Priority;
-            pg.DefaultSettings = Selection;
-            pg.SelectedSettings = Selection;
-            pg.Page = page;
-
-            pg.Image = WizardHelpers.WriteImage(Image, tempFolder, IOUtil.MakePathSafe(Name));
 
             foreach (var option in Options)
             {
@@ -931,8 +949,17 @@ namespace xivModdingFramework.Mods
                 }
                 identifiers.TryGetValue(optionPrefix, out var files);
                 var opt = await option.ToPmpOption(tempFolder, files, imgName);
-                pg.Options.Add(opt);
+                addOptionFn(opt);
             }
+
+            pg.Name = (Name ?? "").Trim();
+            pg.Description = Description ?? "";
+            pg.Priority = Priority;
+            pg.DefaultSettings = Selection;
+            pg.SelectedSettings = Selection;
+            pg.Page = page;
+
+            pg.Image = WizardHelpers.WriteImage(Image, tempFolder, IOUtil.MakePathSafe(Name));
 
             return pg;
         }
@@ -1097,20 +1124,20 @@ namespace xivModdingFramework.Mods
             data.ModPack = mp;
             data.RawSource = pmp;
 
-            var defMod = pmp.DefaultMod as PmpStandardOptionJson;
-            if (defMod != null && !defMod.IsEmptyOption)
+            if (pmp.DefaultMod != null && !pmp.DefaultMod.IsEmptyOption)
             {
                 // Just drum up a basic group containing the default option.
-                var fakeGroup = new PMPGroupJson();
+                var fakeOption = new PmpSingleOptionJson();
+                fakeOption.Name = "Default";
+                fakeOption.Files = pmp.DefaultMod.Files;
+                fakeOption.FileSwaps = pmp.DefaultMod.FileSwaps;
+                fakeOption.Manipulations = pmp.DefaultMod.Manipulations;
+
+                var fakeGroup = new PMPSingleGroupJson();
                 fakeGroup.Name = "Default";
-                fakeGroup.Options = new List<PMPOptionJson>() { pmp.DefaultMod };
+                fakeGroup.OptionData = new List<PmpSingleOptionJson>() { fakeOption };
                 fakeGroup.SelectedSettings = 1;
                 fakeGroup.Type = "Single";
-
-                if (string.IsNullOrWhiteSpace(pmp.DefaultMod.Name))
-                {
-                    pmp.DefaultMod.Name = "Default";
-                }
 
                 var page = new WizardPageEntry();
                 page.Name = "Page 1";
@@ -1444,7 +1471,7 @@ namespace xivModdingFramework.Mods
             ClearNulls();
             var pmp = new PMPJson()
             {
-                DefaultMod = new PMPOptionJson(),
+                DefaultMod = new PmpDefaultMod(),
                 Groups = new List<PMPGroupJson>(),
                 Meta = new PMPMetaJson(),
             };
@@ -1527,11 +1554,28 @@ namespace xivModdingFramework.Mods
                 // their file identifier and internal path information
                 var identifiers = await FileIdentifier.IdentifierListFromDictionaries(allFiles);
 
+                bool defaultModOnly = false;
+
                 if (optionCount == 1)
                 {
-                    pmp.DefaultMod = (await DataPages.First(x => x.Groups.Count > 0).Groups.First(x => x.Options.Count > 0).ToPmpGroup(tempFolder, identifiers, 0, true)).Options[0];
+                    WizardGroupEntry firstGroup = DataPages.First(x => x.Groups.Count > 0)?.Groups?.First(x => x.Options.Count > 0);
+
+                    if (firstGroup != null && firstGroup.ImcData == null)
+                    {
+                        var sg = await firstGroup.ToPmpGroup(tempFolder, identifiers, 0, true);
+                        var so = sg.Options[0] as PmpStandardOptionJson;
+
+                        if (so != null)
+                        {
+                            pmp.DefaultMod.Files = so.Files;
+                            pmp.DefaultMod.FileSwaps = so.FileSwaps;
+                            pmp.DefaultMod.Manipulations = so.Manipulations;
+                            defaultModOnly = true;
+                        }
+                    }
                 }
-                else
+                
+                if (!defaultModOnly)
                 {
                     // This both constructs the JSON structure and writes our files to their
                     // real location in the folder tree in the temp folder.
