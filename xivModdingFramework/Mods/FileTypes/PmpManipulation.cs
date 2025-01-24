@@ -345,10 +345,10 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
         public PMPImcEntry Entry;
+        public PMPObjectType ObjectType;
         public uint PrimaryId;
         public uint SecondaryId;
         public uint Variant;
-        public PMPObjectType ObjectType;
         public PMPEquipSlot EquipSlot;
         public PMPObjectType BodySlot;
 

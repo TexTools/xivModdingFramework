@@ -116,13 +116,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var metaPath = Path.Combine(path, "meta.json");
 
             var text = File.ReadAllText(metaPath);
-            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text);
+            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
 
             string image = null;
 
 
 
-            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath));
+            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath), new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
 
             var groups = new List<PMPGroupJson>();
 
@@ -132,7 +138,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 if (Path.GetFileName(file).StartsWith("group_") && Path.GetFileName(file).ToLower().EndsWith(".json"))
                 {
-                    var group = JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file));
+                    var group = JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file), new JsonSerializerSettings
+                    {
+                        NullValueHandling = NullValueHandling.Ignore
+                    });
                     if (group != null)
                     {
                         groups.Add(group);
@@ -1300,12 +1309,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PMPMetaJson
     {
         public int FileVersion;
-        public string Name;
-        public string Author;
-        public string Description;
-        public string Version;
-        public string Website;
-        public string Image;
+        public string Name = "";
+        public string Author = "";
+        public string Description = "";
+        public string Version = "";
+        public string Website = "";
+        public string Image = "";
 
         // These exist.
         public List<string> ModTags;
@@ -1315,14 +1324,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     [JsonSubtypes.KnownSubType(typeof(PMPImcGroupJson), "Imc")]
     public class PMPGroupJson
     {
-        public string Name;
-        public string Description;
+        public string Name = "";
+        public string Description = "";
         public int Priority;
-        public string Image;
+        public string Image = "";
         public int Page;
 
         // "Multi", "Single", or "Imc"
-        public string Type;
+        public string Type = "";
 
         // Only used internally when the user is selecting options during install/application.
         [JsonIgnore] public int SelectedSettings = -1;
@@ -1335,8 +1344,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     public class PMPImcGroupJson : PMPGroupJson
     {
-        public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public PmpIdentifierJson Identifier;
+        public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public bool AllVariants;
         public bool OnlyAttributes;
 
@@ -1387,22 +1396,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     }
 
     [JsonConverter(typeof(JsonSubtypes))]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpStandardOptionJson), "Files")]
+    [JsonSubtypes.FallBackSubType(typeof(PmpStandardOptionJson))]
     [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
     [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpImcOptionJson), "AttributeMask")]
     public class PMPOptionJson
     {
-        public string Name;
-        public string Description;
-        public string Image;
+        public string Name = "";
+        public string Description = "";
+        public string Image = "";
     }
 
     public class PmpStandardOptionJson : PMPOptionJson
     {
-        public Dictionary<string, string> Files;
-        public Dictionary<string, string> FileSwaps;
-        public List<PMPManipulationWrapperJson> Manipulations;
-        public int Priority;
+        public int Priority = 0;
+        public Dictionary<string, string> Files = new();
+        public Dictionary<string, string> FileSwaps = new();
+        public List<PMPManipulationWrapperJson> Manipulations = new();
 
         [JsonIgnore] public bool IsEmptyOption => !(
             (FileSwaps != null && FileSwaps.Count > 0) ||
