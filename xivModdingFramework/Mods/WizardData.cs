@@ -569,7 +569,7 @@ namespace xivModdingFramework.Mods
         internal string FolderPath;
 
         // Int or Bitflag depending on OptionType.
-        public int Selection
+        public ulong Selection
         {
             get
             {
@@ -580,18 +580,17 @@ namespace xivModdingFramework.Mods
                     {
                         return 0;
                     }
-                    return Options.IndexOf(op);
+                    return (ulong)Options.IndexOf(op);
                 }
                 else
                 {
-                    var total = 0;
+                    ulong total = 0;
                     for (int i = 0; i < Options.Count; i++)
                     {
                         if (Options[i].Selected)
                         {
-                            uint mask = 1;
-                            uint shifted = mask << i;
-                            total |= (int)shifted;
+                            var bit = 1UL << i;
+                            total |= bit;
                         }
                     }
                     return total;
@@ -796,11 +795,11 @@ namespace xivModdingFramework.Mods
 
                 if (group.OptionType == EOptionType.Single)
                 {
-                    wizOp.Selected = pGroup.DefaultSettings == idx;
+                    wizOp.Selected = pGroup.DefaultSettings == (ulong)idx;
                 }
                 else
                 {
-                    var bit = 1 << idx;
+                    var bit = 1UL << idx;
                     wizOp.Selected = (pGroup.DefaultSettings & bit) != 0;
                 }
                 group.Options.Add(wizOp);

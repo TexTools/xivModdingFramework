@@ -350,18 +350,19 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     var selected = group.DefaultSettings;
 
                     // If the user selected custom settings, use those.
-                    if (group.SelectedSettings >= 0)
+                    if (group.SelectedSettings.HasValue)
                     {
-                        selected = group.SelectedSettings;
+                        selected = group.SelectedSettings.Value;
                     }
 
                     if (group.Type == "Single")
                     {
-                        if (selected < 0 || selected >= group.Options.Count)
+                        var selectedIdx = (int)selected;
+                        if (selected < 0 || selectedIdx >= group.Options.Count)
                         {
                             selected = 0;
                         }
-                        var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, groupIdx, optionIdx);
+                        var groupRes = await ImportOption(group.Options[selectedIdx], unzippedPath, tx, progress, groupIdx, optionIdx);
                         UnionDict(imported, groupRes.Imported);
                         notImported.UnionWith(groupRes.NotImported);
                     }
@@ -373,7 +374,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         foreach(var op in ordered)
                         {
                             var i = group.Options.IndexOf(op);
-                            var value = 1 << i;
+                            var value = 1UL << i;
                             if ((selected & value) > 0)
                             {
                                 var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, groupIdx, optionIdx);
@@ -393,7 +394,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         // Bitmask options.
                         for (int i = 0; i < group.Options.Count; i++)
                         {
-                            var value = 1 << i;
+                            var value = 1UL << i;
                             if ((selected & value) > 0)
                             {
                                 var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
@@ -1334,10 +1335,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Type = "";
 
         // Only used internally when the user is selecting options during install/application.
-        [JsonIgnore] public int SelectedSettings = -1;
+        [JsonIgnore] public ulong? SelectedSettings = null;
 
         // Either single Index or Bitflag.
-        public int DefaultSettings;
+        public ulong DefaultSettings;
         
         public List<PMPOptionJson> Options = new List<PMPOptionJson>();
     }
