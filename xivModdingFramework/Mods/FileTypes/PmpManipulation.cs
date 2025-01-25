@@ -315,7 +315,7 @@ namespace xivModdingFramework.Mods.FileTypes
             public byte VfxId;
             public byte MaterialAnimationId;
 
-            // Are these redundantly stored?
+            [JsonIgnore]
             public ushort AttributeAndSound;
             public ushort AttributeMask;
             public byte SoundId;
@@ -345,10 +345,10 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
         public PMPImcEntry Entry;
+        public PMPObjectType ObjectType;
         public uint PrimaryId;
         public uint SecondaryId;
         public uint Variant;
-        public PMPObjectType ObjectType;
         public PMPEquipSlot EquipSlot;
         public PMPObjectType BodySlot;
 
@@ -432,6 +432,7 @@ namespace xivModdingFramework.Mods.FileTypes
         public uint SetId;
         public PMPEquipSlot Slot;
 
+        [JsonIgnore]
         public ushort ShiftedEntry
         {
             get
