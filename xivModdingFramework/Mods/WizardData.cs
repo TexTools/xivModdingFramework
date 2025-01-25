@@ -1554,42 +1554,58 @@ namespace xivModdingFramework.Mods
                 // their file identifier and internal path information
                 var identifiers = await FileIdentifier.IdentifierListFromDictionaries(allFiles);
 
-                bool defaultModOnly = false;
+                WizardGroupEntry defaultModGroup = null;
 
-                if (optionCount == 1)
+                if (optionCount >= 1)
                 {
-                    WizardGroupEntry firstGroup = DataPages.First(x => x.Groups.Count > 0)?.Groups?.First(x => x.Options.Count > 0);
-
-                    if (firstGroup != null && firstGroup.ImcData == null)
-                    {
-                        var sg = await firstGroup.ToPmpGroup(tempFolder, identifiers, 0, true);
-                        var so = sg.Options[0] as PmpStandardOptionJson;
-
-                        if (so != null)
-                        {
-                            pmp.DefaultMod.Files = so.Files;
-                            pmp.DefaultMod.FileSwaps = so.FileSwaps;
-                            pmp.DefaultMod.Manipulations = so.Manipulations;
-                            defaultModOnly = true;
-                        }
-                    }
-                }
-                
-                if (!defaultModOnly)
-                {
-                    // This both constructs the JSON structure and writes our files to their
-                    // real location in the folder tree in the temp folder.
-                    var page = 0;
+                    // Synthesize a PMP default mod from wizard data if an appropriate looking single-option mod group is present.
                     foreach (var p in DataPages)
                     {
                         foreach (var g in p.Groups)
                         {
-                            var gPrefix = MakeGroupPrefix(p, g);
-                            var pg = await g.ToPmpGroup(tempFolder, identifiers, page);
-                            pmp.Groups.Add(pg);
+                            if (g.GroupType == EGroupType.Standard
+                                && (g.Name == "Default" || g.Name == "Default Group")
+                                && g.Options.Count == 1
+                                && (g.Options[0].Name == "Default" || g.Options[0].Name == "Default Option"))
+                            {
+                                var sg = await g.ToPmpGroup(tempFolder, identifiers, 0, true);
+                                var so = sg.Options[0] as PmpStandardOptionJson;
+
+                                if (so != null)
+                                {
+                                    pmp.DefaultMod.Files = so.Files;
+                                    pmp.DefaultMod.FileSwaps = so.FileSwaps;
+                                    pmp.DefaultMod.Manipulations = so.Manipulations;
+                                    defaultModGroup = g;
+                                    break;
+                                }
+                            }
                         }
-                        page++;
+
+                        if (defaultModGroup != null)
+                            break;
                     }
+                }
+                
+                // This both constructs the JSON structure and writes our files to their
+                // real location in the folder tree in the temp folder.
+                var page = 0;
+                foreach (var p in DataPages)
+                {
+                    var numGroupsThisPage = 0;
+                    foreach (var g in p.Groups)
+                    {
+                        // Skip the group that was used to generate DefaultMod, if any
+                        if (g == defaultModGroup)
+                            continue;
+
+                        var gPrefix = MakeGroupPrefix(p, g);
+                        var pg = await g.ToPmpGroup(tempFolder, identifiers, page);
+                        pmp.Groups.Add(pg);
+                        ++numGroupsThisPage;
+                    }
+                    if (numGroupsThisPage > 0)
+                        page++;
                 }
 
 
