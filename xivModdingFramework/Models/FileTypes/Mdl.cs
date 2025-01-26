@@ -348,7 +348,6 @@ namespace xivModdingFramework.Models.FileTypes
 
         public static XivMdl GetXivMdl(byte[] mdlData, string mdlPath = "")
         {
-
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
             var getShapeData = true;
@@ -1019,7 +1018,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
-                    var lodNum = 0;
+                var lodNum = 0;
                 var totalMeshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
@@ -1031,16 +1030,12 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         throw new Exception("Failed to parse some meshes in previous LoD level.");
                     }
-
-                    // Seek to the start of the LoD.
-                    br.BaseStream.Seek(lod.VertexDataOffset, SeekOrigin.Begin);
-                    var LoDStart = br.BaseStream.Position;
                     
                     var mIdx = 0;
 
                     foreach (var meshData in meshDataList)
                     {
-                        MdlVertexReader.ReadVertexData(br, meshData, lod.VertexDataOffset, lod.IndexDataOffset);
+                        MdlVertexReader.ReadVertexData(mdlData, meshData, lod.VertexDataOffset, lod.IndexDataOffset);
 
                         mIdx++;
                         totalMeshNum++;
