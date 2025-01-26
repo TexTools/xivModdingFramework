@@ -744,6 +744,11 @@ namespace xivModdingFramework.Helpers
             sourcePath = MakeLongPath(sourcePath);
             targetPath = MakeLongPath(targetPath);
 
+            // \\?\ prefixed Long File Names will fail if there's double slashes in a path
+            // Guarantee the source and target both have trailing slashes to avoid accidentally creating a double slash
+            if (!sourcePath.EndsWith("\\")) sourcePath += "\\";
+            if (!targetPath.EndsWith("\\")) targetPath += "\\";
+
             Directory.CreateDirectory(targetPath);
 
             //Now Create all of the directories
@@ -765,6 +770,8 @@ namespace xivModdingFramework.Helpers
         {
             if (!path.StartsWith("\\\\?\\"))
             {
+                while (path.Contains("\\\\"))
+                    path = path.Replace("\\\\", "\\");
                 path = "\\\\?\\" + path;
             }
             return path.Replace("/", "\\");
