@@ -97,6 +97,7 @@ namespace xivModdingFramework.Models.DataContainers
 
         /// <summary>
         /// Unknown Usage
+        /// This appears to be multiple individual byte values, with the first 2 being related to neck morph data
         /// </summary>
         public int Unknown7 { get; set; }
 

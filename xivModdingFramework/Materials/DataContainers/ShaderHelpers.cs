@@ -391,6 +391,8 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0xB5545FBB, "g_NormalScale", true);
                 UpdateConstantName(shKv.Key, 0x800EE35F, "g_SheenRate", true);
                 UpdateConstantName(shKv.Key, 0x1F264897, "g_SheenTintRate", true);
+                UpdateConstantName(shKv.Key, 0xD925FF32, "g_ShadowAlphaThreshold", true);
+                UpdateConstantName(shKv.Key, 0x5351646E, "g_ShadowPosOffset", true);
                 UpdateConstantName(shKv.Key, 0xF490F76E, "g_SheenAperture", true);
                 UpdateConstantName(shKv.Key, 0x50E36D56, "g_IrisRingColor", true);
                 UpdateConstantName(shKv.Key, 0x66C93D3E, "g_IrisThickness", true);
@@ -516,6 +518,8 @@ namespace xivModdingFramework.Materials.DataContainers
             g_Sampler = 0x88408C04,
             g_Sampler0 = 0x213CB439,
             g_Sampler1 = 0x563B84AF,
+            g_SkySampler = 0xB4C285EF,
+            g_FogWeightLutSampler = 0x6E231669,
 
         };
 
