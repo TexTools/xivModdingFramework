@@ -440,7 +440,9 @@ namespace xivModdingFramework.Models.Helpers
                     uniqueVertexIds.Sort();
 
                     // Maps old vertex ID to new vertex ID.
-                    var vertMap = new int[uniqueVertexIds.Max() + 1];
+                    var vertMap = Array.Empty<int>();
+                    if (uniqueVertexIds.Count > 0)
+                        vertMap = new int[uniqueVertexIds.Max() + 1];
 
                     // Now we need to loop through, copy over the vertex data, keeping track of the new vertex IDs.
                     ttPart.Vertices = new List<TTVertex>(uniqueVertexIds.Count);
