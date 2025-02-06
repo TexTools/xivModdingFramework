@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyVersion>1.7.0.0</AssemblyVersion>
-    <Version>1.7.0</Version>
+    <AssemblyVersion>1.8.0.0</AssemblyVersion>
+    <Version>1.8.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>9.0</LangVersion>
     <Configurations>Debug;Release;Endwalker Debug;Endwalker Release</Configurations>
@@ -43,7 +43,7 @@
 
  <PropertyGroup>
     <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
-    <FileVersion>1.7.0.0</FileVersion>
+    <FileVersion>1.8.0.0</FileVersion>
  </PropertyGroup>
 
  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

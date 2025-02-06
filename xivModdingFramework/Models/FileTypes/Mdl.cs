@@ -348,7 +348,6 @@ namespace xivModdingFramework.Models.FileTypes
 
         public static XivMdl GetXivMdl(byte[] mdlData, string mdlPath = "")
         {
-
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
             var getShapeData = true;
@@ -894,7 +893,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
-                #region Part Bone Sets & Padding
+                #region Part Bone Sets
                 // Bone index for Parts
                 var partBoneSet = new BoneSet
                 {
@@ -908,7 +907,43 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 xivMdl.PartBoneSets = partBoneSet;
+                #endregion
 
+                #region Neck Morph Data
+                // Neck morph data (appears on face models new in Patch 7.1)
+                xivMdl.NeckMorphTable = new List<NeckMorphEntry>();
+                for (var i = 0; i < xivMdl.ModelData.NeckMorphTableSize; ++i)
+                {
+                    var neckMorphDataEntry = new NeckMorphEntry
+                    {
+                        PositionAdjust = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()),
+                        Unknown = br.ReadUInt32(),
+                        NormalAdjust = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()),
+                        Bones = new List<short>()
+                    };
+                    byte[] neckBoneTable = br.ReadBytes(4);
+                    // Weird code alert:
+                    // - Most vanilla heads legitimately have a zero value in the second slot of the table.
+                    // - Female Hrothgar heads legitimately have a zero value in the first slot of the table.
+                    // - Values in the third and fourth slot seem to be unused, and also seem to use 0 as a padding or null value.
+                    // - However, at least one vanilla model seems to have a non-zero value in the third slot of the table.
+                    // Therefore, only in the third and fourth slot is a zero value treated as an early list terminator.
+                    // This means the table should always contain at least two bones.
+                    for (int j = 0; j < neckBoneTable.Length; ++j)
+                    {
+                        int boneset0_index = neckBoneTable[j];
+                        if (j >= 2 && boneset0_index == 0) break; // Treat this case as an early list terminator.
+                        // Resolve the bone to an index in the bone path table here, to make the in-memory representation a little more normal
+                        if (xivMdl.MeshBoneSets.Count > 0 && xivMdl.MeshBoneSets[0].BoneIndices.Count() > boneset0_index)
+                        {
+                            neckMorphDataEntry.Bones.Add(xivMdl.MeshBoneSets[0].BoneIndices[boneset0_index]);
+                        }
+                    }
+                    xivMdl.NeckMorphTable.Add(neckMorphDataEntry);
+                }
+                #endregion
+
+                #region Padding
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
                 xivMdl.PaddedBytes = br.ReadBytes(xivMdl.PaddingSize);
@@ -983,7 +1018,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
-                    var lodNum = 0;
+                var lodNum = 0;
                 var totalMeshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
@@ -995,16 +1030,12 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         throw new Exception("Failed to parse some meshes in previous LoD level.");
                     }
-
-                    // Seek to the start of the LoD.
-                    br.BaseStream.Seek(lod.VertexDataOffset, SeekOrigin.Begin);
-                    var LoDStart = br.BaseStream.Position;
                     
                     var mIdx = 0;
 
                     foreach (var meshData in meshDataList)
                     {
-                        MdlVertexReader.ReadVertexData(br, meshData, lod.VertexDataOffset, lod.IndexDataOffset);
+                        MdlVertexReader.ReadVertexData(mdlData, meshData, lod.VertexDataOffset, lod.IndexDataOffset);
 
                         mIdx++;
                         totalMeshNum++;
@@ -2987,8 +3018,10 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.Add(bgChangeIdx);
                 basicModelBlock.Add(crestChangeIdx);
 
-                // More Unknowns
-                basicModelBlock.Add(ogModelData.Unknown12);
+                // Using neck morph data from original modal
+                // The field currently named LevelOfDetail.Unknown7 also contains this number, and also gets copied from the original model
+                var neckMorphTableSizePointer = basicModelBlock.Count; // we want to reset this to 0 later if the neck data cannot be preserved
+                basicModelBlock.Add(ogModelData.NeckMorphTableSize);
 
                 // We fix this pointer later after bone table is done.
                 var boneSetSizePointer = basicModelBlock.Count;
@@ -3537,6 +3570,64 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
+                // Neck Morph Data
+                #region Neck Morph Data
+                var neckMorphDataBlock = new List<byte>();
+                // Preserve the original model's neck morph data if present -- but update the bone references inside of it
+                // Bone references are made via BoneSet[0]
+                for (int i = 0; i < ogMdl.NeckMorphTable.Count; ++i)
+                {
+                    // Extract the original data (except the bone list)
+                    var positionAdjust = ogMdl.NeckMorphTable[i].PositionAdjust;
+                    var unknown = ogMdl.NeckMorphTable[i].Unknown;
+                    var normalAdjust = ogMdl.NeckMorphTable[i].NormalAdjust;
+                    var bones = new List<byte>();
+
+                    // Look up the originally referenced bone by name, and map it to the same bone in the imported model
+                    for (int j = 0; j < ogMdl.NeckMorphTable[i].Bones.Count; ++j)
+                    {
+                        string ogBoneName = ogMdl.PathData.BoneList[ogMdl.NeckMorphTable[i].Bones[j]];
+                        int boneset0Index = -1;
+
+                        if (ttModel.MeshGroups.Count > 0)
+                        {
+                            boneset0Index = ttModel.MeshGroups[0].Bones.FindIndex(x => x == ogBoneName);
+                        }
+
+                        // If a bone can't be located in the new model, just discard all of the neck morph data
+                        if (boneset0Index == -1 || boneset0Index > 255)
+                        {
+                            loggingFunction(true, "Could not match bones in neck morph data, so the data was discarded!");
+                            // Reset the table size to 0 in the model header and drop the data
+                            // (Two bytes are also cleared later on when writing the LODs)
+                            basicModelBlock[neckMorphTableSizePointer] = 0;
+                            neckMorphDataBlock = new List<byte>();
+                            break;
+                        }
+
+                        bones.Add((byte)boneset0Index);
+                    }
+
+                    // Serialize
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.X));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.Y));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.Z));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(unknown));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(normalAdjust.X));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(normalAdjust.Y));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(normalAdjust.Z));
+
+                    // Bone list is always 4 bytes -- pad with zeroes
+                    for (int j = 0; j < 4; ++j)
+                    {
+                        if (j < bones.Count)
+                            neckMorphDataBlock.Add(bones[j]);
+                        else
+                            neckMorphDataBlock.Add(0);
+                    }
+                }
+                #endregion
+
                 // Padding 
                 #region Padding Data Block
 
@@ -3692,7 +3783,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This is the offset to the beginning of the vertex data
                 var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraMeshesBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
-                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
+                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + neckMorphDataBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
 
                 var lodDataBlock = new List<byte>();
                 List<int> indexStartInjectPointers = new List<int>();
@@ -3735,6 +3826,14 @@ namespace xivModdingFramework.Models.FileTypes
                 lodDataBlock.AddRange(BitConverter.GetBytes(ogMdl.LoDList[0].Unknown6));
                 lodDataBlock.AddRange(BitConverter.GetBytes(ogMdl.LoDList[0].Unknown7));
 
+                // If the neck morph data was discarded -- clear the morph counts here too
+                // (The first 2 bytes of what is currently named "Unknown7" seem to refer to the size of this table)
+                if (ogMdl.NeckMorphTable.Count > 0 && neckMorphDataBlock.Count == 0)
+                {
+                    lodDataBlock[lodDataBlock.Count - 4] = 0;
+                    lodDataBlock[lodDataBlock.Count - 3] = 0;
+                }
+
                 // Vertex & Index Sizes
                 lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataSize));
                 lodDataBlock.AddRange(BitConverter.GetBytes(indexDataSize));
@@ -3771,6 +3870,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(boneSetsBlock);
                 modelDataBlock.AddRange(FullShapeDataBlock);
                 modelDataBlock.AddRange(partBoneSetsBlock);
+                modelDataBlock.AddRange(neckMorphDataBlock);
                 modelDataBlock.AddRange(paddingDataBlock);
                 modelDataBlock.AddRange(boundingBoxDataBlock);
                 modelDataBlock.AddRange(boneBoundingBoxDataBlock);

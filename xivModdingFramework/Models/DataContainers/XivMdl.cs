@@ -141,5 +141,10 @@ namespace xivModdingFramework.Models.DataContainers
         /// This happens when the sum of all LoD mesh counts is less than the model data mesh count
         /// </remarks>
         public List<MeshData> ExtraMeshData { get; set; }
+
+        /// <summary>
+        /// This data is present on heads and seems to affect the shape of the neck on the body mesh
+        /// </summary>
+        public List<NeckMorphEntry> NeckMorphTable { get; set; }
     }
 }

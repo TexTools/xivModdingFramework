@@ -25,6 +25,7 @@ namespace xivModdingFramework.Mods.FileTypes
     [JsonSubtypes.KnownSubType(typeof(PMPEqdpManipulationWrapperJson), "Eqdp")]
     [JsonSubtypes.KnownSubType(typeof(PMPGmpManipulationWrapperJson), "Gmp")]
     [JsonSubtypes.KnownSubType(typeof(PMPRspManipulationWrapperJson), "Rsp")]
+    [JsonSubtypes.KnownSubType(typeof(PMPAtchManipulationWrapperJson), "Atch")]
     [JsonSubtypes.KnownSubType(typeof(PMPGlobalEqpManipulationWrapperJson), "GlobalEqp")]
     public class PMPManipulationWrapperJson
     {
@@ -168,6 +169,23 @@ namespace xivModdingFramework.Mods.FileTypes
             return base.GetNiceName() + " - " + Manipulation.SubRace + " " + Manipulation.Attribute;
         }
     }
+    public class PMPAtchManipulationWrapperJson : PMPManipulationWrapperJson
+    {
+        [JsonProperty(Order = 2)]
+        public PMPAtchManipulationJson Manipulation = new PMPAtchManipulationJson();
+        public override object GetManipulation()
+        {
+            return Manipulation;
+        }
+        public override void SetManipulation(object o)
+        {
+            Manipulation = o as PMPAtchManipulationJson;
+        }
+        public override string GetNiceName()
+        {
+            return base.GetNiceName() + " - " + Manipulation.Race + " " + Manipulation.Gender + " " + Manipulation.Type + " [" + Manipulation.Index + "]";
+        }
+    }
     public class PMPGlobalEqpManipulationWrapperJson : PMPManipulationWrapperJson
     {
         [JsonProperty(Order = 2)]
@@ -297,7 +315,7 @@ namespace xivModdingFramework.Mods.FileTypes
             public byte VfxId;
             public byte MaterialAnimationId;
 
-            // Are these redundantly stored?
+            [JsonIgnore]
             public ushort AttributeAndSound;
             public ushort AttributeMask;
             public byte SoundId;
@@ -327,10 +345,10 @@ namespace xivModdingFramework.Mods.FileTypes
             }
         }
         public PMPImcEntry Entry;
+        public PMPObjectType ObjectType;
         public uint PrimaryId;
         public uint SecondaryId;
         public uint Variant;
-        public PMPObjectType ObjectType;
         public PMPEquipSlot EquipSlot;
         public PMPObjectType BodySlot;
 
@@ -414,6 +432,7 @@ namespace xivModdingFramework.Mods.FileTypes
         public uint SetId;
         public PMPEquipSlot Slot;
 
+        [JsonIgnore]
         public ushort ShiftedEntry
         {
             get
@@ -793,6 +812,29 @@ namespace xivModdingFramework.Mods.FileTypes
         }
 
     }
+    public class PMPAtchManipulationJson
+    {
+        public struct PMPAtchEntry
+        {
+            public string Bone;
+            public float Scale;
+
+            public float OffsetX;
+            public float OffsetY;
+            public float OffsetZ;
+
+            public float RotationX;
+            public float RotationY;
+            public float RotationZ;
+        }
+
+        public PMPAtchEntry Entry;
+        public PMPGender Gender;
+        public PMPModelRace Race;
+        public string Type;
+        public int Index;
+    }
+
     public class PMPGlobalEqpManipulationJson
     {
         public GlobalEqpType Type;

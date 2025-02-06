@@ -13,7 +13,7 @@ namespace xivModdingFramework.Models.FileTypes
 {
     internal static class MdlVertexReader
     {
-        public static void ReadVertexData(BinaryReader br, MeshData meshData, int lodVertexOffset, int lodIndexOffset)
+        public static void ReadVertexData(byte[] mdlData, MeshData meshData, int lodVertexOffset, int lodIndexOffset)
         {
             var vertexData = new VertexData();
 
@@ -24,45 +24,37 @@ namespace xivModdingFramework.Models.FileTypes
             var block1Offset = meshData.MeshInfo.VertexDataOffset1 + lodVertexOffset;
             var indexOffset = (meshData.MeshInfo.IndexDataOffset * 2) + lodIndexOffset;
 
-            br.BaseStream.Seek(block0Offset, SeekOrigin.Begin);
-            var block0Sorted = info.Where(x => x.DataBlock == 0).OrderBy(x => x.DataOffset);
-            for(int i = 0; i < vertexCount; i++)
+            var block0Sorted = info.Where(x => x.DataBlock == 0).OrderBy(x => x.DataOffset).ToList();
+            var block1Sorted = info.Where(x => x.DataBlock == 1).OrderBy(x => x.DataOffset).ToList();
+
+            var block0Reader = new BinaryReader(new MemoryStream(mdlData, block0Offset, vertexCount * meshData.MeshInfo.VertexDataEntrySize0));
+            for (int i = 0; i < vertexCount; i++)
             {
-                foreach(var entry in block0Sorted)
+                foreach (var entry in block0Sorted)
                 {
-                    ReadData(vertexData, br, entry.DataUsage, entry.DataType, entry.Count);
+                    ReadData(vertexData, block0Reader, entry.DataUsage, entry.DataType, entry.Count);
                 }
             }
 
-            if(br.BaseStream.Position != block0Offset + (vertexCount * meshData.MeshInfo.VertexDataEntrySize0))
-            {
+            if (block0Reader.BaseStream.Position != block0Reader.BaseStream.Length)
                 throw new InvalidDataException("Vertex Data Size Mismatch. Some part(s) of the vertex data in stream 0 were not read properly.");
-            }
 
-            br.BaseStream.Seek(block1Offset, SeekOrigin.Begin);
-            var block1Sorted = info.Where(x => x.DataBlock == 1).OrderBy(x => x.DataOffset);
+            var block1Reader = new BinaryReader(new MemoryStream(mdlData, block1Offset, vertexCount * meshData.MeshInfo.VertexDataEntrySize1));
             for (int i = 0; i < vertexCount; i++)
             {
                 foreach (var entry in block1Sorted)
                 {
-                    ReadData(vertexData, br, entry.DataUsage, entry.DataType, entry.Count);
+                    ReadData(vertexData, block1Reader, entry.DataUsage, entry.DataType, entry.Count);
                 }
             }
 
-            if (br.BaseStream.Position != block1Offset + (vertexCount * meshData.MeshInfo.VertexDataEntrySize1))
-            {
+            if (block1Reader.BaseStream.Position != block1Reader.BaseStream.Length)
                 throw new InvalidDataException("Vertex Data Size Mismatch. Some part(s) of the vertex data in stream 1 were not read properly.");
-            }
 
-            br.BaseStream.Seek(indexOffset, SeekOrigin.Begin);
+            var indexReader = new BinaryReader(new MemoryStream(mdlData, indexOffset, indexCount * 2));
             for (var i = 0; i < indexCount; i++)
             {
-                vertexData.Indices.Add(br.ReadUInt16());
-            }
-
-            if (br.BaseStream.Position != indexOffset + (indexCount * 2))
-            {
-                throw new InvalidDataException("Index Size Mismatch. Some part(s) of the index data were not read properly.");
+                vertexData.Indices.Add(indexReader.ReadUInt16());
             }
 
             meshData.VertexData = vertexData;

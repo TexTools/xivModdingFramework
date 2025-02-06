@@ -172,7 +172,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// </summary>
         public byte BgCrestChangeMaterialIndex { get; set; }
 
-        public byte Unknown12 { get; set; }
+        public byte NeckMorphTableSize { get; set; }
 
         /// <summary>
         /// Unknown Usage
@@ -241,7 +241,7 @@ namespace xivModdingFramework.Models.DataContainers
                 BgChangeMaterialIndex = br.ReadByte(),
                 BgCrestChangeMaterialIndex = br.ReadByte(),
 
-                Unknown12 = br.ReadByte(),
+                NeckMorphTableSize = br.ReadByte(),
                 BoneSetSize = br.ReadInt16(),
 
                 Unknown13 = br.ReadInt16(),
@@ -278,7 +278,7 @@ namespace xivModdingFramework.Models.DataContainers
             br.Write((byte)Flags3);
             br.Write(BgChangeMaterialIndex);
             br.Write(BgCrestChangeMaterialIndex);
-            br.Write(Unknown12);
+            br.Write(NeckMorphTableSize);
             br.Write(BoneSetSize);
             br.Write(Unknown13);
             br.Write(Unknown14);

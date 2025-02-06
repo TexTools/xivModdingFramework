@@ -421,7 +421,6 @@ namespace xivModdingFramework.Models.Helpers
 
                 for (var pi = 0; pi < totalParts; pi++)
                 {
-
                     var ttPart = new TTMeshPart();
                     ttMesh.Parts.Add(ttPart);
                     ttPart.Name = "Part " + partIdx;
@@ -431,24 +430,23 @@ namespace xivModdingFramework.Models.Helpers
                     var indexStart = fakePart == false ? basePart.IndexOffset - baseMesh.MeshInfo.IndexDataOffset : 0;
                     var indexCount = fakePart == false ? basePart.IndexCount : baseMesh.MeshInfo.IndexCount;
 
-                    var indices = baseMesh.VertexData.Indices.GetRange(indexStart, indexCount);
+                    var indices = baseMesh.VertexData.Indices.Skip(indexStart).Take(indexCount);
 
                     // Get the Vertices unique to this part.
-                    var uniqueVertexIdSet = new SortedSet<int>(indices); // Maximum possible amount is # of indices, though likely it is less.
-
-                    foreach (var ind in indices)
-                    {
-                        uniqueVertexIdSet.Add(ind);
-                    }
+                    var uniqueVertexIdSet = new HashSet<int>(indices);
 
                     // Need it as a list to have index access to it.
-                    var uniqueVertexIds = uniqueVertexIdSet.ToList();
+                    var uniqueVertexIds = new List<int>(uniqueVertexIdSet);
+                    uniqueVertexIds.Sort();
 
                     // Maps old vertex ID to new vertex ID.
-                    var vertDict = new Dictionary<int, int>(uniqueVertexIds.Count);
+                    var vertMap = Array.Empty<int>();
+                    if (uniqueVertexIds.Count > 0)
+                        vertMap = new int[uniqueVertexIds.Max() + 1];
 
                     // Now we need to loop through, copy over the vertex data, keeping track of the new vertex IDs.
                     ttPart.Vertices = new List<TTVertex>(uniqueVertexIds.Count);
+
                     for (var i = 0; i < uniqueVertexIds.Count; i++)
                     {
                         var oldVertexId = uniqueVertexIds[i];
@@ -556,14 +554,14 @@ namespace xivModdingFramework.Models.Helpers
                         }
 
                         ttPart.Vertices.Add(ttVert);
-                        vertDict.Add(oldVertexId, ttPart.Vertices.Count - 1);
+                        vertMap[oldVertexId] = ttPart.Vertices.Count - 1;
                     }
 
                     // Now we need to copy in the triangle indices, pointing to the new, part-level vertex IDs.
-                    ttPart.TriangleIndices = new List<int>(indices.Count);
+                    ttPart.TriangleIndices = new List<int>(indexCount);
                     foreach (var oldVertexId in indices)
                     {
-                        ttPart.TriangleIndices.Add(vertDict[oldVertexId]);
+                        ttPart.TriangleIndices.Add(vertMap[oldVertexId]);
                     }
 
                     // Ok, gucci now.
