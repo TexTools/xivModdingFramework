@@ -1004,9 +1004,10 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
                 else { 
-                    if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
-                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8)
-                        && xivMdl.LoDList[1].VertexDataSize == 0)
+                    if ((xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
+                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                        && xivMdl.LoDList[1].VertexDataSize == 0 // Avoid applying this fix to vanilla models
+                        && xivMdl.ModelData.NeckMorphTableSize != 0x0A) // Avoid applying to face models, which were written incorrectly after patch 7.1
                     {
 
                         var delta = (int)(xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
@@ -3607,6 +3608,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                         bones.Add((byte)boneset0Index);
                     }
+
+                    // Fully abort building neck data if we gave up inside the previous loop
+                    if (basicModelBlock[neckMorphTableSizePointer] == 0)
+                        break;
 
                     // Serialize
                     neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.X));
