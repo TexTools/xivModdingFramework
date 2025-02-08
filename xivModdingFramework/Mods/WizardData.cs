@@ -514,17 +514,12 @@ namespace xivModdingFramework.Mods
             PMPOptionJson op;
             if (GroupType == EGroupType.Imc)
             {
-                if (ImcData.IsDisableOption)
-                {
-                    var io = new PmpDisableImcOptionJson();
-                    op = io;
-                }
-                else
-                {
-                    var io = new PmpImcOptionJson();
-                    op = io;
+                var io = new PmpImcOptionJson();
+                op = io;
+                if (!ImcData.IsDisableOption)
                     io.AttributeMask = ImcData.AttributeMask;
-                }
+                else
+                    io.IsDisableSubMod = true;
             }
             else
             {
@@ -831,17 +826,10 @@ namespace xivModdingFramework.Mods
                 {
                     var imcData = new WizardImcOptionData();
                     var imcOp = o as PmpImcOptionJson;
-                    if (imcOp != null)
-                    {
-                        imcData.IsDisableOption = false;
+                    if (!imcOp.IsDisableSubMod)
                         imcData.AttributeMask = imcOp.AttributeMask;
-                    }
-                    var defOp = o as PmpDisableImcOptionJson;
-                    if (defOp != null)
-                    {
-                        imcData.IsDisableOption = defOp.IsDisableSubMod;
-                        imcData.AttributeMask = 0;
-                    }
+                    else
+                        imcData.IsDisableOption = imcOp.IsDisableSubMod;
                     wizOp.ImcData = imcData;
                 }
 
