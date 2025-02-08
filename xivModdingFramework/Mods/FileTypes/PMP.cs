@@ -419,6 +419,26 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         {
                             var root = imcGroup.GetRoot();
                             var metaData = await GetImportMetadata(imported, root, tx);
+
+                            // If the OnlyAttribute flag is set on the group, fill in the fields that should be ignored from the current values instead
+                            // ( The source can be null, in the case that we're going to be synthesizing new variants from thin air )
+                            void CopyNonMaskImcValues(XivImc xivImc, XivImc src)
+                            {
+                                xivImc.Animation = src?.Animation ?? 0;
+                                xivImc.SoundId = src?.SoundId ?? 0;
+                                xivImc.MaterialSet = src?.MaterialSet ?? 0;
+                                xivImc.Decal = src?.Decal ?? 0;
+                                xivImc.Vfx = src?.Vfx ?? 0;
+                            };
+
+                            if (imcGroup.OnlyAttributes)
+                            {
+                                XivImc copyFromEntry = null;
+                                if (imcGroup.Identifier.Variant < metaData.ImcEntries.Count)
+                                    copyFromEntry = metaData.ImcEntries[(int)imcGroup.Identifier.Variant];
+                                CopyNonMaskImcValues(xivImc, copyFromEntry);
+                            }
+
                             if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
                             {
                                 while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
@@ -435,7 +455,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             {
                                 for (int i = 0; i < metaData.ImcEntries.Count; i++)
                                 {
-                                    metaData.ImcEntries[i] = (XivImc)xivImc.Clone();
+                                    var variantXivImc = (XivImc)xivImc.Clone();
+                                    if (imcGroup.OnlyAttributes)
+                                        CopyNonMaskImcValues(variantXivImc, metaData.ImcEntries[i]);
+                                    metaData.ImcEntries[i] = variantXivImc;
                                 }
                             }
 
