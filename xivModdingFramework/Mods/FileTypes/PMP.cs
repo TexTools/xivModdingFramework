@@ -401,15 +401,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             var value = 1UL << i;
                             if ((selected & value) > 0)
                             {
-                                var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
-                                if (disableOpt != null)
+                                var opt = group.Options[i] as PmpImcOptionJson;
+                                if (opt.IsDisableSubMod)
                                 {
                                     // No options allowed >:|
                                     disabled = true;
                                     break;
                                 }
 
-                                var opt = group.Options[i] as PmpImcOptionJson;
                                 optionIdx++;
 
                                 xivImc.AttributeMask |= opt.AttributeMask;
@@ -1479,16 +1478,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public int Priority = 0;
     }
 
-    public class PmpDisableImcOptionJson : PMPOptionJson
-    {
-        public bool IsDisableSubMod = true;
-    }
-
-    [JsonConverter(typeof(JsonSubtypes))]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
     public class PmpImcOptionJson : PMPOptionJson
     {
-        public ushort AttributeMask;
+        public bool IsDisableSubMod = false;
+        public ushort AttributeMask = 0;
+
+        public bool ShouldSerializeIsDisableSubMod() { return IsDisableSubMod; }
+        public bool ShouldSerializeAttributeMask() { return !IsDisableSubMod; }
     }
 
     #endregion
