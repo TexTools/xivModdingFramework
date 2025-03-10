@@ -680,7 +680,8 @@ namespace xivModdingFramework.Cache
                 match = _slotRegex.Match(internalFilePath);
                 if (match.Success)
                 {
-                    info.Slot = match.Groups[1].Value;
+                    if (XivItemTypes.GetAvailableSlots(info.PrimaryType).Contains(match.Groups[1].Value))
+                        info.Slot = match.Groups[1].Value;
                 }
             }
             else
