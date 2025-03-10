@@ -508,7 +508,7 @@ namespace xivModdingFramework.Materials.DataContainers
         public string GetItemTypeIdentifier()
         {
             // This regex feels a little janky, but it's good enough for now.
-            var match = Regex.Match(MTRLPath, "_([a-z]{3})_[a-z0-9]\\.mtrl");
+            var match = Regex.Match(MTRLPath, "_([a-z]{3})_[a-z0-9]+\\.mtrl");
             if (match.Success)
             {
                 return "_" + match.Groups[1].Value;
