@@ -1757,8 +1757,8 @@ namespace xivModdingFramework.Models.DataContainers
                             model.MeshGroups[matNum].Material = materialPath;
                         }
                     }
-                
 
+                    XivCache.WaitForSqlCleanup();
                     db.Close();
                 }
 
