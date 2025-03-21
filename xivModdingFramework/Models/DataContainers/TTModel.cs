@@ -1476,7 +1476,7 @@ namespace xivModdingFramework.Models.DataContainers
             {
                 loggingFunction = ModelModifiers.NoOp;
             }
-            if (settings == null)
+            if(settings == null)
             {
                 settings = new ModelImportOptions();
             }
@@ -1519,7 +1519,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 }
                                 else
                                 {
-                                    model.MeshGroups[meshNum].MeshType = (EMeshType)Enum.Parse(typeof(EMeshType), t);
+                                    model.MeshGroups[meshNum].MeshType = (EMeshType) Enum.Parse(typeof(EMeshType), t);
                                 }
 
                                 model.MeshGroups[meshNum].Name = reader.GetString("name");
@@ -1546,7 +1546,7 @@ namespace xivModdingFramework.Models.DataContainers
                             }
 
                             // Spawn parts as needed.
-                            while (model.MeshGroups[meshNum].Parts.Count <= partNum)
+                            while(model.MeshGroups[meshNum].Parts.Count <= partNum)
                             {
                                 model.MeshGroups[meshNum].Parts.Add(new TTMeshPart());
 
@@ -1672,15 +1672,14 @@ namespace xivModdingFramework.Models.DataContainers
                             vertex.FlowDirection[0] = reader.GetFloat("flow_u");
                             vertex.FlowDirection[1] = reader.GetFloat("flow_v");
 
-                            if (vertex.Binormal != Vector3.Zero)
+                            if(vertex.Binormal != Vector3.Zero)
                             {
                                 var tangent = Vector3.Cross(vertex.Normal, vertex.Binormal).Normalized();
                                 var dot = Vector3.Dot(tangent, vertex.Tangent);
-                                if (dot < 0.5f)
+                                if(dot < 0.5f)
                                 {
                                     vertex.Handedness = true;
-                                }
-                                else
+                                } else
                                 {
                                     vertex.Handedness = false;
                                 }
@@ -1694,8 +1693,7 @@ namespace xivModdingFramework.Models.DataContainers
                             try
                             {
                                 return reader.GetInt32("vertex_id");
-                            }
-                            catch (Exception ex)
+                            } catch (Exception ex)
                             {
                                 throw ex;
                             }
