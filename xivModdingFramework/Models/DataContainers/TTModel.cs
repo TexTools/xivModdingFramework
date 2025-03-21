@@ -1693,7 +1693,7 @@ namespace xivModdingFramework.Models.DataContainers
                             try
                             {
                                 return reader.GetInt32("vertex_id");
-                            } catch (Exception ex)
+                            } catch(Exception ex)
                             {
                                 throw ex;
                             }
