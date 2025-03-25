@@ -196,16 +196,18 @@ namespace xivModdingFramework.Exd.FileTypes
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
                 { "ModelCharaId", ( 8, ExcelColumnDataType.UInt16 ) },
-                { "Icon", ( 26, ExcelColumnDataType.UInt16 ) },
+                { "Icon", ( 28, ExcelColumnDataType.UInt16 ) },
             };
 
             if (language == XivLanguage.Korean)
             {
                 // Set up overrides here if necessary for KR.
+                columnExpectations["Icon"] = (26, ExcelColumnDataType.UInt16);
             }
             else if (language == XivLanguage.Chinese)
             {
                 // Set up overrides here if necessary for CN.
+                columnExpectations["Icon"] = (26, ExcelColumnDataType.UInt16);
             }
 
             return columnExpectations;
