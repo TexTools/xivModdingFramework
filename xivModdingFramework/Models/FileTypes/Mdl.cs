@@ -3029,11 +3029,19 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.AddRange(BitConverter.GetBytes((short)0));
 
                 // Unknowns that are probably partly padding.
+                // So far since Dawntrail, copying these blindly has only caused problems
+                /*
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown16));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown17));
+                */
+                basicModelBlock.AddRange(BitConverter.GetBytes(new byte[]{0, 0}));
+                basicModelBlock.AddRange(BitConverter.GetBytes(new byte[]{0, 0})); // Patch 7.2 face shadows
+                basicModelBlock.AddRange(BitConverter.GetBytes(new byte[]{0, 0}));
+                basicModelBlock.AddRange(BitConverter.GetBytes(new byte[]{0, 0}));
+                basicModelBlock.AddRange(BitConverter.GetBytes(new byte[]{0, 0}));
 
 
 
@@ -3638,6 +3646,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 var paddingDataBlock = new List<byte>();
 
+                // Since patch 7.2, faces contain extra data inside of the "padding" here
                 paddingDataBlock.Add(ogMdl.PaddingSize);
                 paddingDataBlock.AddRange(ogMdl.PaddedBytes);
 
