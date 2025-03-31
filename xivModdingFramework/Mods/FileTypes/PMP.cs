@@ -43,6 +43,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public static class PMP
     {
         public const int _WriteFileVersion = 3;
+
+        private const char _PMPSafeNameReplacement = '_';
+
         private static bool _ImportActive = false;
         private static string _Source = null;
 
@@ -815,7 +818,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             for(int i = 0; i < pmp.Groups.Count; i++)
             {
-                var gName = IOUtil.MakePathSafe(pmp.Groups[i].Name.ToLower());
+                var gName = PMP.MakePMPPathSafe(pmp.Groups[i].Name);
                 var groupPath = Path.Combine(workingDirectory, "group_" + (i+1).ToString("D3") + "_" + gName + ".json");
                 var groupString = JsonConvert.SerializeObject(pmp.Groups[i], Formatting.Indented);
                 File.WriteAllText(groupPath, groupString);
@@ -1261,9 +1264,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return (seenMetadata.Values.ToList(), seenRgsps.Values.ToList(), otherManipulations);
         }
 
+        private static string MakePMPPathSafe(string fileName)
+        {
+            // This method enforces the naming scheme that penumbra expects for its json components.
+            if (fileName == ".")
+                return new(_PMPSafeNameReplacement, 1);
+
+            if (fileName == "..")
+                return new(_PMPSafeNameReplacement, 2);
+
+            return IOUtil.MakePathSafe(fileName.Normalize(NormalizationForm.FormKC), _PMPSafeNameReplacement, true);
+        }
     }
-
-
 
     #region Penumbra Simple JSON Classes
     public class PMPJson
