@@ -146,5 +146,10 @@ namespace xivModdingFramework.Models.DataContainers
         /// This data is present on heads and seems to affect the shape of the neck on the body mesh
         /// </summary>
         public List<NeckMorphEntry> NeckMorphTable { get; set; }
+
+        /// <summary>
+        /// Currently unknown data
+        /// </summary>
+        public UnknownDataPatch72 UnkDataPatch72 { get; set; }
     }
 }

@@ -943,6 +943,15 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                #region Patch 7.2 Unknown Data
+                // Something to do with shadows (appears on face models new in Patch 7.2)
+                var unkDataPatch72 = new UnknownDataPatch72
+                {
+                    Unknown = br.ReadBytes(xivMdl.ModelData.Patch72TableSize * 16)
+                };
+                xivMdl.UnkDataPatch72 = unkDataPatch72;
+                #endregion
+
                 #region Padding
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
@@ -3030,7 +3039,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Unknowns that are probably partly padding.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
+                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Patch72TableSize));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown16));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown17));
@@ -3633,6 +3642,11 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                // Patch 7.2 Unknown Data
+                #region Patch 7.2 Unknown Data
+                var unknownPatch72DataBlock = ogMdl.UnkDataPatch72.Unknown;
+                #endregion
+
                 // Padding 
                 #region Padding Data Block
 
@@ -3788,7 +3802,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This is the offset to the beginning of the vertex data
                 var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraMeshesBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
-                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + neckMorphDataBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
+                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + neckMorphDataBlock.Count + unknownPatch72DataBlock.Length + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
 
                 var lodDataBlock = new List<byte>();
                 List<int> indexStartInjectPointers = new List<int>();
@@ -3876,6 +3890,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(FullShapeDataBlock);
                 modelDataBlock.AddRange(partBoneSetsBlock);
                 modelDataBlock.AddRange(neckMorphDataBlock);
+                modelDataBlock.AddRange(unknownPatch72DataBlock);
                 modelDataBlock.AddRange(paddingDataBlock);
                 modelDataBlock.AddRange(boundingBoxDataBlock);
                 modelDataBlock.AddRange(boneBoundingBoxDataBlock);

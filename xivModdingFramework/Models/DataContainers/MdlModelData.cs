@@ -187,7 +187,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// Unknown Usage
         /// </summary>
-        public short Unknown14 { get; set; }
+        public short Patch72TableSize { get; set; }
 
         /// <summary>
         /// Padding?
@@ -245,7 +245,7 @@ namespace xivModdingFramework.Models.DataContainers
                 BoneSetSize = br.ReadInt16(),
 
                 Unknown13 = br.ReadInt16(),
-                Unknown14 = br.ReadInt16(),
+                Patch72TableSize = br.ReadInt16(),
                 Unknown15 = br.ReadInt16(),
                 Unknown16 = br.ReadInt16(),
                 Unknown17 = br.ReadInt16()
@@ -281,7 +281,7 @@ namespace xivModdingFramework.Models.DataContainers
             br.Write(NeckMorphTableSize);
             br.Write(BoneSetSize);
             br.Write(Unknown13);
-            br.Write(Unknown14);
+            br.Write(Patch72TableSize);
             br.Write(Unknown15);
             br.Write(Unknown16);
             br.Write(Unknown17);
