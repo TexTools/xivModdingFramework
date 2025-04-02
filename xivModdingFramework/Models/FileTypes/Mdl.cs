@@ -3039,7 +3039,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Unknowns that are probably partly padding.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Patch72TableSize));
+                // XXX: Not preserving new Patch 7.2 face data
+                // It seems to have a dependency on the number of vertices, and thus crashes with custom models with fewer of them
+                // It also has a dependency on the order of vertices, and thus has poor results when Blender decides to shuffle them around...
+                //basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Patch72TableSize));
+                basicModelBlock.AddRange(new byte[] { 0, 0 });
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown16));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown17));
@@ -3644,7 +3648,10 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Patch 7.2 Unknown Data
                 #region Patch 7.2 Unknown Data
-                var unknownPatch72DataBlock = ogMdl.UnkDataPatch72.Unknown;
+                // XXX: Not preserving Patch 7.2 face data
+                //var unknownPatch72DataBlock = ogMdl.UnkDataPatch72.Unknown;
+                var unknownPatch72DataBlock = Array.Empty<byte>();
+
                 #endregion
 
                 // Padding 
