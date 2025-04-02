@@ -40,11 +40,14 @@ using xivModdingFramework.Cache;
 using System.Management;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Text;
 
 namespace xivModdingFramework.Helpers
 {
     public static class IOUtil
     {
+        private static readonly HashSet<char> _InvalidFileNameChars = new(Path.GetInvalidFileNameChars());
+
         /// <summary>
         /// Compresses raw byte data.
         /// </summary>
@@ -729,16 +732,32 @@ namespace xivModdingFramework.Helpers
 
         public static string MakePathSafe(string fileName, bool makeLowercase = true)
         {
-            foreach (var c in Path.GetInvalidFileNameChars())
-            {
-                fileName = fileName.Replace(c, '-');
-            }
-            if (makeLowercase)
-            {
-                fileName = fileName.ToLower();
-            }
-            return fileName.Trim();
+            return IOUtil.MakePathSafe(fileName, '-', makeLowercase);
         }
+
+        public static string MakePathSafe(string fileName, char rep, bool makeLowercase = true)
+        {
+            // This approach walks the string once, and hash lookups are O(1).
+            StringBuilder ret = new(fileName.Length);
+            foreach (var c in fileName)
+            {
+                if (_InvalidFileNameChars.Contains(c))
+                {
+                    ret.Append(rep);
+                }
+                else if (makeLowercase)
+                {
+                    ret.Append(Char.ToLower(c));
+                }
+                else
+                {
+                    ret.Append(c);
+                }
+            }
+
+            return ret.ToString().Trim();
+        }
+
         public static void CopyFolder(string sourcePath, string targetPath)
         {
             sourcePath = MakeLongPath(sourcePath);
@@ -962,6 +981,5 @@ namespace xivModdingFramework.Helpers
                 Trace.WriteLine(ex);
             }
         }
-
     }
 }
