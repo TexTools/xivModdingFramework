@@ -1373,6 +1373,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         [JsonIgnore] public ulong? SelectedSettings = null;
 
         // Either single Index or Bitflag.
+        [JsonConverter(typeof(CustomUInt64Converter))]
         public ulong DefaultSettings;
         
         [JsonIgnore]
@@ -1524,4 +1525,36 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
     #endregion
 
+    #region JSON helper classes
+
+    // Handle negative numbers without crashing
+    internal class CustomUInt64Converter : JsonConverter<ulong>
+    {
+        public override ulong ReadJson(JsonReader reader, Type objectType, ulong existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            var token = JToken.ReadFrom(reader);
+
+            // TexTools was previously of writing -1 instead of 2^32 - 1
+            // Even though we know that was the intended value, we'll interpret it as 2^64 - 1 for bug-compatibility with Penumbra
+            if (token.ToString().StartsWith("-"))
+            {
+                var signedValue = JToken.ReadFrom(reader).Value<long>();
+                return (ulong)signedValue;
+            }
+            else
+            {
+                return JToken.ReadFrom(reader).Value<ulong>();
+            }
+        }
+
+        public override void WriteJson(JsonWriter writer, ulong value, JsonSerializer serializer)
+        {
+            writer.WriteValue(value);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanWrite => true;
+    }
+
+    #endregion
 }
