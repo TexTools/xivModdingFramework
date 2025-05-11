@@ -287,11 +287,13 @@ namespace xivModdingFramework.Materials.FileTypes
                 if(type == StainingTemplateArrayType.Indexed)
                 {
                     var nArray = new List<Half[]>();
-                    for (int i = 0; i < numDyes; i++)
+                    // The first entry in the list is an 0xFF byte that we skip
+                    // Since that would leave us with one less value than we need, as dummy value is added for the last dye
+                    for (int i = 1; i < numDyes + 1; i++)
                     {
                         try
                         {
-                            var index = data[indexStart + i];
+                            var index = (i == numDyes) ? 255 : data[indexStart + i];
                             if (index == 255 || index == 0)
                             {
                                 if (x < 3)
