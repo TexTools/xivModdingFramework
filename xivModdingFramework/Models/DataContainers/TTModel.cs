@@ -357,7 +357,7 @@ namespace xivModdingFramework.Models.DataContainers
     public class TTShapePart : ICloneable
     {
         /// <summary>
-        /// The raw shp_ identifier.
+        /// The raw shp identifier.
         /// </summary>
         public string Name;
 
@@ -808,7 +808,7 @@ namespace xivModdingFramework.Models.DataContainers
             MeshGroups = MeshGroups.OrderBy(x => (int)x.MeshType).ToList();
 
             if (MeshGroups.Any(x => x.MeshType != EMeshType.Standard &&
-            x.Parts.Any(x => x.ShapeParts.Count(x => x.Key.StartsWith("shp_")) > 0)))
+            x.Parts.Any(x => x.ShapeParts.Count(x => x.Key.StartsWith("shp")) > 0)))
             {
                 throw new InvalidDataException("Non-Standard Meshes cannot have shape data.");
             }
@@ -954,7 +954,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count(x => x.Key.StartsWith("shp_")) > 0 ));
+                return MeshGroups.Any(x => x.Parts.Any( x => x.ShapeParts.Count(x => x.Key.StartsWith("shp")) > 0 ));
             }
         }
         
@@ -972,7 +972,7 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         foreach (var shp in p.ShapeParts)
                         {
-                            if (!shp.Key.StartsWith("shp_")) continue;
+                            if (!shp.Key.StartsWith("shp")) continue;
                             shapes.Add(shp.Key);
                         }
                     }
@@ -996,7 +996,7 @@ namespace xivModdingFramework.Models.DataContainers
                     {
                         foreach(var shp in p.ShapeParts)
                         {
-                            if (!shp.Key.StartsWith("shp_")) continue;
+                            if (!shp.Key.StartsWith("shp")) continue;
                             shapeNames.Add(shp.Key);
                         }
                     }
@@ -1024,7 +1024,7 @@ namespace xivModdingFramework.Models.DataContainers
                             // For every index.
                             foreach(var shp in p.ShapeParts)
                             {
-                                if (!shp.Key.StartsWith("shp_")) continue;
+                                if (!shp.Key.StartsWith("shp")) continue;
                                 // There is an entry for every shape it shows up in.
                                 if (shp.Value.VertexReplacements.ContainsKey(index))
                                 {
@@ -1059,7 +1059,7 @@ namespace xivModdingFramework.Models.DataContainers
                 var shpIdx = 0;
                 foreach (var shpNm in shapeNames)
                 {
-                    if (!shpNm.StartsWith("shp_")) continue;
+                    if (!shpNm.StartsWith("shp")) continue;
                     foreach (var m in MeshGroups)
                     {
                         if (m.Parts.Any(x => x.ShapeParts.ContainsKey(shpNm)))
@@ -1124,7 +1124,7 @@ namespace xivModdingFramework.Models.DataContainers
                     foreach(var shapeKv in p.ShapeParts)
                     {
                         var shapeName = shapeKv.Key;
-                        if(!shapeName.StartsWith("shp_"))
+                        if(!shapeName.StartsWith("shp"))
                         {
                             continue;
                         }
@@ -2079,7 +2079,7 @@ namespace xivModdingFramework.Models.DataContainers
                                 // Shape Parts
                                 foreach(var shpKv in p.ShapeParts)
                                 {
-                                    if (!shpKv.Key.StartsWith("shp_")) continue;
+                                    if (!shpKv.Key.StartsWith("shp")) continue;
                                     var shp = shpKv.Value;
 
                                     query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
@@ -2473,7 +2473,7 @@ namespace xivModdingFramework.Models.DataContainers
                                     // Shape Parts
                                     foreach (var shpKv in p.ShapeParts)
                                     {
-                                        if (!shpKv.Key.StartsWith("shp_")) continue;
+                                        if (!shpKv.Key.StartsWith("shp")) continue;
                                         var shp = shpKv.Value;
 
                                         query = @"insert into shape_vertices ( mesh,  part,  shape,  vertex_id,  position_x,  position_y,  position_z) 
