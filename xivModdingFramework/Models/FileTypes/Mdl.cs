@@ -943,6 +943,15 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 #endregion
 
+                #region Patch 7.2 Unknown Data
+                // Something to do with shadows (appears on face models new in Patch 7.2)
+                var unkDataPatch72 = new UnknownDataPatch72
+                {
+                    Unknown = br.ReadBytes(xivMdl.ModelData.Patch72TableSize * 16)
+                };
+                xivMdl.UnkDataPatch72 = unkDataPatch72;
+                #endregion
+
                 #region Padding
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
@@ -1004,9 +1013,10 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
                 else { 
-                    if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
-                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8)
-                        && xivMdl.LoDList[1].VertexDataSize == 0)
+                    if ((xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
+                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                        && xivMdl.LoDList[1].VertexDataSize == 0 // Avoid applying this fix to vanilla models
+                        && xivMdl.ModelData.NeckMorphTableSize != 0x0A) // Avoid applying to face models, which were written incorrectly after patch 7.1
                     {
 
                         var delta = (int)(xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
@@ -3032,7 +3042,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Unknowns that are probably partly padding.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
+                // XXX: Not preserving new Patch 7.2 face data
+                // It seems to have a dependency on the number of vertices, and thus crashes with custom models with fewer of them
+                // It also has a dependency on the order of vertices, and thus has poor results when Blender decides to shuffle them around...
+                //basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Patch72TableSize));
+                basicModelBlock.AddRange(new byte[] { 0, 0 });
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown16));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown17));
@@ -3611,6 +3625,10 @@ namespace xivModdingFramework.Models.FileTypes
                         bones.Add((byte)boneset0Index);
                     }
 
+                    // Fully abort building neck data if we gave up inside the previous loop
+                    if (basicModelBlock[neckMorphTableSizePointer] == 0)
+                        break;
+
                     // Serialize
                     neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.X));
                     neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.Y));
@@ -3629,6 +3647,14 @@ namespace xivModdingFramework.Models.FileTypes
                             neckMorphDataBlock.Add(0);
                     }
                 }
+                #endregion
+
+                // Patch 7.2 Unknown Data
+                #region Patch 7.2 Unknown Data
+                // XXX: Not preserving Patch 7.2 face data
+                //var unknownPatch72DataBlock = ogMdl.UnkDataPatch72.Unknown;
+                var unknownPatch72DataBlock = Array.Empty<byte>();
+
                 #endregion
 
                 // Padding 
@@ -3786,7 +3812,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This is the offset to the beginning of the vertex data
                 var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraMeshesBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
-                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + neckMorphDataBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
+                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + neckMorphDataBlock.Count + unknownPatch72DataBlock.Length + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
 
                 var lodDataBlock = new List<byte>();
                 List<int> indexStartInjectPointers = new List<int>();
@@ -3874,6 +3900,7 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(FullShapeDataBlock);
                 modelDataBlock.AddRange(partBoneSetsBlock);
                 modelDataBlock.AddRange(neckMorphDataBlock);
+                modelDataBlock.AddRange(unknownPatch72DataBlock);
                 modelDataBlock.AddRange(paddingDataBlock);
                 modelDataBlock.AddRange(boundingBoxDataBlock);
                 modelDataBlock.AddRange(boneBoundingBoxDataBlock);
