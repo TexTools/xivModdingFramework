@@ -413,7 +413,7 @@ namespace xivModdingFramework.Models.FileTypes
                     for (var i = 0; i < mdlModelData.MaterialCount; i++)
                     {
                         var mat = IOUtil.ReadNullTerminatedString(br1, false);
-                        if (mat.StartsWith("shp_"))
+                        if (mat.StartsWith("shp"))
                         {
                             // Catch case for situation where there's null values at the end of the materials list.
                             mdlPathData.ShapeList.Add(mat);
@@ -3133,7 +3133,7 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 foreach (var shapePart in part.ShapeParts)
                                 {
-                                    if (shapePart.Key.StartsWith("shp_"))
+                                    if (shapePart.Key.StartsWith("shp"))
                                     {
                                         vertexCount += shapePart.Value.Vertices.Count;
                                     }
