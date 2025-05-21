@@ -58,6 +58,7 @@ namespace xivModdingFramework.Textures.FileTypes
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC4U"), 0) , XivTexFormat.BC4 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI2"), 0) , XivTexFormat.BC5 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("AR12"), 0) , XivTexFormat.A4R4G4B4 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("AR15"), 0) , XivTexFormat.A1R5G5B5 },
 
             //ARGB 16F
