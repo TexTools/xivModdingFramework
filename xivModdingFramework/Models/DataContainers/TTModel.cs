@@ -1741,25 +1741,42 @@ namespace xivModdingFramework.Models.DataContainers
                         }
                     }
                 }
-                db.Close();
+
+                //Load Mats if applicable
+                query = "select * from materials order by material_id";
+                using (var cmd = new SQLiteCommand(query, db))
+                {
+                    using (var reader = new CacheReader(cmd.ExecuteReader()))
+                    {
+                        while (reader.NextRow())
+                        {
+                            var matNum = reader.GetInt32("material_id");
+                            var materialPath = reader.GetString("name");
+                            model.MeshGroups[matNum].Material = materialPath;
+                        }
+                    }
+
+                    XivCache.WaitForSqlCleanup();
+                    db.Close();
+                }
+
+                // Try to make sure the DB is properly unlocked.'
+
+                XivCache.WaitForSqlCleanup();
+
+                model.UVState = UVAddressingSpace.Standard;
+
+                // Convert the model to FFXIV's internal weirdness.
+                ModelModifiers.MakeImportReady(model, settings.ShiftImportUV, loggingFunction);
+
+                await ModelModifiers.CalculateTangents(model, loggingFunction);
+
+                await ModelModifiers.ConvertFlowData(model, loggingFunction);
+
+                ModelModifiers.CleanWeights(model, loggingFunction);
+
+                return model;
             }
-
-            // Try to make sure the DB is properly unlocked.'
-
-            XivCache.WaitForSqlCleanup();
-
-            model.UVState = UVAddressingSpace.Standard;
-
-            // Convert the model to FFXIV's internal weirdness.
-            ModelModifiers.MakeImportReady(model, settings.ShiftImportUV, loggingFunction);
-
-            await ModelModifiers.CalculateTangents(model, loggingFunction);
-
-            await ModelModifiers.ConvertFlowData(model, loggingFunction);
-
-            ModelModifiers.CleanWeights(model, loggingFunction);
-
-            return model;
         }
 
         private static void MigrateImportDb(SQLiteConnection db)
