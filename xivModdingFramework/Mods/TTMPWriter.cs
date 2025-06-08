@@ -330,7 +330,7 @@ namespace xivModdingFramework.Mods
             var zf = new ZipFile();
             zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
             zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
-            zf.ProvisionalAlternateEncoding = Encoding.UTF8; // Fix Unicode filename corruption (etc, ____.jpg)
+            zf.AlternateEncoding = Encoding.UTF8; // Fix Unicode filename corruption (etc, ____.jpg)
 
             zf.AddFile(tempMPL, "");
             zf.AddFile(tempMPD, "");
