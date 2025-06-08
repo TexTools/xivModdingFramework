@@ -1043,56 +1043,21 @@ namespace xivModdingFramework.Textures.FileTypes
             headerData.AddRange(BitConverter.GetBytes((short)1));
             headerData.AddRange(BitConverter.GetBytes((short)newMipCount));
 
+            var mipSizes = DDS.CalculateMipMapSizes(format, newWidth, newHeight);
+
+            if (mipSizes.Count < newMipCount)
+                throw new InvalidDataException($"CreateTexFileHeader: newMipCount ({newMipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
             headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
             headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
-
-            int mipLength;
-
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    mipLength = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.A8:
-                    mipLength = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    mipLength = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    mipLength = (newWidth * newHeight) * 4;
-                    break;
-            }
 
             var mipMapUncompressedOffset = 80;
 
             for (var i = 0; i < newMipCount; i++)
             {
                 headerData.AddRange(BitConverter.GetBytes(mipMapUncompressedOffset));
-                mipMapUncompressedOffset = mipMapUncompressedOffset + mipLength;
-
-                if (mipLength > 16)
-                {
-                    mipLength = mipLength / 4;
-                }
-                else
-                {
-                    mipLength = 16;
-                }
+                mipMapUncompressedOffset = mipMapUncompressedOffset + mipSizes[i];
             }
 
             var padding = 80 - headerData.Count;

@@ -454,6 +454,30 @@ namespace xivModdingFramework.Textures.FileTypes
             return header.ToArray();
         }
 
+        // Calculate a sequence of mipmap sizes given a texture format and size
+        public static List<int> CalculateMipMapSizes(XivTexFormat format, int width, int height)
+        {
+            var offsets = new List<int>();
+
+            int minDimension = format.GetMipMinDimension();
+            int mipBitsPerPixel = format.GetBitsPerPixel();
+            int mipWidth = width;
+            int mipHeight = height;
+            int mipLength = Math.Max(minDimension, mipWidth) * Math.Max(minDimension, mipHeight) * mipBitsPerPixel / 8;
+
+            offsets.Add(mipLength);
+
+            while (mipWidth > 1 || mipHeight > 1)
+            {
+                mipWidth = Math.Max(1, mipWidth / 2);
+                mipHeight = Math.Max(1, mipHeight / 2);
+                mipLength = Math.Max(minDimension, mipWidth) * Math.Max(minDimension, mipHeight) * mipBitsPerPixel / 8;
+                offsets.Add(mipLength);
+            }
+
+            return offsets;
+        }
+
         /// <summary>
         /// Compresses a normal DDS File into just the core image data that FFXIV stores.
         /// This assumes the Binary Reader is already positioned at the end of whatever header there is (.DDS or .Tex)
@@ -467,56 +491,19 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             var ddsParts = new List<List<byte[]>>();
 
-            int mipLength;
+            var mipSizes = CalculateMipMapSizes(format, newWidth, newHeight);
 
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    mipLength = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.BC4:
-                case XivTexFormat.BC5:
-                case XivTexFormat.A8:
-                case XivTexFormat.BC7:
-                    mipLength = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    mipLength = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    mipLength = (newWidth * newHeight) * 4;
-                    break;
-            }
+            if (mipSizes.Count < newMipCount)
+                throw new InvalidDataException($"CompressDDSBody: newMipCount ({newMipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             // Queue all the compression tasks.
             var totalBytesRead = 0;
             var mipTasks = new List<Task<List<byte[]>>>();
             for (var i = 0; i < newMipCount; i++)
             {
-                var uncompBytes = br.ReadBytes(mipLength);
+                var uncompBytes = br.ReadBytes(mipSizes[i]);
                 totalBytesRead += uncompBytes.Length;
-
                 mipTasks.Add(Dat.CompressData(uncompBytes.ToList()));
-                if (mipLength > 32)
-                {
-                    mipLength = mipLength / 4;
-                }
-                else
-                {
-                    mipLength = 8;
-                }
             }
 
             // Wait for them to finish.
