@@ -764,7 +764,7 @@ namespace xivModdingFramework.Textures.FileTypes
             BitConverter.GetBytes(124).CopyTo(header, 4);
 
             // Flags?
-            BitConverter.GetBytes(0).CopyTo(header, 8);
+            BitConverter.GetBytes(0x21007).CopyTo(header, 8);
 
             // Size
             BitConverter.GetBytes(height).CopyTo(header, 12);
@@ -779,12 +779,15 @@ namespace xivModdingFramework.Textures.FileTypes
             // MipMap Count
             BitConverter.GetBytes(mipCount).CopyTo(header, 28);
 
+            // dwCaps. DDSCAPS_MIPMAP(0x40000) + DDSCAPS_TEXTURE(0x1000)
+            BitConverter.GetBytes(mipCount > 1 ? 0x401000 : 0x1000).CopyTo(header, 104);
+
             var startOfPixStruct = 76;
             // Pixel struct size
             BitConverter.GetBytes(32).CopyTo(header, startOfPixStruct);
 
-            // Pixel Flags.  In this case, uncompressed(64) + contains alpha(1).
-            BitConverter.GetBytes(65).CopyTo(header, startOfPixStruct + 4);
+            // Pixel Flags.  In this case, uncompressed(0x40) + contains alpha(0x01).
+            BitConverter.GetBytes(0x41).CopyTo(header, startOfPixStruct + 4);
 
             // DWFourCC, unused
             BitConverter.GetBytes(0).CopyTo(header, startOfPixStruct + 8);
