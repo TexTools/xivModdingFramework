@@ -593,7 +593,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         try
                         {
-                            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+                            var resized = await EndwalkerUpgrade.ValidateTexFileData(data);
                             if(resized != null)
                             {
                                 data = resized;

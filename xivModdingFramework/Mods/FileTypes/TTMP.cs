@@ -1408,7 +1408,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var data = await TransactionDataHandler.GetUncompressedFile(info);
 
-            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+            var resized = await EndwalkerUpgrade.ValidateTexFileData(data);
             if(resized != null)
             {
                 data = resized;

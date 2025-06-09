@@ -161,8 +161,78 @@ namespace xivModdingFramework.Textures.FileTypes
                 Debug.Assert(bw.BaseStream.Position == _TexHeaderSize, "Data was not fully written.");
                 return res;
             }
-        }
 
+            // Many tex files were written with broken mipmap offsets. Try to rebuild them here, using the total tex file size as a heuristic
+            // Returns true if any data was changed
+            internal static bool FixUpBrokenMipOffsets(TexHeader header, long texSizeIncludingHeader)
+            {
+                bool modified = false;
+                int originalMipCount = header.MipCount;
+                int mipOffset = (int)Tex._TexHeaderSize;
+
+                // A mip count of more than 13 is impossible
+                if (originalMipCount > 13)
+                    originalMipCount = 13;
+
+                // This will throw for unknown formats
+                var mipSizes = DDS.CalculateMipMapSizes((XivTexFormat)header.TextureFormat, header.Width, header.Height);
+
+                // Ensure MipCount is always something valid. First offset will always be 80 or 0x50
+                header.MipCount = 1;
+                modified |= (header.MipMapOffsets[0] != (uint)mipOffset);
+                header.MipMapOffsets[0] = (uint)mipOffset;
+                mipOffset += mipSizes[0];
+
+                int mipLevel;
+
+                for (mipLevel = 1; mipLevel < originalMipCount; ++mipLevel)
+                {
+                    // There's more mipmaps in the original file than we calculated should be possible -- cut the list short
+                    if (mipLevel >= mipSizes.Count)
+                        break;
+
+                    int mipSize = mipSizes[mipLevel];
+
+                    // We've reached a mipmap we calculate would extend past the end of the file -- cut the list short
+                    if (mipOffset + mipSize > texSizeIncludingHeader)
+                        break;
+
+                    // Write the expected mipmap offset
+                    modified |= (header.MipMapOffsets[mipLevel] != (uint)mipOffset);
+                    header.MipMapOffsets[mipLevel] = (uint)mipOffset;
+
+                    // Next offset
+                    mipOffset += mipSize;
+
+                    // Bump the mip count in the header to match what we have verified so far
+                    header.MipCount = (byte)(mipLevel + 1);
+                }
+
+                // Update LoDMips in case we removed a referenced mipmap
+                for (int lodLevel = 0; lodLevel < 3; ++lodLevel)
+                {
+                    if (header.LoDMips[lodLevel] >= header.MipCount)
+                    {
+                        modified = true;
+                        header.LoDMips[lodLevel] = (uint)(header.MipCount - 1);
+                    }
+                }
+
+                // Fill out the rest of table with zeroes
+                for (; mipLevel < 13; ++mipLevel)
+                {
+                    if (header.MipMapOffsets[mipLevel] != 0)
+                    {
+                        modified = true;
+                        header.MipMapOffsets[mipLevel] = 0;
+                    }
+                }
+
+                modified |= (header.MipCount != originalMipCount);
+
+                return modified;
+            }
+        }
 
         /// <summary>
         /// Gets the path to the default blank texture for a given texture format.
@@ -1236,6 +1306,10 @@ namespace xivModdingFramework.Textures.FileTypes
                 offset = br.BaseStream.Position;
             }
             var header = TexHeader.ReadTexHeader(br);
+
+            // Fix broken tex file headers while we have a chance
+            // This occurs before a tex file is written to game files or ttmp2 modpacks
+            TexHeader.FixUpBrokenMipOffsets(header, lengthIncludingHeader);
 
             List<byte> newTex = new List<byte>();
             // Here we need to read the texture header.

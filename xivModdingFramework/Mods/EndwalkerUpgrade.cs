@@ -2097,8 +2097,8 @@ namespace xivModdingFramework.Mods
             return data;
         }
 
-
-        public static async Task<byte[]> ValidateTextureSizes(byte[] uncompressedTex)
+        // Validate and potentially rebuild texture data coming in from PMP modpacks
+        public static async Task<byte[]> ValidateTexFileData(byte[] uncompressedTex)
         {
             using (var ms = new MemoryStream(uncompressedTex))
             {
@@ -2112,6 +2112,13 @@ namespace xivModdingFramework.Mods
 
                         return tex.ToUncompressedTex();
                     }
+                    else if (Tex.TexHeader.FixUpBrokenMipOffsets(header, uncompressedTex.Length))
+                    {
+                        byte[] newData = new byte[uncompressedTex.Length];
+                        Array.Copy(header.ToBytes(), newData, Tex._TexHeaderSize);
+                        Array.Copy(uncompressedTex, Tex._TexHeaderSize, newData, Tex._TexHeaderSize, uncompressedTex.Length - Tex._TexHeaderSize);
+                        return newData;
+                    }
                 }
             }
             return null;
@@ -2120,7 +2127,7 @@ namespace xivModdingFramework.Mods
         public static async Task<FileStorageInformation> ValidateTextureSizes(FileStorageInformation info)
         {
             var data = await TransactionDataHandler.GetUncompressedFile(info);
-            var resized = await ValidateTextureSizes(data);
+            var resized = await ValidateTexFileData(data);
 
             if(resized != null)
             {

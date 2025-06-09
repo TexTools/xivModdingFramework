@@ -117,6 +117,7 @@ namespace xivModdingFramework.Textures.DataContainers
             }
 
             var header = TexHeader.ReadTexHeader(br);
+            TexHeader.FixUpBrokenMipOffsets(header, dataSize);
 
             var tex = new XivTex();
 
