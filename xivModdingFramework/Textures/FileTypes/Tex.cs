@@ -1251,14 +1251,6 @@ namespace xivModdingFramework.Textures.FileTypes
                 newTex.AddRange(Dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
 
                 // Texture file header.
-                // CompressDDSBody call above alters individual mipmap sizes, ending up changing the offsets.
-                // Calculate those again here.
-                header.MipMapOffsets[0] = _TexHeaderSize;
-                for (var i = 1; i < header.MipCount; i++)
-                    header.MipMapOffsets[i] = header.MipMapOffsets[i - 1] + (uint)ddsParts[i - 1].Count;
-                header.LoDMips[0] = Math.Min(header.MipCount - 1u, header.LoDMips[0]);
-                header.LoDMips[1] = Math.Min(header.MipCount - 1u, Math.Max(header.LoDMips[0], header.LoDMips[1]));
-                header.LoDMips[2] = Math.Min(header.MipCount - 1u, Math.Max(header.LoDMips[1], header.LoDMips[2]));
                 newTex.AddRange(header.ToBytes());
 
                 // Compressed pixel data.
