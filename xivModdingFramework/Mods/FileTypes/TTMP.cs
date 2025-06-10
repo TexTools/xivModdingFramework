@@ -104,7 +104,7 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
-        internal const string _currentTTMPVersion = "2.0";
+        internal const string _currentTTMPVersion = "2.1";
 
         internal const char _typeCodeSimple = 's';
         internal const char _typeCodeWizard = 'w';
@@ -908,9 +908,12 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             if (string.IsNullOrEmpty(version))
                 return true;
-
-            Int32.TryParse(version.Substring(0, 1), out var v);
-            return v < 2;
+            int major = 0, minor = 0;
+            string[] parts = version.Split('.');
+            int.TryParse(parts[0], out major);
+            if (parts.Length > 1)
+                int.TryParse(new(parts[1].TakeWhile(char.IsDigit).ToArray()), out minor);
+            return major < 2 || (major == 2 && minor == 0);
         }
 
 
