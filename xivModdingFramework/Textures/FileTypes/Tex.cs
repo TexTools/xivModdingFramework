@@ -162,9 +162,10 @@ namespace xivModdingFramework.Textures.FileTypes
                 return res;
             }
 
-            // Many tex files were written with broken mipmap offsets. Try to rebuild them here, using the total tex file size as a heuristic
-            // Returns true if any data was changed
-            internal static bool FixUpBrokenMipOffsets(TexHeader header, long texSizeIncludingHeader)
+            // Many tex files were written with broken mipmap offsets, and extra data at the end.
+            // Try to rebuild them here, using the total tex file size as a heuristic
+            // Returns a flag indicating if any data was changed, as well as the size in bytes that the tex file should be
+            internal static (bool HeaderChanged, long CalculatedTexSize) FixUpBrokenMipOffsets(TexHeader header, long texSizeIncludingHeader)
             {
                 bool modified = false;
                 int originalMipCount = header.MipCount;
@@ -230,7 +231,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 modified |= (header.MipCount != originalMipCount);
 
-                return modified;
+                return (modified, mipOffset);
             }
         }
 
@@ -1309,7 +1310,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             // Fix broken tex file headers while we have a chance
             // This occurs before a tex file is written to game files or ttmp2 modpacks
-            TexHeader.FixUpBrokenMipOffsets(header, lengthIncludingHeader);
+            _ = TexHeader.FixUpBrokenMipOffsets(header, lengthIncludingHeader);
 
             List<byte> newTex = new List<byte>();
             // Here we need to read the texture header.

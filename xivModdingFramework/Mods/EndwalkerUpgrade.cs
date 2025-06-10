@@ -2097,7 +2097,6 @@ namespace xivModdingFramework.Mods
             return data;
         }
 
-        // Validate and potentially rebuild texture data coming in from PMP modpacks
         public static async Task<byte[]> ValidateTexFileData(byte[] uncompressedTex)
         {
             using (var ms = new MemoryStream(uncompressedTex))
@@ -2112,16 +2111,67 @@ namespace xivModdingFramework.Mods
 
                         return tex.ToUncompressedTex();
                     }
-                    else if (Tex.TexHeader.FixUpBrokenMipOffsets(header, uncompressedTex.Length))
+                    else
                     {
-                        byte[] newData = new byte[uncompressedTex.Length];
-                        Array.Copy(header.ToBytes(), newData, Tex._TexHeaderSize);
-                        Array.Copy(uncompressedTex, Tex._TexHeaderSize, newData, Tex._TexHeaderSize, uncompressedTex.Length - Tex._TexHeaderSize);
-                        return newData;
+                        var fixupResult = Tex.TexHeader.FixUpBrokenMipOffsets(header, uncompressedTex.Length);
+
+                        if (fixupResult.HeaderChanged || fixupResult.CalculatedTexSize != uncompressedTex.Length)
+                        {
+                            byte[] newData = new byte[fixupResult.CalculatedTexSize];
+                            Array.Copy(header.ToBytes(), newData, Tex._TexHeaderSize);
+                            Array.Copy(uncompressedTex, Tex._TexHeaderSize, newData, Tex._TexHeaderSize, fixupResult.CalculatedTexSize - Tex._TexHeaderSize);
+                            return newData;
+                        }
                     }
                 }
             }
             return null;
+        }
+
+        // Quickly check a tex file for invalid header data and excess data at the end of the file and repair it
+        public static bool FastValidateTexFile(string externalPath)
+        {
+            bool repaired = false;
+            var fi = new FileInfo(externalPath);
+            using (var fs = File.Open(externalPath, FileMode.Open, FileAccess.ReadWrite))
+            {
+                var header = Tex.TexHeader.ReadTexHeader(new BinaryReader(fs));
+                var fixupResult = Tex.TexHeader.FixUpBrokenMipOffsets(header, fi.Length);
+
+                // Rewrite the tex file header if the mip offsets were wrong
+                if (fixupResult.HeaderChanged)
+                {
+                    fs.Seek(0, SeekOrigin.Begin);
+                    fs.Write(header.ToBytes(), 0, (int)Tex._TexHeaderSize);
+                    repaired = true;
+                }
+
+                // Truncate the file if it has extra null data at the end
+                // Textools would repeatedly add 80 null bytes to the end of textures
+                if (fixupResult.CalculatedTexSize < fi.Length)
+                {
+                    long diff = fi.Length - fixupResult.CalculatedTexSize;
+                    bool allZero = true;
+                    fs.Seek(fixupResult.CalculatedTexSize, SeekOrigin.Begin);
+
+                    for (long i = 0; i < diff; ++i)
+                    {
+                        if (fs.ReadByte() != 0)
+                        {
+                            allZero = false;
+                            break;
+                        }
+                    }
+
+                    if (allZero)
+                    {
+                        fs.SetLength(fixupResult.CalculatedTexSize);
+                        repaired = true;
+                    }
+                }
+            }
+
+            return repaired;
         }
 
         public static async Task<FileStorageInformation> ValidateTextureSizes(FileStorageInformation info)
