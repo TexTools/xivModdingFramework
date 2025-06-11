@@ -96,6 +96,13 @@ namespace xivModdingFramework.Mods.FileTypes
             Pmp
         };
 
+        public enum UpgradesNeeded
+        {
+            None = 0x00,
+            NeedsTexFix = 0x01,
+            NeedsMdlFix = 0x02
+        };
+
         // These file types are forbidden from being included in Modpacks or being imported via modpacks.
         // This is because these file types are re-built from constituent smaller files, and thus importing
         // a complete file would bash the user's current file state in unpredictable ways.
@@ -683,7 +690,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
 
 
-                    var needsTexFix = DoesModpackNeedTexFix(modpackMpl);
+                    var upgradesNeeded = DoesModpackNeedFix(modpackMpl);
+                    bool needsTexFix = (upgradesNeeded & UpgradesNeeded.NeedsTexFix) == UpgradesNeeded.NeedsTexFix;
+                    bool needsMdlFix = (upgradesNeeded & UpgradesNeeded.NeedsMdlFix) == UpgradesNeeded.NeedsMdlFix;
                     var count = 0;
                     var modList = await tx.GetModList();
 
@@ -729,7 +738,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 Trace.WriteLine(ex);
                                 continue;
                             }
-                        } else if(needsTexFix && modJson.FullPath.EndsWith(".mdl"))
+                        } else if(needsMdlFix && modJson.FullPath.EndsWith(".mdl"))
                         {
                             try
                             {
@@ -894,26 +903,30 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modpackPath">The path to the modpack.</param>
         /// <returns>True if we must modify tex header uncompressed sizes, false otherwise.</returns>
-        public static bool DoesModpackNeedTexFix(DirectoryInfo modpackPath) {
+        public static UpgradesNeeded DoesModpackNeedFix(DirectoryInfo modpackPath) {
 
 	        var ver = GetVersion(modpackPath);
 
-            return DoesModpackNeedTexFix(ver);
+            return DoesModpackNeedFix(ver);
         }
-        public static bool DoesModpackNeedTexFix(ModPackJson mpl)
+        public static UpgradesNeeded DoesModpackNeedFix(ModPackJson mpl)
         {
-            return DoesModpackNeedTexFix(mpl.TTMPVersion);
+            return DoesModpackNeedFix(mpl.TTMPVersion);
         }
-        public static bool DoesModpackNeedTexFix(string version)
+        public static UpgradesNeeded DoesModpackNeedFix(string version)
         {
             if (string.IsNullOrEmpty(version))
-                return true;
+                version = "0.0";
             int major = 0, minor = 0;
             string[] parts = version.Split('.');
             int.TryParse(parts[0], out major);
             if (parts.Length > 1)
                 int.TryParse(new(parts[1].TakeWhile(char.IsDigit).ToArray()), out minor);
-            return major < 2 || (major == 2 && minor == 0);
+            if (major < 2)
+                return UpgradesNeeded.NeedsTexFix | UpgradesNeeded.NeedsMdlFix;
+            if (major == 2 && minor == 0)
+                return UpgradesNeeded.NeedsTexFix;
+            return UpgradesNeeded.None;
         }
 
 
@@ -1258,9 +1271,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     mpl = await GetModpackList(modpackPath);
                 }
 
-                var needsTexFix = DoesModpackNeedTexFix(mpl);
+                UpgradesNeeded upgradesNeeded = DoesModpackNeedFix(mpl);
 
-                return await MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, needsTexFix, includeData);
+                return await MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, upgradesNeeded, includeData);
             });
         }
         private static async Task<Dictionary<string, FileStorageInformation>> UnpackWizardModlist(string modpackPath, bool includeData = true, ModTransaction tx = null)
@@ -1314,19 +1327,20 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
 
-                var needsTexFix = DoesModpackNeedTexFix(mpl);
-                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, needsTexFix, includeData);
+                var upgradesNeeded = DoesModpackNeedFix(mpl);
+                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, upgradesNeeded, includeData);
 
             });
         }
 
-        private static async Task<Dictionary<string, FileStorageInformation>> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, bool needsTexFix, bool includeData = true)
+        private static async Task<Dictionary<string, FileStorageInformation>> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, UpgradesNeeded upgradesNeeded, bool includeData = true)
         {
             var ret = new Dictionary<string, FileStorageInformation>();
+            bool needsTexFix = (upgradesNeeded & UpgradesNeeded.NeedsTexFix) == UpgradesNeeded.NeedsTexFix;
+            bool needsMdlFix = (upgradesNeeded & UpgradesNeeded.NeedsMdlFix) == UpgradesNeeded.NeedsMdlFix;
+
             foreach (var file in mods)
             {
-
-
                 if (!includeData)
                 {
                     if (ret.ContainsKey(file.FullPath))
@@ -1363,7 +1377,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         // Skip the file?
                         continue;
                     }
-                } else if(needsTexFix && file.FullPath.EndsWith(".mdl") && includeData)
+                } else if(needsMdlFix && file.FullPath.EndsWith(".mdl") && includeData)
                 {
                     try
                     {
