@@ -1308,10 +1308,6 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             var header = TexHeader.ReadTexHeader(br);
 
-            // Fix broken tex file headers while we have a chance
-            // This occurs before a tex file is written to game files or ttmp2 modpacks
-            _ = TexHeader.FixUpBrokenMipOffsets(header, lengthIncludingHeader);
-
             List<byte> newTex = new List<byte>();
             // Here we need to read the texture header.
             if (!extentionOrInternalPath.Contains(".atex"))
