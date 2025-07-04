@@ -74,7 +74,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         // Unzip everything.
                         await IOUtil.UnzipFiles(path, tempFolder);
-                    } else
+
+                        // Quick check of tex file headers after unpacking from PMP modpacks
+                        // It is safe to rewrite the files here, as they are unzipped to a temporary path
+                        foreach (var filePath in IOUtil.GetFilesInFolder(tempFolder))
+                        {
+                            if (filePath.EndsWith(".tex"))
+                            {
+                                try
+                                {
+                                    _ = EndwalkerUpgrade.FastValidateTexFile(filePath);
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                    else
                     {
                         // Just JSON files.
                         await IOUtil.UnzipFiles(path, tempFolder, (file) =>
@@ -593,7 +608,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         try
                         {
-                            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+                            var resized = await EndwalkerUpgrade.ValidateTexFileData(data);
                             if(resized != null)
                             {
                                 data = resized;
@@ -1063,6 +1078,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
                 var externalPath = Path.Combine(unzipPath, file.Value);
+
+                // Quick check of tex file headers after unpacking from PMP modpacks
+                // It is safe to rewrite the files here, as they are unzipped to a temporary path
+                if (!alreadyUnzipped && internalPath.EndsWith(".tex"))
+                {
+                    try
+                    {
+                        _ = EndwalkerUpgrade.FastValidateTexFile(externalPath);
+                    }
+                    catch { }
+                }
+
                 var fileInfo = new FileStorageInformation()
                 {
                     StorageType = EFileStorageType.UncompressedIndividual,
