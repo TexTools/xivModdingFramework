@@ -284,7 +284,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
-            var shaderFn = GetShaderMapper(GetCustomColors(), mtrl, settings);
+            var shaderFn = GetShaderMapper(colors, mtrl, settings);
             bool invertNormalGreen = colors.InvertNormalGreen;
 
             await Task.Run(() =>
