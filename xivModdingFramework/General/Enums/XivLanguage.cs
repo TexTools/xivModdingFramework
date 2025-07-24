@@ -34,6 +34,7 @@ namespace xivModdingFramework.General.Enums
         [Description("fr")] French,
         [Description("ko")] Korean,
         [Description("chs")] Chinese,
+        [Description("tc")] TraditionalChinese,
         [Description("none")] None
     }
 
