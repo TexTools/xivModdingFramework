@@ -57,8 +57,10 @@ namespace xivModdingFramework.Mods
             Directory.CreateDirectory(dir);
 
             using var fs = File.OpenWrite(fName);
-            var enc = new PngEncoder();
-            enc.BitDepth = PngBitDepth.Bit16;
+            var enc = new PngEncoder
+            {
+                BitDepth = PngBitDepth.Bit16
+            };
             img.Save(fs, enc);
 
             return path;

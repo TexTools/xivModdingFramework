@@ -5,10 +5,6 @@ VisualStudioVersion = 15.0.27428.2015
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "xivModdingFramework", "xivModdingFramework\xivModdingFramework.csproj", "{83A720A7-A039-4FE3-BE65-95146CF5C6F3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "xivModdingFramework.xUnit", "xivModdingFramework.xUnit\xivModdingFramework.xUnit.csproj", "{4214BC4D-2FAD-4C9A-9F60-06A3EB22820D}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "exChecker", "exChecker\exChecker.csproj", "{D174095D-1B25-471A-B443-83D69E0A3173}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

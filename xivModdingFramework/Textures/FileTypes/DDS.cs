@@ -16,11 +16,13 @@
 
 using SharpDX;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.PixelFormats;
 using System;
 using System.Collections.Generic;
+using System.Data.Entity.ModelConfiguration.Conventions;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -654,10 +656,10 @@ namespace xivModdingFramework.Textures.FileTypes
                         {
                             for (var x = 0; x < width; x++)
                             {
-                                var r = new Half(br.ReadUInt16());
-                                var g = new Half(br.ReadUInt16());
-                                var b = new Half(br.ReadUInt16());
-                                var a = new Half(br.ReadUInt16());
+                                var r = new SharpDX.Half(br.ReadUInt16());
+                                var g = new SharpDX.Half(br.ReadUInt16());
+                                var b = new SharpDX.Half(br.ReadUInt16());
+                                var a = new SharpDX.Half(br.ReadUInt16());
 
                                 // 255 * value, clamped to 0-255.
                                 var byteR = (byte)Math.Max(0, Math.Min(255, Math.Round(r * 255.0f)));
@@ -748,9 +750,11 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 using (var img = Image.LoadPixelData<Bgra32>(rgbaData, width, height))
                 {
-                    var encoder = new TgaEncoder();
-                    encoder.Compression = TgaCompression.None;
-                    encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
+                    var encoder = new TgaEncoder
+                    {
+                        Compression = TgaCompression.None,
+                        BitsPerPixel = TgaBitsPerPixel.Pixel32
+                    };
                     img.SaveAsTga(input, encoder);
                 }
             }
@@ -758,9 +762,11 @@ namespace xivModdingFramework.Textures.FileTypes
             {
                 using (var img = Image.LoadPixelData<Rgba32>(rgbaData, width, height))
                 {
-                    var encoder = new TgaEncoder();
-                    encoder.Compression = TgaCompression.None;
-                    encoder.BitsPerPixel = TgaBitsPerPixel.Pixel32;
+                    var encoder = new TgaEncoder
+                    {
+                        Compression = TgaCompression.None,
+                        BitsPerPixel = TgaBitsPerPixel.Pixel32
+                    };
                     img.SaveAsTga(input, encoder);
                 }
             }
@@ -781,14 +787,20 @@ namespace xivModdingFramework.Textures.FileTypes
             // TexConv does not handle PNGs correctly.  Rip the raw bytes ourselves and resave as TGA.
             if (file.ToLower().EndsWith(".png"))
             {
-                var decoder = new PngDecoder();
+                var decoder = PngDecoder.Instance;
                 byte[] data;
                 int width, height;
-                using (var img = Image.Load<Rgba32>(file, decoder))
+
+                using (var stream = File.OpenRead(file))
                 {
-                    width = img.Width;
-                    height = img.Height;
-                    data = IOUtil.GetImageSharpPixels(img);
+                    var options = new DecoderOptions { Configuration = SixLabors.ImageSharp.Configuration.Default };
+
+                    using (var img = Image.Load<Rgba32>(options, stream))
+                    {
+                        width = img.Width;
+                        height = img.Height;
+                        data = IOUtil.GetImageSharpPixels(img);
+                    }
                 }
                 // TexConv does not handle PNG reading correctly.
                 return await TexConv(data, width, height, format, generateMipMaps);

@@ -794,7 +794,7 @@ namespace xivModdingFramework.Mods
             }
 
             // Update Colorset
-            List<Half> newData = new List<Half>(1024);
+            List<SharpDX.Half> newData = new List<SharpDX.Half>(1024);
 
             for (int i = 0; i < 32; i++)
             {
@@ -1226,9 +1226,9 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        public static Half[] GetDefaultColorsetRow(EShaderPack pack)
+        public static SharpDX.Half[] GetDefaultColorsetRow(EShaderPack pack)
         {
-            var row = new Half[32];
+            var row = new SharpDX.Half[32];
 
             // Diffuse pixel base
             for (int i = 0; i < 8; i++)

@@ -921,7 +921,7 @@ namespace xivModdingFramework.Mods.FileTypes
             string[] parts = version.Split('.');
             int.TryParse(parts[0], out major);
             if (parts.Length > 1)
-                int.TryParse(new(parts[1].TakeWhile(char.IsDigit).ToArray()), out minor);
+                int.TryParse(new string(parts[1].TakeWhile(char.IsDigit).ToArray()), out minor);
             if (major < 2)
                 return UpgradesNeeded.NeedsTexFix | UpgradesNeeded.NeedsMdlFix;
             if (major == 2 && minor == 0)
