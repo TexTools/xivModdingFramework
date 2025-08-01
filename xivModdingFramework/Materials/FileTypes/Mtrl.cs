@@ -262,7 +262,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 xivMtrl.AdditionalData = br.ReadBytes(additionalDataSize);
 
-                xivMtrl.ColorSetData = new List<Half>();
+                xivMtrl.ColorSetData = new List<SharpDX.Half>();
                 xivMtrl.ColorSetDyeData = new byte[0];
 
                 if (colorSetDataSize > 0)
@@ -273,7 +273,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                     for (var i = 0; i < colorDataSize / 2; i++)
                     {
-                        xivMtrl.ColorSetData.Add(new Half(br.ReadUInt16()));
+                        xivMtrl.ColorSetData.Add(new SharpDX.Half(br.ReadUInt16()));
                     }
 
                     // If the color set is 544 (DT: 2080) in length, it has an extra 32 bytes at the end

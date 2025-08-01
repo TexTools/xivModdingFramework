@@ -1350,7 +1350,7 @@ namespace xivModdingFramework.Textures.FileTypes
         #region Colorset Import Handling
         // Special one-off functions for importing colorsets as image files.
 
-        public static (List<Half> ColorsetData, byte[] DyeData) GetColorsetDataFromDDS(string ddsFilePath)
+        public static (List<SharpDX.Half> ColorsetData, byte[] DyeData) GetColorsetDataFromDDS(string ddsFilePath)
         {
             var colorSetData = DDSToColorset(ddsFilePath);
             var dyeData = GetColorsetDyeInformationFromFile(ddsFilePath);
@@ -1395,7 +1395,7 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="ddsFileDirectory"></param>
         /// <returns></returns>
-        public static List<Half> DDSToColorset(string ddsPath)
+        public static List<SharpDX.Half> DDSToColorset(string ddsPath)
         {
             using (var br = new BinaryReader(File.OpenRead(ddsPath)))
             {
@@ -1436,14 +1436,14 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
 
                 var size = width * height * 4;
-                var colorSetData = new List<Half>(size);
+                var colorSetData = new List<SharpDX.Half>(size);
 
 
                 br.BaseStream.Seek(128, SeekOrigin.Begin);
 
                 for (var i = 0; i < size; i++)
                 {
-                    colorSetData.Add((new Half(br.ReadUInt16())));
+                    colorSetData.Add((new SharpDX.Half(br.ReadUInt16())));
                 }
 
                 return colorSetData;

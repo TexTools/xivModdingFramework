@@ -647,7 +647,7 @@ namespace xivModdingFramework.Models.ModelTextures
             specularColorMul *= specularColorMul;
             emissiveColorMul *= emissiveColorMul;
 
-            List<Half> colorset = null;
+            List<SharpDX.Half> colorset = null;
             if(mtrl.ColorSetData != null && mtrl.ColorSetData.Count >= 1024)
             {
                 // Clone the list in case the data is accessed or changed while we're working.
@@ -1336,7 +1336,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// <param name="colorsetData"></param>
         /// <param name="rowNumber"></param>
         /// <returns></returns>
-        public static Half[] GetColorsetRow(List<Half> colorsetData, float indexRed, float indexGreen, bool visualizeOnly = false, int highlightRow = -1)
+        public static SharpDX.Half[] GetColorsetRow(List<SharpDX.Half> colorsetData, float indexRed, float indexGreen, bool visualizeOnly = false, int highlightRow = -1)
         {
             if(colorsetData == null || colorsetData.Count == 0) {
                 return null;
@@ -1365,7 +1365,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
 
 
-            var rowData = new Half[_RowSize];
+            var rowData = new SharpDX.Half[_RowSize];
             if (visualizeOnly)
             {
                 for(int i = 0; i < 3; i++) { 
@@ -1430,7 +1430,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Half LerpHalf(Half a, Half b, float f)
+        public static SharpDX.Half LerpHalf(SharpDX.Half a, SharpDX.Half b, float f)
         {
             return a * (1.0f - f) + (b * f);
         }

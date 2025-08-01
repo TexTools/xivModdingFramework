@@ -139,30 +139,30 @@ namespace xivModdingFramework.Materials.FileTypes
     {
         // Data Entries, in the format of
         // [Data Offset] => [Dye Id] = Dye values
-        public readonly List<List<Half[]>> Entries = new List<List<Half[]>>();
+        public readonly List<List<SharpDX.Half[]>> Entries = new List<List<SharpDX.Half[]>>();
 
-        public Half[] GetDiffuseData(int dyeId = 0)
+        public SharpDX.Half[] GetDiffuseData(int dyeId = 0)
         {
             return GetData(0, dyeId);
         }
-        public Half[] GetSpecularData(int dyeId = 0)
+        public SharpDX.Half[] GetSpecularData(int dyeId = 0)
         {
             return GetData(1, dyeId);
         }
-        public Half[] GetEmissiveData(int dyeId = 0)
+        public SharpDX.Half[] GetEmissiveData(int dyeId = 0)
         {
             return GetData(2, dyeId);
         }
-        public Half[] GetSpecularPowerData(int dyeId = 0)
+        public SharpDX.Half[] GetSpecularPowerData(int dyeId = 0)
         {
             return GetData(3, dyeId);
         }
-        public Half[] GetGlossData(int dyeId = 0)
+        public SharpDX.Half[] GetGlossData(int dyeId = 0)
         {
             return GetData(4, dyeId);
         }
 
-        public Half[] GetData(int offset, int dyeId = 0)
+        public SharpDX.Half[] GetData(int offset, int dyeId = 0)
         {
             if(offset >= Entries.Count)
             {
@@ -225,7 +225,7 @@ namespace xivModdingFramework.Materials.FileTypes
             var lastOffset = 0;
             for (int x = 0; x < _ItemCount; x++)
             {
-                Entries.Add(new List<Half[]>());
+                Entries.Add(new List<SharpDX.Half[]>());
                 var elementSize = 1;
                 if(x < 3)
                 {
@@ -265,20 +265,20 @@ namespace xivModdingFramework.Materials.FileTypes
                 var arrayStart = lastOffset;
                 var offsetStart = (start + headerSize + (arrayStart * 2));
 
-                List<Half[]> halfData  = new List<Half[]>();
+                List<SharpDX.Half[]> halfData  = new List<SharpDX.Half[]>();
 
                 for (int i = 0; i < arraySize; i++)
                 {
 
-                    Half[] halfs = new Half[elementSize];
+                    SharpDX.Half[] halfs = new SharpDX.Half[elementSize];
 
                     var elementStart = offsetStart + ((i * 2) * elementSize);
 
-                    halfs[0] = new Half(BitConverter.ToUInt16(data, elementStart));
+                    halfs[0] = new SharpDX.Half(BitConverter.ToUInt16(data, elementStart));
                     if (elementSize > 1)
                     {
-                        halfs[1] = new Half(BitConverter.ToUInt16(data, elementStart + 2));
-                        halfs[2] = new Half(BitConverter.ToUInt16(data, elementStart + 4));
+                        halfs[1] = new SharpDX.Half(BitConverter.ToUInt16(data, elementStart + 2));
+                        halfs[2] = new SharpDX.Half(BitConverter.ToUInt16(data, elementStart + 4));
                     }
 
                     halfData.Add(halfs);
@@ -286,7 +286,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 if(type == StainingTemplateArrayType.Indexed)
                 {
-                    var nArray = new List<Half[]>();
+                    var nArray = new List<SharpDX.Half[]>();
                     // The first entry in the list is an 0xFF byte that we skip
                     // Since that would leave us with one less value than we need, as dummy value is added for the last dye
                     for (int i = 1; i < numDyes + 1; i++)
@@ -298,11 +298,11 @@ namespace xivModdingFramework.Materials.FileTypes
                             {
                                 if (x < 3)
                                 {
-                                    nArray.Add(new Half[] { new Half(), new Half(), new Half() });
+                                    nArray.Add(new SharpDX.Half[] { new SharpDX.Half(), new SharpDX.Half(), new SharpDX.Half() });
                                 }
                                 else
                                 {
-                                    nArray.Add(new Half[] { new Half() });
+                                    nArray.Add(new SharpDX.Half[] { new SharpDX.Half() });
                                 }
                                 continue;
                             }
