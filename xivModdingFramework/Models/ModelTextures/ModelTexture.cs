@@ -62,6 +62,7 @@ namespace xivModdingFramework.Models.ModelTextures
         public Color EyeColor;      // Off eye color customization isn't really sanely doable since it's managed by Vertex Color.
         public Color LipColor;
         public Color HairColor;
+        public Color LightColor;
 
         // Also known as Limbal Color or Etc. Color.  Just depends on race.
         // Most have tattoo color, so that's the default name.
@@ -89,6 +90,7 @@ namespace xivModdingFramework.Models.ModelTextures
             EyeColor = new Color(172, 113, 159, 255);
             LipColor = new Color(139, 55, 46, 153);
             HairColor = new Color(110, 77, 35, 255);
+            LightColor = new Color(0, 0, 0, 255);
             HairHighlightColor = new Color(91, 110, 129, 255);
             TattooColor = new Color(48, 112, 102, 255);
             FurnitureColor = new Color(141, 60, 204, 255);
@@ -920,6 +922,7 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 var hairColor = (Color4)colors.HairColor;
                 var bonusColor = GetHairBonusColor(mtrl, colors, colors.HairHighlightColor != null ? colors.HairHighlightColor.Value : colors.HairColor);
+                var lightColor = SrgbToLinear(new Color4(1, 0, 1, 1));
 
                 //bonusColor = SrgbToLinear(bonusColor);
 
@@ -928,13 +931,15 @@ namespace xivModdingFramework.Models.ModelTextures
                     var metalness = 0.0f;
                     var occlusion = 1.0f;
                     float bonusInfluence = normal.Blue;
+                    float lightInfluence = (float)Math.Pow(mask.Red, 4.25f);
 
-
+                    //Console.WriteLine($"light influence: {lightInfluence}");
 
                     roughness = mask.Green;
                     var specular = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
 
-                    diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    var baseHairColor = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    diffuse = Color4.Lerp(baseHairColor, colors.LightColor, lightInfluence);
                     diffuse *= diffuseColorMul;
 
                     occlusion = (mask.Alpha * mask.Alpha);
