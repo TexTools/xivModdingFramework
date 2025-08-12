@@ -583,24 +583,6 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to DX11.
-        /// </summary>
-        internal static string DX11 {
-            get {
-                return ResourceManager.GetString("DX11", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to DX9.
-        /// </summary>
-        internal static string DX9 {
-            get {
-                return ResourceManager.GetString("DX9", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Ear.
         /// </summary>
         internal static string Ear {
@@ -727,7 +709,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Emote.
+        ///   Looks up a localized string similar to Emotes.
         /// </summary>
         internal static string Emote {
             get {
@@ -2284,7 +2266,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Ring Left.
         /// </summary>
         internal static string Ring_Left {
             get {
@@ -2293,7 +2275,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Ring Right.
         /// </summary>
         internal static string Ring_Right {
             get {
@@ -2527,7 +2509,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Texture Mao.
         /// </summary>
         internal static string Texture_Map {
             get {
@@ -2554,7 +2536,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Type.
         /// </summary>
         internal static string Type {
             get {
@@ -2563,7 +2545,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Part Type.
         /// </summary>
         internal static string TypePart {
             get {

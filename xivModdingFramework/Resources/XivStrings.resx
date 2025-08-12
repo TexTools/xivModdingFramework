@@ -258,12 +258,6 @@
   <data name="Diffuse" xml:space="preserve">
     <value>Diffuse</value>
   </data>
-  <data name="DX11" xml:space="preserve">
-    <value>DX11</value>
-  </data>
-  <data name="DX9" xml:space="preserve">
-    <value>DX9</value>
-  </data>
   <data name="Earring" xml:space="preserve">
     <value>Earring</value>
   </data>
@@ -271,7 +265,7 @@
     <value>Elezen</value>
   </data>
   <data name="Emote" xml:space="preserve">
-    <value>Emote</value>
+    <value>Emotes</value>
   </data>
   <data name="EmoteEXD" xml:space="preserve">
     <value>emote_0_{0}.exd</value>
@@ -1024,19 +1018,19 @@
     <value>Race</value>
   </data>
   <data name="Ring_Left" xml:space="preserve">
-    <value />
+    <value>Ring Left</value>
   </data>
   <data name="Ring_Right" xml:space="preserve">
-    <value />
+    <value>Ring Right</value>
   </data>
   <data name="Texture_Map" xml:space="preserve">
-    <value />
+    <value>Texture Mao</value>
   </data>
   <data name="Type" xml:space="preserve">
-    <value />
+    <value>Type</value>
   </data>
   <data name="TypePart" xml:space="preserve">
-    <value />
+    <value>Part Type</value>
   </data>
   <data name="Variant" xml:space="preserve">
     <value>Variant</value>
