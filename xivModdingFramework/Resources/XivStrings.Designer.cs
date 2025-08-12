@@ -1600,7 +1600,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Language_Change_Ja.
         /// </summary>
         internal static string Language_Change_Ja {
             get {
