@@ -67,6 +67,14 @@ namespace xivModdingFramework.Cache
 
         public XivTexFormat DefaultTextureFormat { get; set; } = XivTexFormat.A8R8G8B8;
 
+        public enum EPenumbraRedrawMode
+        {
+            RedrawAll,
+            RedrawSelf,
+            NoRedraw,
+        }
+
+        public EPenumbraRedrawMode PenumbraRedrawMode { get; set; } = EPenumbraRedrawMode.RedrawAll;
     }
 
     /// <summary>

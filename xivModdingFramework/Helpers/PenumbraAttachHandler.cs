@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Mods.FileTypes.PMP;
@@ -361,7 +362,10 @@ namespace xivModdingFramework.Helpers
                     {
                         await PenumbraAPI.ReloadMod(folder);
                     }
-                    await PenumbraAPI.Redraw();
+                    if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawAll)
+                        await PenumbraAPI.Redraw();
+                    else if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawSelf)
+                        await PenumbraAPI.RedrawSelf();
                 }
             }
             catch

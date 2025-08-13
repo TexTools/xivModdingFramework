@@ -17,7 +17,6 @@ namespace xivModdingFramework.Helpers
     /// </summary>
     public static class PenumbraAPI
     {
-
         /// <summary>
         /// Calls /redraw on the Penumbra API.
         /// </summary>
@@ -26,6 +25,19 @@ namespace xivModdingFramework.Helpers
         {
             return await Request("/redraw");
 
+        }
+
+        /// <summary>
+        /// Calls /redraw on the Penumbra API to redraw only the local player.
+        /// </summary>
+        /// <returns></returns>
+        public static async Task<bool> RedrawSelf()
+        {
+            Dictionary<string, string> args = new()
+            {
+                { "ObjectTableIndex", "0" }
+            };
+            return await Request("/redraw", args);
         }
 
         /// <summary>
