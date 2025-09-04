@@ -313,6 +313,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Body + Legs.
+        /// </summary>
+        internal static string Body_Legs {
+            get {
+                return ResourceManager.GetString("Body_Legs", resourceCulture);
+            }
+        }		
+		
+        /// <summary>
         ///   Looks up a localized string similar to Body + Legs + Feet.
         /// </summary>
         internal static string Body_Legs_Feet {
