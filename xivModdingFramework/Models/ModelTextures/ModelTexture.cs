@@ -931,7 +931,7 @@ namespace xivModdingFramework.Models.ModelTextures
                     var metalness = 0.0f;
                     var occlusion = 1.0f;
                     float bonusInfluence = normal.Blue;
-                    float lightInfluence = (float)Math.Pow(mask.Red, 4.25f);
+                    float lightInfluence = mask.Alpha * mask.Alpha;
 
                     //Console.WriteLine($"light influence: {lightInfluence}");
 
@@ -939,8 +939,15 @@ namespace xivModdingFramework.Models.ModelTextures
                     var specular = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
 
                     var baseHairColor = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
-                    diffuse = Color4.Lerp(baseHairColor, colors.LightColor, lightInfluence);
+                    // var strandColor = baseHairColor * (colors.LightColor * lightInfluence);
+
+                    // diffuse = Color4.Lerp(baseHairColor, strandColor, lightInfluence);
+
+                    diffuse = baseHairColor;
+
                     diffuse *= diffuseColorMul;
+
+                    diffuse *= lightInfluence;
 
                     occlusion = (mask.Alpha * mask.Alpha);
                     if (!settings.GeneratePbrMaps)
@@ -952,7 +959,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var sss = mask.Blue;
 
-                    var alpha = normal.Alpha * alphaMultiplier;
+                    var alpha = normal.Alpha;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
                     diffuse.Alpha = alpha;
