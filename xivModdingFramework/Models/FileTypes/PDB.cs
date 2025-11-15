@@ -336,16 +336,16 @@ namespace xivModdingFramework.Models.FileTypes
 
             if (def.Deformations.ContainsKey(node.BoneName))
             {
-                def.InvertedDeformations.Add(node.BoneName, def.Deformations[node.BoneName].Inverted());
+                var invertedMatrix = def.Deformations[node.BoneName].Inverted();
+                def.InvertedDeformations.Add(node.BoneName, invertedMatrix);
 
-                var normalMatrix = def.Deformations[node.BoneName];
+                var normalMatrix = invertedMatrix;
                 normalMatrix.Transpose();
                 def.NormalDeformations.Add(node.BoneName, normalMatrix);
 
-                var invertexNormalMatrix = def.Deformations[node.BoneName];
-                normalMatrix.Transpose();
-                invertexNormalMatrix.Invert();
-                def.InvertedNormalDeformations.Add(node.BoneName, invertexNormalMatrix);
+                var invertedNormalMatrix = def.Deformations[node.BoneName];
+                invertedNormalMatrix.Transpose();
+                def.InvertedNormalDeformations.Add(node.BoneName, invertedNormalMatrix);
             }
             else
             {
