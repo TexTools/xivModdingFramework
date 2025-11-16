@@ -343,8 +343,7 @@ namespace xivModdingFramework.Models.FileTypes
                 normalMatrix.Transpose();
                 def.NormalDeformations.Add(node.BoneName, normalMatrix);
 
-                var invertedNormalMatrix = def.Deformations[node.BoneName];
-                invertedNormalMatrix.Transpose();
+                var invertedNormalMatrix = normalMatrix.Inverted();
                 def.InvertedNormalDeformations.Add(node.BoneName, invertedNormalMatrix);
             }
             else
