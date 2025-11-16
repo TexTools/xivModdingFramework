@@ -1438,7 +1438,11 @@ namespace xivModdingFramework.Models.Helpers
                                 v.Normal = normal.Normalized();
                                 v.Binormal = binormal.Normalized();
                                 v.Tangent = tangent.Normalized();
-                                v.FlowDirection = flow.Normalized();
+
+                                if (v.FlowDirection != Vector3.Zero)
+                                {
+                                    v.FlowDirection = flow.Normalized();
+                                }
                             }
                         }
 
