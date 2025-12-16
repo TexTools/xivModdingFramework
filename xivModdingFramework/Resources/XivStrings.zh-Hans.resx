@@ -202,7 +202,7 @@
     <value>女性</value>
   </data>
   <data name="Food" xml:space="preserve">
-    <value>食品</value>
+    <value>食物</value>
   </data>
   <data name="Garuda_Egi" xml:space="preserve">
     <value>迦楼罗之灵</value>
@@ -448,7 +448,7 @@
     <value>人族</value>
   </data>
   <data name="Ear" xml:space="preserve">
-    <value>耳朵</value>
+    <value>耳</value>
   </data>
   <data name="Left" xml:space="preserve">
     <value>左</value>
@@ -526,7 +526,7 @@
     <value>饰品</value>
   </data>
   <data name="Ears" xml:space="preserve">
-    <value>耳</value>
+    <value>耳朵</value>
   </data>
   <data name="Furniture" xml:space="preserve">
     <value>家具</value>
@@ -575,5 +575,104 @@
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>武器</value>
+  </data>
+  <data name="Shields" xml:space="preserve">
+    <value>盾</value>
+  </data>
+  <data name="PaladinArms" xml:space="preserve">
+    <value>骑士武器</value>
+  </data>
+  <data name="MonkArms" xml:space="preserve">
+    <value>武僧武器</value>
+  </data>
+  <data name="WarriorArms" xml:space="preserve">
+    <value>战士武器</value>
+  </data>
+  <data name="DragoonArms" xml:space="preserve">
+    <value>龙骑士武器</value>
+  </data>
+  <data name="BardArms" xml:space="preserve">
+    <value>吟游诗人武器</value>
+  </data>
+  <data name="BlackMageArms" xml:space="preserve">
+    <value>黑魔法师武器</value>
+  </data>
+  <data name="WhiteMageArms" xml:space="preserve">
+    <value>白魔法师武器</value>
+  </data>
+  <data name="DarkKnightArms" xml:space="preserve">
+    <value>暗黑骑士武器</value>
+  </data>
+  <data name="SummonerScholarArms" xml:space="preserve">
+    <value>召唤师·学者武器</value>
+  </data>
+  <data name="NinjaArms" xml:space="preserve">
+    <value>忍者武器</value>
+  </data>
+  <data name="MachinistArms" xml:space="preserve">
+    <value>机工士武器</value>
+  </data>
+  <data name="AstrologianArms" xml:space="preserve">
+    <value>占星术士武器</value>
+  </data>
+  <data name="SamuraiArms" xml:space="preserve">
+    <value>武士武器</value>
+  </data>
+  <data name="RedMageArms" xml:space="preserve">
+    <value>赤魔法师武器</value>
+  </data>
+  <data name="BlueMageArms" xml:space="preserve">
+    <value>青魔法师武器</value>
+  </data>
+  <data name="GunbreakerArms" xml:space="preserve">
+    <value>绝枪战士武器</value>
+  </data>
+  <data name="DancerArms" xml:space="preserve">
+    <value>舞者武器</value>
+  </data>
+  <data name="SageArms" xml:space="preserve">
+    <value>贤者武器</value>
+  </data>
+  <data name="ReaperArms" xml:space="preserve">
+    <value>钐镰客武器</value>
+  </data>
+  <data name="PictomancerArms" xml:space="preserve">
+    <value>绘灵法师武器</value>
+  </data>
+  <data name="ViperArms" xml:space="preserve">
+    <value>蝰蛇武器</value>
+  </data>
+  <data name="CarpenterArms" xml:space="preserve">
+    <value>刻木匠武器</value>
+  </data>
+  <data name="BlacksmithArms" xml:space="preserve">
+    <value>锻铁匠武器</value>
+  </data>
+  <data name="ArmorerArms" xml:space="preserve">
+    <value>铸甲匠武器</value>
+  </data>
+  <data name="GoldsmithArms" xml:space="preserve">
+    <value>雕金匠武器</value>
+  </data>
+  <data name="LeatherworkerArms" xml:space="preserve">
+    <value>制革匠武器</value>
+  </data>
+  <data name="WeaverArms" xml:space="preserve">
+    <value>裁衣匠武器</value>
+  </data>
+  <data name="AlchemistArms" xml:space="preserve">
+    <value>炼金术士武器</value>
+  </data>
+  <data name="CulinarianArms" xml:space="preserve">
+    <value>烹调师武器</value>
+  </data>
+  <data name="MinerArms" xml:space="preserve">
+    <value>采矿工武器</value>
+  </data>
+  <data name="BotanistArms" xml:space="preserve">
+    <value>园艺工武器</value>
+  </data>
+  <data name="FisherArms" xml:space="preserve">
+    <value>捕鱼人武器</value>
   </data>
 </root>

@@ -1038,4 +1038,106 @@
   <data name="Variant" xml:space="preserve">
     <value>Variant</value>
   </data>
+  <data name="Shields" xml:space="preserve">
+    <value>Shields</value>
+  </data>
+  <data name="PaladinArms" xml:space="preserve">
+    <value>Paladin Arms</value>
+  </data>
+  <data name="MonkArms" xml:space="preserve">
+    <value>Monk Arms</value>
+  </data>
+  <data name="WarriorArms" xml:space="preserve">
+    <value>Warrior Arms</value>
+  </data>
+  <data name="DragoonArms" xml:space="preserve">
+    <value>Dragoon Arms</value>
+  </data>
+  <data name="BardArms" xml:space="preserve">
+    <value>Bard Arms</value>
+  </data>
+  <data name="BlackMageArms" xml:space="preserve">
+    <value>Black Mage Arms</value>
+  </data>
+  <data name="WhiteMageArms" xml:space="preserve">
+    <value>White Mage Arms</value>
+  </data>
+  <data name="DarkKnightArms" xml:space="preserve">
+    <value>Dark Knight Arms</value>
+  </data>
+  <data name="SummonerScholarArms" xml:space="preserve">
+    <value>Summoner/Scholar Arms</value>
+  </data>
+  <data name="NinjaArms" xml:space="preserve">
+    <value>Ninja Arms</value>
+  </data>
+  <data name="MachinistArms" xml:space="preserve">
+    <value>Machinist Arms</value>
+  </data>
+  <data name="AstrologianArms" xml:space="preserve">
+    <value>Astrologian Arms</value>
+  </data>
+  <data name="SamuraiArms" xml:space="preserve">
+    <value>Samurai Arms</value>
+  </data>
+  <data name="RedMageArms" xml:space="preserve">
+    <value>Red Mage Arms</value>
+  </data>
+  <data name="BlueMageArms" xml:space="preserve">
+    <value>Blue Mage Arms</value>
+  </data>
+  <data name="GunbreakerArms" xml:space="preserve">
+    <value>Gunbreaker Arms</value>
+  </data>
+  <data name="DancerArms" xml:space="preserve">
+    <value>Dancer Arms</value>
+  </data>
+  <data name="SageArms" xml:space="preserve">
+    <value>Sage Arms</value>
+  </data>
+  <data name="ReaperArms" xml:space="preserve">
+    <value>Reaper Arms</value>
+  </data>
+  <data name="PictomancerArms" xml:space="preserve">
+    <value>Pictomancer Arms</value>
+  </data>
+  <data name="ViperArms" xml:space="preserve">
+    <value>Viper Arms</value>
+  </data>
+  <data name="Whips" xml:space="preserve">
+    <value>Whips</value>
+  </data>
+  <data name="CarpenterArms" xml:space="preserve">
+    <value>Carpenter Arms</value>
+  </data>
+  <data name="BlacksmithArms" xml:space="preserve">
+    <value>Blacksmith Arms</value>
+  </data>
+  <data name="ArmorerArms" xml:space="preserve">
+    <value>Armorer Arms</value>
+  </data>
+  <data name="GoldsmithArms" xml:space="preserve">
+    <value>Goldsmith Arms</value>
+  </data>
+  <data name="LeatherworkerArms" xml:space="preserve">
+    <value>Leatherworker Arms</value>
+  </data>
+  <data name="WeaverArms" xml:space="preserve">
+    <value>Weaver Arms</value>
+  </data>
+  <data name="AlchemistArms" xml:space="preserve">
+    <value>Alchemist Arms</value>
+  </data>
+  <data name="CulinarianArms" xml:space="preserve">
+    <value>Culinarian Arms</value>
+  </data>
+  <data name="MinerArms" xml:space="preserve">
+    <value>Miner Arms</value>
+  </data>
+  <data name="BotanistArms" xml:space="preserve">
+    <value>Botanist Arms</value>
+  </data>
+  <data name="FisherArms" xml:space="preserve">
+    <value>Fisher Arms</value>
+  </data>
 </root>

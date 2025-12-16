@@ -160,6 +160,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Alchemist Arms.
+        /// </summary>
+        internal static string AlchemistArms {
+            get {
+                return ResourceManager.GetString("AlchemistArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to ALL.
         /// </summary>
         internal static string All {
@@ -174,6 +183,24 @@ namespace xivModdingFramework.Resources {
         internal static string All_Races {
             get {
                 return ResourceManager.GetString("All_Races", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Armorer Arms.
+        /// </summary>
+        internal static string ArmorerArms {
+            get {
+                return ResourceManager.GetString("ArmorerArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Astrologian Arms.
+        /// </summary>
+        internal static string AstrologianArms {
+            get {
+                return ResourceManager.GetString("AstrologianArms", resourceCulture);
             }
         }
         
@@ -259,6 +286,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Bard Arms.
+        /// </summary>
+        internal static string BardArms {
+            get {
+                return ResourceManager.GetString("BardArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Beneficial.
         /// </summary>
         internal static string Beneficial {
@@ -273,6 +309,33 @@ namespace xivModdingFramework.Resources {
         internal static string Bishop_Autoturret {
             get {
                 return ResourceManager.GetString("Bishop_Autoturret", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Black Mage Arms.
+        /// </summary>
+        internal static string BlackMageArms {
+            get {
+                return ResourceManager.GetString("BlackMageArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Blacksmith Arms.
+        /// </summary>
+        internal static string BlacksmithArms {
+            get {
+                return ResourceManager.GetString("BlacksmithArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Blue Mage Arms.
+        /// </summary>
+        internal static string BlueMageArms {
+            get {
+                return ResourceManager.GetString("BlueMageArms", resourceCulture);
             }
         }
         
@@ -376,6 +439,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Botanist Arms.
+        /// </summary>
+        internal static string BotanistArms {
+            get {
+                return ResourceManager.GetString("BotanistArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Buddy.
         /// </summary>
         internal static string Buddy {
@@ -399,6 +471,15 @@ namespace xivModdingFramework.Resources {
         internal static string Carbuncle {
             get {
                 return ResourceManager.GetString("Carbuncle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Carpenter Arms.
+        /// </summary>
+        internal static string CarpenterArms {
+            get {
+                return ResourceManager.GetString("CarpenterArms", resourceCulture);
             }
         }
         
@@ -466,11 +547,38 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Culinarian Arms.
+        /// </summary>
+        internal static string CulinarianArms {
+            get {
+                return ResourceManager.GetString("CulinarianArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Cure.
         /// </summary>
         internal static string Cure {
             get {
                 return ResourceManager.GetString("Cure", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Dancer Arms.
+        /// </summary>
+        internal static string DancerArms {
+            get {
+                return ResourceManager.GetString("DancerArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Dark Knight Arms.
+        /// </summary>
+        internal static string DarkKnightArms {
+            get {
+                return ResourceManager.GetString("DarkKnightArms", resourceCulture);
             }
         }
         
@@ -579,6 +687,15 @@ namespace xivModdingFramework.Resources {
         internal static string Diffuse {
             get {
                 return ResourceManager.GetString("Diffuse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Dragoon Arms.
+        /// </summary>
+        internal static string DragoonArms {
+            get {
+                return ResourceManager.GetString("DragoonArms", resourceCulture);
             }
         }
         
@@ -1051,6 +1168,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Fisher Arms.
+        /// </summary>
+        internal static string FisherArms {
+            get {
+                return ResourceManager.GetString("FisherArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Food.
         /// </summary>
         internal static string Food {
@@ -1119,6 +1245,24 @@ namespace xivModdingFramework.Resources {
         internal static string GeneralAction {
             get {
                 return ResourceManager.GetString("GeneralAction", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Goldsmith Arms.
+        /// </summary>
+        internal static string GoldsmithArms {
+            get {
+                return ResourceManager.GetString("GoldsmithArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Gunbreaker Arms.
+        /// </summary>
+        internal static string GunbreakerArms {
+            get {
+                return ResourceManager.GetString("GunbreakerArms", resourceCulture);
             }
         }
         
@@ -1618,6 +1762,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Leatherworker Arms.
+        /// </summary>
+        internal static string LeatherworkerArms {
+            get {
+                return ResourceManager.GetString("LeatherworkerArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Left.
         /// </summary>
         internal static string Left {
@@ -1668,6 +1821,15 @@ namespace xivModdingFramework.Resources {
         internal static string LoadingScreen {
             get {
                 return ResourceManager.GetString("LoadingScreen", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Machinist Arms.
+        /// </summary>
+        internal static string MachinistArms {
+            get {
+                return ResourceManager.GetString("MachinistArms", resourceCulture);
             }
         }
         
@@ -1816,6 +1978,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Miner Arms.
+        /// </summary>
+        internal static string MinerArms {
+            get {
+                return ResourceManager.GetString("MinerArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Minimap.
         /// </summary>
         internal static string Minimap {
@@ -1933,6 +2104,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Monk Arms.
+        /// </summary>
+        internal static string MonkArms {
+            get {
+                return ResourceManager.GetString("MonkArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Monster.
         /// </summary>
         internal static string Monster {
@@ -2046,6 +2226,15 @@ namespace xivModdingFramework.Resources {
         internal static string Neck {
             get {
                 return ResourceManager.GetString("Neck", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Ninja Arms.
+        /// </summary>
+        internal static string NinjaArms {
+            get {
+                return ResourceManager.GetString("NinjaArms", resourceCulture);
             }
         }
         
@@ -2194,6 +2383,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Paladin Arms.
+        /// </summary>
+        internal static string PaladinArms {
+            get {
+                return ResourceManager.GetString("PaladinArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Part.
         /// </summary>
         internal static string Part {
@@ -2217,6 +2415,15 @@ namespace xivModdingFramework.Resources {
         internal static string Pets {
             get {
                 return ResourceManager.GetString("Pets", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Pictomancer Arms.
+        /// </summary>
+        internal static string PictomancerArms {
+            get {
+                return ResourceManager.GetString("PictomancerArms", resourceCulture);
             }
         }
         
@@ -2262,6 +2469,24 @@ namespace xivModdingFramework.Resources {
         internal static string Ramuh_Egi {
             get {
                 return ResourceManager.GetString("Ramuh_Egi", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Reaper Arms.
+        /// </summary>
+        internal static string ReaperArms {
+            get {
+                return ResourceManager.GetString("ReaperArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Red Mage Arms.
+        /// </summary>
+        internal static string RedMageArms {
+            get {
+                return ResourceManager.GetString("RedMageArms", resourceCulture);
             }
         }
         
@@ -2374,6 +2599,24 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Sage Arms.
+        /// </summary>
+        internal static string SageArms {
+            get {
+                return ResourceManager.GetString("SageArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Samurai Arms.
+        /// </summary>
+        internal static string SamuraiArms {
+            get {
+                return ResourceManager.GetString("SamuraiArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Search Textures.
         /// </summary>
         internal static string SearchBox {
@@ -2419,6 +2662,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Shields.
+        /// </summary>
+        internal static string Shields {
+            get {
+                return ResourceManager.GetString("Shields", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Skin.
         /// </summary>
         internal static string Skin {
@@ -2460,6 +2712,15 @@ namespace xivModdingFramework.Resources {
         internal static string StatusExd {
             get {
                 return ResourceManager.GetString("StatusExd", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Summoner/Scholar Arms.
+        /// </summary>
+        internal static string SummonerScholarArms {
+            get {
+                return ResourceManager.GetString("SummonerScholarArms", resourceCulture);
             }
         }
         
@@ -2680,11 +2941,29 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Viper Arms.
+        /// </summary>
+        internal static string ViperArms {
+            get {
+                return ResourceManager.GetString("ViperArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Waist.
         /// </summary>
         internal static string Waist {
             get {
                 return ResourceManager.GetString("Waist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Warrior Arms.
+        /// </summary>
+        internal static string WarriorArms {
+            get {
+                return ResourceManager.GetString("WarriorArms", resourceCulture);
             }
         }
         
@@ -2811,6 +3090,33 @@ namespace xivModdingFramework.Resources {
         internal static string WeatherEXD {
             get {
                 return ResourceManager.GetString("WeatherEXD", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Weaver Arms.
+        /// </summary>
+        internal static string WeaverArms {
+            get {
+                return ResourceManager.GetString("WeaverArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Whips.
+        /// </summary>
+        internal static string Whips {
+            get {
+                return ResourceManager.GetString("Whips", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to White Mage Arms.
+        /// </summary>
+        internal static string WhiteMageArms {
+            get {
+                return ResourceManager.GetString("WhiteMageArms", resourceCulture);
             }
         }
         

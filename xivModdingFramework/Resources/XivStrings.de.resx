@@ -193,7 +193,7 @@
     <value>Weiblich</value>
   </data>
   <data name="Food" xml:space="preserve">
-    <value>Gericht</value>
+    <value>Essen</value>
   </data>
   <data name="Gear" xml:space="preserve">
     <value>Ausrüstung</value>
@@ -286,15 +286,114 @@
     <value>Accessoires</value>
   </data>
   <data name="Ears" xml:space="preserve">
-    <value>Ohr</value>
+    <value>Ohren</value>
   </data>
   <data name="Earring" xml:space="preserve">
     <value>Ohrring</value>
   </data>
   <data name="Ear" xml:space="preserve">
-    <value>Ohren</value>
+    <value>Ohr</value>
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>Waffen</value>
+  </data>
+  <data name="Shields" xml:space="preserve">
+    <value>Schilde</value>
+  </data>
+  <data name="PaladinArms" xml:space="preserve">
+    <value>Paladin-Waffen</value>
+  </data>
+  <data name="MonkArms" xml:space="preserve">
+    <value>Mönch-Waffen</value>
+  </data>
+  <data name="WarriorArms" xml:space="preserve">
+    <value>Krieger-Waffen</value>
+  </data>
+  <data name="DragoonArms" xml:space="preserve">
+    <value>Dragoon-Waffen</value>
+  </data>
+  <data name="BardArms" xml:space="preserve">
+    <value>Barden-Waffen</value>
+  </data>
+  <data name="BlackMageArms" xml:space="preserve">
+    <value>Schwarzmagier-Waffen</value>
+  </data>
+  <data name="WhiteMageArms" xml:space="preserve">
+    <value>Weißmagier-Waffen</value>
+  </data>
+  <data name="DarkKnightArms" xml:space="preserve">
+    <value>Dunkelritter-Waffen</value>
+  </data>
+  <data name="SummonerScholarArms" xml:space="preserve">
+    <value>Beschwörer/Gelehrter/Waffen</value>
+  </data>
+  <data name="NinjaArms" xml:space="preserve">
+    <value>Ninja-Waffen</value>
+  </data>
+  <data name="MachinistArms" xml:space="preserve">
+    <value>Maschinist-Waffen</value>
+  </data>
+  <data name="AstrologianArms" xml:space="preserve">
+    <value>Astrologe-Waffen</value>
+  </data>
+  <data name="SamuraiArms" xml:space="preserve">
+    <value>Samurai-Waffen</value>
+  </data>
+  <data name="RedMageArms" xml:space="preserve">
+    <value>Rotmagier-Waffen</value>
+  </data>
+  <data name="BlueMageArms" xml:space="preserve">
+    <value>Blaumagier-Waffen</value>
+  </data>
+  <data name="GunbreakerArms" xml:space="preserve">
+    <value>Revolverklinge-Waffen</value>
+  </data>
+  <data name="DancerArms" xml:space="preserve">
+    <value>Tänzer-Waffen</value>
+  </data>
+  <data name="SageArms" xml:space="preserve">
+    <value>Weiser-Waffen</value>
+  </data>
+  <data name="ReaperArms" xml:space="preserve">
+    <value>Schnitter-Waffen</value>
+  </data>
+  <data name="PictomancerArms" xml:space="preserve">
+    <value>Piktomant-Waffen</value>
+  </data>
+  <data name="ViperArms" xml:space="preserve">
+    <value>Viper-Waffen</value>
+  </data>
+  <data name="CarpenterArms" xml:space="preserve">
+    <value>Zimmerer-Waffen</value>
+  </data>
+  <data name="BlacksmithArms" xml:space="preserve">
+    <value>Grobschmied-Waffen</value>
+  </data>
+  <data name="ArmorerArms" xml:space="preserve">
+    <value>Plattner-Waffen</value>
+  </data>
+  <data name="GoldsmithArms" xml:space="preserve">
+    <value>Goldschmied-Waffen</value>
+  </data>
+  <data name="LeatherworkerArms" xml:space="preserve">
+    <value>Gerber-Waffen</value>
+  </data>
+  <data name="WeaverArms" xml:space="preserve">
+    <value>Weber-Waffen</value>
+  </data>
+  <data name="AlchemistArms" xml:space="preserve">
+    <value>Alchemist-Waffen</value>
+  </data>
+  <data name="CulinarianArms" xml:space="preserve">
+    <value>Koch-Waffen</value>
+  </data>
+  <data name="MinerArms" xml:space="preserve">
+    <value>Minenarbeiter-Waffen</value>
+  </data>
+  <data name="BotanistArms" xml:space="preserve">
+    <value>Gärtner-Waffen</value>
+  </data>
+  <data name="FisherArms" xml:space="preserve">
+    <value>Fischer-Waffen</value>
   </data>
 </root>

@@ -172,7 +172,7 @@
     <value>여성</value>
   </data>
   <data name="Food" xml:space="preserve">
-    <value>요리</value>
+    <value>음식</value>
   </data>
   <data name="Gear" xml:space="preserve">
     <value>장비</value>
@@ -287,5 +287,104 @@
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>무기</value>
+  </data>
+  <data name="Shields" xml:space="preserve">
+    <value>방패</value>
+  </data>
+  <data name="PaladinArms" xml:space="preserve">
+    <value>나이트</value>
+  </data>
+  <data name="MonkArms" xml:space="preserve">
+    <value>몽크</value>
+  </data>
+  <data name="WarriorArms" xml:space="preserve">
+    <value>전사</value>
+  </data>
+  <data name="DragoonArms" xml:space="preserve">
+    <value>용기사</value>
+  </data>
+  <data name="BardArms" xml:space="preserve">
+    <value>음유시인</value>
+  </data>
+  <data name="BlackMageArms" xml:space="preserve">
+    <value>흑마도사</value>
+  </data>
+  <data name="WhiteMageArms" xml:space="preserve">
+    <value>백마도사</value>
+  </data>
+  <data name="DarkKnightArms" xml:space="preserve">
+    <value>암흑기사</value>
+  </data>
+  <data name="SummonerScholarArms" xml:space="preserve">
+    <value>소환사/학자</value>
+  </data>
+  <data name="NinjaArms" xml:space="preserve">
+    <value>닌자</value>
+  </data>
+  <data name="MachinistArms" xml:space="preserve">
+    <value>기공사</value>
+  </data>
+  <data name="AstrologianArms" xml:space="preserve">
+    <value>점성술사</value>
+  </data>
+  <data name="SamuraiArms" xml:space="preserve">
+    <value>사무라이</value>
+  </data>
+  <data name="RedMageArms" xml:space="preserve">
+    <value>적마도사</value>
+  </data>
+  <data name="BlueMageArms" xml:space="preserve">
+    <value>청마도사</value>
+  </data>
+  <data name="GunbreakerArms" xml:space="preserve">
+    <value>건브레이커</value>
+  </data>
+  <data name="DancerArms" xml:space="preserve">
+    <value>무도가</value>
+  </data>
+  <data name="SageArms" xml:space="preserve">
+    <value>현자</value>
+  </data>
+  <data name="ReaperArms" xml:space="preserve">
+    <value>리퍼</value>
+  </data>
+  <data name="PictomancerArms" xml:space="preserve">
+    <value>픽토멘서</value>
+  </data>
+  <data name="ViperArms" xml:space="preserve">
+    <value>바이퍼</value>
+  </data>
+  <data name="CarpenterArms" xml:space="preserve">
+    <value>목수</value>
+  </data>
+  <data name="BlacksmithArms" xml:space="preserve">
+    <value>대장장이</value>
+  </data>
+  <data name="ArmorerArms" xml:space="preserve">
+    <value>갑주제작사</value>
+  </data>
+  <data name="GoldsmithArms" xml:space="preserve">
+    <value>보석공예가</value>
+  </data>
+  <data name="LeatherworkerArms" xml:space="preserve">
+    <value>가죽공예가</value>
+  </data>
+  <data name="WeaverArms" xml:space="preserve">
+    <value>재봉사</value>
+  </data>
+  <data name="AlchemistArms" xml:space="preserve">
+    <value>연금술사</value>
+  </data>
+  <data name="CulinarianArms" xml:space="preserve">
+    <value>요리사</value>
+  </data>
+  <data name="MinerArms" xml:space="preserve">
+    <value>광부</value>
+  </data>
+  <data name="BotanistArms" xml:space="preserve">
+    <value>원예가</value>
+  </data>
+  <data name="FisherArms" xml:space="preserve">
+    <value>어부</value>
   </data>
 </root>
