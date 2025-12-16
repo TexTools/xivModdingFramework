@@ -161,8 +161,79 @@ namespace xivModdingFramework.Textures.FileTypes
                 Debug.Assert(bw.BaseStream.Position == _TexHeaderSize, "Data was not fully written.");
                 return res;
             }
-        }
 
+            // Many tex files were written with broken mipmap offsets, and extra data at the end.
+            // Try to rebuild them here, using the total tex file size as a heuristic
+            // Returns a flag indicating if any data was changed, as well as the size in bytes that the tex file should be
+            internal static (bool HeaderChanged, long CalculatedTexSize) FixUpBrokenMipOffsets(TexHeader header, long texSizeIncludingHeader)
+            {
+                bool modified = false;
+                int originalMipCount = header.MipCount;
+                int mipOffset = (int)Tex._TexHeaderSize;
+
+                // A mip count of more than 13 is impossible
+                if (originalMipCount > 13)
+                    originalMipCount = 13;
+
+                // This will throw for unknown formats
+                var mipSizes = DDS.CalculateMipMapSizes((XivTexFormat)header.TextureFormat, header.Width, header.Height);
+
+                // Ensure MipCount is always something valid. First offset will always be 80 or 0x50
+                header.MipCount = 1;
+                modified |= (header.MipMapOffsets[0] != (uint)mipOffset);
+                header.MipMapOffsets[0] = (uint)mipOffset;
+                mipOffset += mipSizes[0];
+
+                int mipLevel;
+
+                for (mipLevel = 1; mipLevel < originalMipCount; ++mipLevel)
+                {
+                    // There's more mipmaps in the original file than we calculated should be possible -- cut the list short
+                    if (mipLevel >= mipSizes.Count)
+                        break;
+
+                    int mipSize = mipSizes[mipLevel];
+
+                    // We've reached a mipmap we calculate would extend past the end of the file -- cut the list short
+                    if (mipOffset + mipSize > texSizeIncludingHeader)
+                        break;
+
+                    // Write the expected mipmap offset
+                    modified |= (header.MipMapOffsets[mipLevel] != (uint)mipOffset);
+                    header.MipMapOffsets[mipLevel] = (uint)mipOffset;
+
+                    // Next offset
+                    mipOffset += mipSize;
+
+                    // Bump the mip count in the header to match what we have verified so far
+                    header.MipCount = (byte)(mipLevel + 1);
+                }
+
+                // Update LoDMips in case we removed a referenced mipmap
+                for (int lodLevel = 0; lodLevel < 3; ++lodLevel)
+                {
+                    if (header.LoDMips[lodLevel] >= header.MipCount)
+                    {
+                        modified = true;
+                        header.LoDMips[lodLevel] = (uint)(header.MipCount - 1);
+                    }
+                }
+
+                // Fill out the rest of table with zeroes
+                for (; mipLevel < 13; ++mipLevel)
+                {
+                    if (header.MipMapOffsets[mipLevel] != 0)
+                    {
+                        modified = true;
+                        header.MipMapOffsets[mipLevel] = 0;
+                    }
+                }
+
+                modified |= (header.MipCount != originalMipCount);
+
+                return (modified, mipOffset);
+            }
+        }
 
         /// <summary>
         /// Gets the path to the default blank texture for a given texture format.
@@ -764,7 +835,7 @@ namespace xivModdingFramework.Textures.FileTypes
             BitConverter.GetBytes(124).CopyTo(header, 4);
 
             // Flags?
-            BitConverter.GetBytes(0).CopyTo(header, 8);
+            BitConverter.GetBytes(0x21007).CopyTo(header, 8);
 
             // Size
             BitConverter.GetBytes(height).CopyTo(header, 12);
@@ -779,12 +850,15 @@ namespace xivModdingFramework.Textures.FileTypes
             // MipMap Count
             BitConverter.GetBytes(mipCount).CopyTo(header, 28);
 
+            // dwCaps. DDSCAPS_MIPMAP(0x40000) + DDSCAPS_TEXTURE(0x1000)
+            BitConverter.GetBytes(mipCount > 1 ? 0x401000 : 0x1000).CopyTo(header, 104);
+
             var startOfPixStruct = 76;
             // Pixel struct size
             BitConverter.GetBytes(32).CopyTo(header, startOfPixStruct);
 
-            // Pixel Flags.  In this case, uncompressed(64) + contains alpha(1).
-            BitConverter.GetBytes(65).CopyTo(header, startOfPixStruct + 4);
+            // Pixel Flags.  In this case, uncompressed(0x40) + contains alpha(0x01).
+            BitConverter.GetBytes(0x41).CopyTo(header, startOfPixStruct + 4);
 
             // DWFourCC, unused
             BitConverter.GetBytes(0).CopyTo(header, startOfPixStruct + 8);
@@ -1043,56 +1117,21 @@ namespace xivModdingFramework.Textures.FileTypes
             headerData.AddRange(BitConverter.GetBytes((short)1));
             headerData.AddRange(BitConverter.GetBytes((short)newMipCount));
 
+            var mipSizes = DDS.CalculateMipMapSizes(format, newWidth, newHeight);
+
+            if (mipSizes.Count < newMipCount)
+                throw new InvalidDataException($"CreateTexFileHeader: newMipCount ({newMipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
             headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
             headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
-
-            int mipLength;
-
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    mipLength = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.A8:
-                    mipLength = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    mipLength = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    mipLength = (newWidth * newHeight) * 4;
-                    break;
-            }
 
             var mipMapUncompressedOffset = 80;
 
             for (var i = 0; i < newMipCount; i++)
             {
                 headerData.AddRange(BitConverter.GetBytes(mipMapUncompressedOffset));
-                mipMapUncompressedOffset = mipMapUncompressedOffset + mipLength;
-
-                if (mipLength > 16)
-                {
-                    mipLength = mipLength / 4;
-                }
-                else
-                {
-                    mipLength = 16;
-                }
+                mipMapUncompressedOffset = mipMapUncompressedOffset + mipSizes[i];
             }
 
             var padding = 80 - headerData.Count;
@@ -1283,14 +1322,6 @@ namespace xivModdingFramework.Textures.FileTypes
                 newTex.AddRange(Dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
 
                 // Texture file header.
-                // CompressDDSBody call above alters individual mipmap sizes, ending up changing the offsets.
-                // Calculate those again here.
-                header.MipMapOffsets[0] = _TexHeaderSize;
-                for (var i = 1; i < header.MipCount; i++)
-                    header.MipMapOffsets[i] = header.MipMapOffsets[i - 1] + (uint)ddsParts[i - 1].Count;
-                header.LoDMips[0] = Math.Min(header.MipCount - 1u, header.LoDMips[0]);
-                header.LoDMips[1] = Math.Min(header.MipCount - 1u, Math.Max(header.LoDMips[0], header.LoDMips[1]));
-                header.LoDMips[2] = Math.Min(header.MipCount - 1u, Math.Max(header.LoDMips[1], header.LoDMips[2]));
                 newTex.AddRange(header.ToBytes());
 
                 // Compressed pixel data.

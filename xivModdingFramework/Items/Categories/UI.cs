@@ -355,7 +355,9 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(emoteData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (ushort)action.GetColumnByName("Icon");
+
+                // HACKHACK - Because SE is unlikely to ever actually use past 2^31 icons here, the simpler choice is used of casting this to int for now.
+                int iconId = (int)((uint)action.GetColumnByName("Icon"));
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 

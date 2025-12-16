@@ -201,7 +201,7 @@ namespace xivModdingFramework.Materials.FileTypes
             }},
         };
 
-        public StainingTemplateEntry(byte[] data, int offset, EStainingTemplate templateType)
+        public StainingTemplateEntry(byte[] data, int offset, EStainingTemplate templateType, bool oldFormat = false)
         {
             var arrayEnds = new List<ushort>();
             var start = offset;
@@ -212,9 +212,9 @@ namespace xivModdingFramework.Materials.FileTypes
                 _ItemCount = 5;
             }
 
+            var numDyes = oldFormat ? 128 : 254;
 
             // This format sucks.
-            var moreData = new List<ushort>();
             for (int i = 0; i < _ItemCount; i++)
             {
                 arrayEnds.Add(BitConverter.ToUInt16(data, offset));
@@ -244,17 +244,17 @@ namespace xivModdingFramework.Materials.FileTypes
                     // Single entry used for everything.
                     type = StainingTemplateArrayType.Singleton;
                 }
-                if(arraySize == 0)
+                else if(arraySize == 0)
                 {
                     // No data.
                     continue;
                 }
-                else if (arraySize < 128)
+                else if (arraySize < numDyes)
                 {
                     // Indexed array, where we have [n] # of real entries,
-                    // then 128 one-byte index entries referencing those [n] entries.
+                    // then 254 one-byte index entries referencing those [n] entries.
                     var totalBytes = (arrayEnds[x] - lastOffset) *2;
-                    var remBytes = totalBytes - 128;
+                    var remBytes = totalBytes - numDyes;
 
                     indexStart = start + headerSize + (lastOffset * 2) + remBytes;
 
@@ -287,13 +287,13 @@ namespace xivModdingFramework.Materials.FileTypes
                 if(type == StainingTemplateArrayType.Indexed)
                 {
                     var nArray = new List<Half[]>();
-                    var indexes = new byte[128];
-                    var indexCopy = data.Skip(indexStart).Take(129).ToArray();
-                    for (int i = 0; i < 128; i++)
+                    // The first entry in the list is an 0xFF byte that we skip
+                    // Since that would leave us with one less value than we need, as dummy value is added for the last dye
+                    for (int i = 1; i < numDyes + 1; i++)
                     {
                         try
                         {
-                            var index = data[indexStart + i];
+                            var index = (i == numDyes) ? 255 : data[indexStart + i];
                             if (index == 255 || index == 0)
                             {
                                 if (x < 3)
@@ -321,7 +321,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 if (halfData.Count == 1)
                 {
-                    for (int i = 0; i < 127; i++)
+                    for (int i = 0; i < numDyes; i++)
                     {
                         halfData.Add(halfData[0]);
                     }
@@ -337,8 +337,6 @@ namespace xivModdingFramework.Materials.FileTypes
 
                 lastOffset = arrayEnds[x];
             }
-
-            var length = lastOffset;
         }
 
     }
@@ -378,41 +376,50 @@ namespace xivModdingFramework.Materials.FileTypes
             TemplateType = templateType;
             // Get header size and # of entries.
             var Header = BitConverter.ToUInt16(data, 0);
+            var Version = BitConverter.ToUInt16(data, 2);
             var entryCount = BitConverter.ToUInt16(data, 4);
             var unknown = BitConverter.ToUInt16(data, 6);
 
+            // Number got bigger since Patch 7.2
+            // stainingtemplate_gud.stm (DT / non-legacy) can be distinguished by Version number
+            // stainingtemplate.stm (EW / legacy) instead uses a janky heuristic
+            // Once CN/KR are updated to 7.2, this logic can be removed
+            bool oldFormat = false;
+            if (templateType == EStainingTemplate.Dawntrail && Version < 0x201)
+                oldFormat = true;
+            else if (templateType == EStainingTemplate.Endwalker && (data[0x0A] != 0x00 || data[0x0B] != 0x00))
+                oldFormat = true;
 
-            Dictionary<ushort, int> entryOffsets = new Dictionary<ushort, int>();
+            Dictionary<uint, int> entryOffsets = new Dictionary<uint, int>();
 
-            List<ushort> keys = new List<ushort>();
-            List<ushort> values = new List<ushort>();
-            List<int> sizes = new List<int>();
+            List<uint> keys = new List<uint>();
             var offset = 8;
 
             // Read template Ids
             for (int i = 0; i < entryCount; i++)
             {
-                var key = BitConverter.ToUInt16(data, offset);
+                var key = oldFormat ? (uint)BitConverter.ToUInt16(data, offset) : BitConverter.ToUInt32(data, offset);
                 entryOffsets.Add(key, 0);
                 keys.Add(key);
-                offset += 2;
+                offset += oldFormat ? 2 : 4;
             }
 
-            const int _headerEntrySize = 4;
+            int _headerEntrySize = oldFormat ? 4 : 8;
             var endOfHeader = (8 + (_headerEntrySize * entryCount));
 
             for (int i = 0; i < entryCount; i++)
             {
-                entryOffsets[keys[i]] = ((BitConverter.ToUInt16(data, offset) * 2) + endOfHeader);
-                offset += 2;
+                var rawOffset = oldFormat ? (uint)BitConverter.ToUInt16(data, offset) : BitConverter.ToUInt32(data, offset);
+                entryOffsets[keys[i]] = (int)rawOffset * 2 + endOfHeader;
+                offset += oldFormat ? 2 : 4;
             }
 
 
             var idx = 0;
             foreach (var kv in entryOffsets)
             {
-                var entry = new StainingTemplateEntry(data, kv.Value, templateType);
-                Templates.Add(kv.Key, entry);
+                var entry = new StainingTemplateEntry(data, kv.Value, templateType, oldFormat);
+                Templates.Add((ushort)kv.Key, entry);
                 idx++;
             }
         }

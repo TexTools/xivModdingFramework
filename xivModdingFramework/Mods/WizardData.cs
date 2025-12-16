@@ -514,17 +514,12 @@ namespace xivModdingFramework.Mods
             PMPOptionJson op;
             if (GroupType == EGroupType.Imc)
             {
-                if (ImcData.IsDisableOption)
-                {
-                    var io = new PmpDisableImcOptionJson();
-                    op = io;
-                }
-                else
-                {
-                    var io = new PmpImcOptionJson();
-                    op = io;
+                var io = new PmpImcOptionJson();
+                op = io;
+                if (!ImcData.IsDisableOption)
                     io.AttributeMask = ImcData.AttributeMask;
-                }
+                else
+                    io.IsDisableSubMod = true;
             }
             else
             {
@@ -647,7 +642,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         public object ModOption;
 
-        public static async Task<WizardGroupEntry> FromWizardGroup(ModGroupJson tGroup, string unzipPath, bool needsTexFix)
+        public static async Task<WizardGroupEntry> FromWizardGroup(ModGroupJson tGroup, string unzipPath, TTMP.UpgradesNeeded upgradesNeeded)
         {
             var group = new WizardGroupEntry();
             group.Options = new List<WizardOptionEntry>();
@@ -657,6 +652,9 @@ namespace xivModdingFramework.Mods
             group.OptionType = tGroup.SelectionType == "Single" ? EOptionType.Single : EOptionType.Multi;
 
             var mpdPath = Path.Combine(unzipPath, "TTMPD.mpd");
+
+            bool needsTexFix = (upgradesNeeded & UpgradesNeeded.NeedsTexFix) == UpgradesNeeded.NeedsTexFix;
+            bool needsMdlFix = (upgradesNeeded & UpgradesNeeded.NeedsMdlFix) == UpgradesNeeded.NeedsMdlFix;
 
             foreach (var o in tGroup.OptionList)
             {
@@ -713,7 +711,7 @@ namespace xivModdingFramework.Mods
                                     continue;
                                 }
                             }
-                            else if (needsTexFix && mj.FullPath.EndsWith(".mdl"))
+                            else if (needsMdlFix && mj.FullPath.EndsWith(".mdl"))
                             {
                                 try
                                 {
@@ -831,17 +829,10 @@ namespace xivModdingFramework.Mods
                 {
                     var imcData = new WizardImcOptionData();
                     var imcOp = o as PmpImcOptionJson;
-                    if (imcOp != null)
-                    {
-                        imcData.IsDisableOption = false;
+                    if (!imcOp.IsDisableSubMod)
                         imcData.AttributeMask = imcOp.AttributeMask;
-                    }
-                    var defOp = o as PmpDisableImcOptionJson;
-                    if (defOp != null)
-                    {
-                        imcData.IsDisableOption = defOp.IsDisableSubMod;
-                        imcData.AttributeMask = 0;
-                    }
+                    else
+                        imcData.IsDisableOption = imcOp.IsDisableSubMod;
                     wizOp.ImcData = imcData;
                 }
 
@@ -983,7 +974,7 @@ namespace xivModdingFramework.Mods
             }
         }
 
-        public static async Task<WizardPageEntry> FromWizardModpackPage(ModPackPageJson jp, string unzipPath, bool needsTexFix)
+        public static async Task<WizardPageEntry> FromWizardModpackPage(ModPackPageJson jp, string unzipPath, TTMP.UpgradesNeeded upgradesNeeded)
         {
             var page = new WizardPageEntry();
             page.Name = "Page " + (jp.PageIndex + 1);
@@ -991,7 +982,7 @@ namespace xivModdingFramework.Mods
             page.Groups = new List<WizardGroupEntry>();
             foreach (var p in jp.ModGroups)
             {
-                var g = await WizardGroupEntry.FromWizardGroup(p, unzipPath, needsTexFix);
+                var g = await WizardGroupEntry.FromWizardGroup(p, unzipPath, upgradesNeeded);
                 if (g == null) continue;
                 page.Groups.Add(g);
             }
@@ -1183,13 +1174,13 @@ namespace xivModdingFramework.Mods
             data.ModPack = mp;
             data.RawSource = mpl;
 
-            var needsTexFix = TTMP.DoesModpackNeedTexFix(mpl);
+            var upgradesNeeded = TTMP.DoesModpackNeedFix(mpl);
 
 
             data.DataPages = new List<WizardPageEntry>();
             foreach (var p in mpl.ModPackPages)
             {
-                data.DataPages.Add(await WizardPageEntry.FromWizardModpackPage(p, unzipPath, needsTexFix));
+                data.DataPages.Add(await WizardPageEntry.FromWizardModpackPage(p, unzipPath, upgradesNeeded));
             }
             return data;
         }
@@ -1207,7 +1198,7 @@ namespace xivModdingFramework.Mods
             data.ModPack = mp;
             data.RawSource = mpl;
 
-            var needsTexFix = TTMP.DoesModpackNeedTexFix(mpl);
+            var needsTexFix = TTMP.DoesModpackNeedFix(mpl);
 
             // Create a fake page/group.
             data.DataPages = new List<WizardPageEntry>();

@@ -147,6 +147,9 @@
   <data name="Body_Hands_Legs_Feet" xml:space="preserve">
     <value>胴 + 手 + 脚 + 足</value>
   </data>
+  <data name="Body_Legs" xml:space="preserve">
+    <value>胴 + 脚</value>
+  </data>  
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>胴 + 脚 + 足</value>
   </data>
@@ -159,9 +162,6 @@
   <data name="Character" xml:space="preserve">
     <value>キャラクター</value>
   </data>
-  <data name="ColorSet" xml:space="preserve">
-    <value>ColorSet</value>
-  </data>
   <data name="Companions" xml:space="preserve">
     <value>バディ</value>
   </data>
@@ -171,17 +171,8 @@
   <data name="Craft" xml:space="preserve">
     <value>製作</value>
   </data>
-  <data name="Cure" xml:space="preserve">
-    <value>ケアル</value>
-  </data>
   <data name="Detrimental" xml:space="preserve">
     <value>弱体</value>
-  </data>
-  <data name="Diffuse" xml:space="preserve">
-    <value>Diffuse</value>
-  </data>
-  <data name="Ears" xml:space="preserve">
-    <value>耳</value>
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>エレゼン</value>
@@ -194,15 +185,6 @@
   </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>クレスト</value>
-  </data>
-  <data name="Error_DirectoryError" xml:space="preserve">
-    <value>Directory Error</value>
-  </data>
-  <data name="Error_FileNotFound" xml:space="preserve">
-    <value>Unable to find file, please check your directories under settings</value>
-  </data>
-  <data name="Etc" xml:space="preserve">
-    <value>Etc</value>
   </data>
   <data name="Event" xml:space="preserve">
     <value>イベント</value>
@@ -243,20 +225,8 @@
   <data name="Head_Body" xml:space="preserve">
     <value>頭 + 胴</value>
   </data>
-  <data name="Housing" xml:space="preserve">
-    <value>ハウジング</value>
-  </data>
-  <data name="Hyur_H" xml:space="preserve">
-    <value>Hyur Highlander</value>
-  </data>
-  <data name="Hyur_M" xml:space="preserve">
-    <value>Hyur Midlander</value>
-  </data>
   <data name="Ifrit_Egi" xml:space="preserve">
     <value>イフリート・エギ</value>
-  </data>
-  <data name="Iris" xml:space="preserve">
-    <value>Iris</value>
   </data>
   <data name="Items" xml:space="preserve">
     <value>アイテム</value>
@@ -267,17 +237,11 @@
   <data name="Language" xml:space="preserve">
     <value>ja</value>
   </data>
-  <data name="Language_Change_Ja" xml:space="preserve">
-    <value>言語を変更するには、アプリケーションを再起動する必要があります。 \n今すぐ再起動？</value>
-  </data>
   <data name="Legs" xml:space="preserve">
     <value>脚</value>
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>脚 + 足</value>
-  </data>
-  <data name="LoadingScreen" xml:space="preserve">
-    <value>Loading Screen</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>メインアーム</value>
@@ -294,26 +258,17 @@
   <data name="Marker" xml:space="preserve">
     <value>マーカー</value>
   </data>
-  <data name="Mask" xml:space="preserve">
-    <value>Mask</value>
-  </data>
   <data name="Minions" xml:space="preserve">
     <value>ミニオン</value>
   </data>
   <data name="Miqote" xml:space="preserve">
     <value>ミコッテ</value>
   </data>
-  <data name="Monster" xml:space="preserve">
-    <value>Monster</value>
-  </data>
   <data name="Mounts" xml:space="preserve">
     <value>マウント</value>
   </data>
   <data name="Neck" xml:space="preserve">
     <value>首</value>
-  </data>
-  <data name="Normal" xml:space="preserve">
-    <value>Normal</value>
   </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>サブアーム</value>
@@ -339,14 +294,8 @@
   <data name="Selene" xml:space="preserve">
     <value>フェアリー・セレネ</value>
   </data>
-  <data name="Seraph" xml:space="preserve">
-    <value>セラフィム</value>
-  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>ソウルクリスタル</value>
-  </data>
-  <data name="Specular" xml:space="preserve">
-    <value>Specular</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>ステータス</value>
@@ -368,5 +317,20 @@
   </data>
   <data name="Wrists" xml:space="preserve">
     <value>腕</value>
+  </data>
+  <data name="Housing" xml:space="preserve">
+    <value>ハウジング</value>
+  </data>
+  <data name="Seraph" xml:space="preserve">
+    <value>セラフィム</value>
+  </data>
+  <data name="Cure" xml:space="preserve">
+    <value>ケアル</value>
+  </data>
+  <data name="Ears" xml:space="preserve">
+    <value>耳</value>
+  </data>
+  <data name="Language_Change_Ja" xml:space="preserve">
+    <value>言語を変更するには、アプリケーションを再起動する必要があります。 \n今すぐ再起動？</value>
   </data>
 </root>

@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <AssemblyVersion>1.7.0.0</AssemblyVersion>
-    <Version>1.7.0</Version>
+    <AssemblyVersion>3.1.0.1</AssemblyVersion>
+    <Version>3.1.0.1</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <LangVersion>9.0</LangVersion>
     <Configurations>Debug;Release;Endwalker Debug;Endwalker Release</Configurations>
@@ -24,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="DotNetZip" Version="1.16.0" />
+    <PackageReference Include="DotNetZip.Original" Version="2025.2.15" />
     <PackageReference Include="HelixToolkit" Version="2.25.0" />
     <PackageReference Include="HelixToolkit.SharpDX.Core" Version="2.25.0" />
     <PackageReference Include="JeremyAnsel.BcnSharp" Version="1.0.6" />
@@ -34,7 +34,7 @@
     <PackageReference Include="SharpDX" Version="4.2.0" />
     <PackageReference Include="SharpDX.Mathematics" Version="4.2.0" />
     <PackageReference Include="System.Buffers" Version="4.5.1" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.9" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11" />
     <PackageReference Include="System.Data.SQLite" Version="1.0.118" />
     <PackageReference Include="System.Management" Version="8.0.0" />
     <PackageReference Include="System.Numerics.Vectors" Version="4.5.0" />
@@ -43,7 +43,7 @@
 
  <PropertyGroup>
     <ContentSQLiteInteropFiles>true</ContentSQLiteInteropFiles>
-    <FileVersion>1.7.0.0</FileVersion>
+    <FileVersion>3.1.0.1</FileVersion>
  </PropertyGroup>
 
  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

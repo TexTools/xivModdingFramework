@@ -114,30 +114,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return 2147483647;
                 case "FAT32":
                     return 4294967296;
-                case "NTFS":
+                default:
+                    // Unknown HDD Format, default to the max index limit.
                     // 2 ^35 is the maximum addressable size in the Index files. (28 precision bits, left-shifted 7 bits (increments of 128)
                     return 34359738368;
-                case "exFAT":
-                    return 34359738368;
-                case "ext2":
-                    return 34359738368;
-                case "ext3":
-                    return 34359738368;
-                case "ext4":
-                    return 34359738368;
-                case "XFS":
-                    return 34359738368;
-                case "btrfs":
-                    return 34359738368;
-                case "ZFS":
-                    return 34359738368;
-                case "ReiserFS":
-                    return 34359738368;
-                case "apfs":
-                    return 34359738368;
-                default:
-                    // Unknown HDD Format, default to the basic limit.
-                    return 2000000000;
             }
         }
 
@@ -926,7 +906,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Decompress Mipmap blocks ...
             var decompressedData = new byte[uncompressedFileSize];
-            int decompOffset = 0;
+            Array.Copy(texHeader, 0, decompressedData, 0, texHeader.Length);
+            int decompOffset = texHeader.Length;
 
             var mipData = new List<Task<byte[]>>[mipCount];
 
@@ -962,11 +943,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 decompressedData = res.Buffer;
             }
 
-            byte[] finalbytes = new byte[texHeader.Length + decompressedData.Length];
-            Array.Copy(texHeader, 0, finalbytes, 0, texHeader.Length);
-            Array.Copy(decompressedData, 0, finalbytes, texHeader.Length, decompressedData.Length);
-
-            return finalbytes;
+            return decompressedData;
         }
 
         public static uint GetSqPackType(BinaryReader br, long offset = -1)
@@ -1097,33 +1074,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             var mipCompressedOffset = 80;
             var uncompMipSize = newHeight * newWidth;
 
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    uncompMipSize = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.A8:
-                    uncompMipSize = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    uncompMipSize = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    uncompMipSize = (newWidth * newHeight) * 4;
-                    break;
-            }
+            var mipSizes = DDS.CalculateMipMapSizes(format, newWidth, newHeight);
+
+            if (mipSizes.Count < mipCount)
+                throw new InvalidDataException($"MakeType4DatHeader: mipCount ({mipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             for (var i = 0; i < mipCount; i++)
             {
@@ -1135,7 +1089,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 headerData.AddRange(BitConverter.GetBytes(compressedSize));
                 
                 // Uncompressed Size
-                var uncompressedSize = uncompMipSize > 16 ? uncompMipSize : 16;
+                var uncompressedSize = mipSizes[i];
                 headerData.AddRange(BitConverter.GetBytes(uncompressedSize));
 
                 // Data Block Offset
@@ -1143,10 +1097,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Data Block Size
                 headerData.AddRange(BitConverter.GetBytes(ddsParts[i].Count));
-
-
-                // Every MipMap is 1/4th the net size, so this is a easy way to recalculate it.
-                uncompMipSize = uncompMipSize / 4;
 
                 dataBlockOffset = dataBlockOffset + ddsParts[i].Count;
                 mipCompressedOffset = mipCompressedOffset + compressedSize;

@@ -74,6 +74,58 @@ namespace xivModdingFramework.Textures.Enums
             var attribute = (XivTexFormatDescriptionAttribute[])field.GetCustomAttributes(typeof(XivTexFormatDescriptionAttribute), false);
             return attribute.Length > 0 ? attribute[0].DisplayName : value.ToString();
         }
+
+        public static bool IsCompressedFormat(this XivTexFormat value)
+        {
+            switch (value)
+            {
+                case XivTexFormat.DXT1:
+                case XivTexFormat.DXT3:
+                case XivTexFormat.DXT5:
+                case XivTexFormat.BC4:
+                case XivTexFormat.BC5:
+                case XivTexFormat.BC7:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static int GetMipMinDimension(this XivTexFormat value)
+        {
+            return value.IsCompressedFormat() ? 4 : 1;
+        }
+
+        public static int GetBitsPerPixel(this XivTexFormat value)
+        {
+            switch (value)
+            {
+                case XivTexFormat.DXT1:
+                case XivTexFormat.BC4:
+                    return 4;
+                case XivTexFormat.DXT5:
+                case XivTexFormat.BC5:
+                case XivTexFormat.A8:
+                case XivTexFormat.BC7:
+                    return 8;
+                case XivTexFormat.A1R5G5B5:
+                case XivTexFormat.A4R4G4B4:
+                    return 16;
+                case XivTexFormat.L8:
+                case XivTexFormat.A8R8G8B8:
+                case XivTexFormat.X8R8G8B8:
+                case XivTexFormat.R32F:
+                case XivTexFormat.G16R16F:
+                case XivTexFormat.G32R32F:
+                case XivTexFormat.A16B16G16R16F:
+                case XivTexFormat.A32B32G32R32F:
+                case XivTexFormat.DXT3:
+                case XivTexFormat.D16:
+                    return 32;
+            }
+
+            throw new ArgumentException("No BitsPerPixel defined for texture format");
+        }
     }
 
     [AttributeUsage(AttributeTargets.All)]

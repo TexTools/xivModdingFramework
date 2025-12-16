@@ -117,17 +117,11 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Accessory" xml:space="preserve">
-    <value>Accessory</value>
-  </data>
   <data name="All" xml:space="preserve">
     <value>모두</value>
   </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>아우라</value>
-  </data>
-  <data name="Bishop_Autoturret" xml:space="preserve">
-    <value>Bishop Autoturret</value>
   </data>
   <data name="Body" xml:space="preserve">
     <value>몸통</value>
@@ -141,6 +135,9 @@
   <data name="Body_Hands_Legs_Feet" xml:space="preserve">
     <value>몸통 + 손 + 다리 + 발</value>
   </data>
+  <data name="Body_Legs" xml:space="preserve">
+    <value>몸통 +다리</value>
+  </data>  
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>몸통 +다리 + 발</value>
   </data>
@@ -150,35 +147,14 @@
   <data name="Character" xml:space="preserve">
     <value>캐릭터</value>
   </data>
-  <data name="ColorSet" xml:space="preserve">
-    <value>ColorSet</value>
-  </data>
   <data name="Companions" xml:space="preserve">
     <value>버디</value>
-  </data>
-  <data name="Diffuse" xml:space="preserve">
-    <value>Diffuse</value>
-  </data>
-  <data name="Ears" xml:space="preserve">
-    <value>귀</value>
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>엘레젠</value>
   </data>
-  <data name="Eos" xml:space="preserve">
-    <value>Eos</value>
-  </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>장비 문장</value>
-  </data>
-  <data name="Error_DirectoryError" xml:space="preserve">
-    <value>Directory Error</value>
-  </data>
-  <data name="Error_FileNotFound" xml:space="preserve">
-    <value>Unable to find file, please check your directories under settings</value>
-  </data>
-  <data name="Etc" xml:space="preserve">
-    <value>Etc</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>얼굴</value>
@@ -195,9 +171,6 @@
   <data name="Food" xml:space="preserve">
     <value>요리</value>
   </data>
-  <data name="Garuda_Egi" xml:space="preserve">
-    <value>Garuda-Egi</value>
-  </data>
   <data name="Gear" xml:space="preserve">
     <value>장비</value>
   </data>
@@ -213,17 +186,11 @@
   <data name="Head_Body" xml:space="preserve">
     <value>머리 + 몸통</value>
   </data>
-  <data name="Housing" xml:space="preserve">
-    <value>하우징</value>
-  </data>
   <data name="Hyur_H" xml:space="preserve">
     <value>휴런 고원 부족</value>
   </data>
   <data name="Hyur_M" xml:space="preserve">
     <value>휴런 중원 부족</value>
-  </data>
-  <data name="Ifrit_Egi" xml:space="preserve">
-    <value>Ifrit-Egi</value>
   </data>
   <data name="Iris" xml:space="preserve">
     <value>눈동자</value>
@@ -240,9 +207,6 @@
   <data name="Legs_Feet" xml:space="preserve">
     <value>다리 + 발</value>
   </data>
-  <data name="LoadingScreen" xml:space="preserve">
-    <value>로딩 화면</value>
-  </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>주 무기</value>
   </data>
@@ -251,9 +215,6 @@
   </data>
   <data name="Male" xml:space="preserve">
     <value>남성</value>
-  </data>
-  <data name="Mask" xml:space="preserve">
-    <value>Mask</value>
   </data>
   <data name="Minions" xml:space="preserve">
     <value>꼬마 친구</value>
@@ -270,17 +231,11 @@
   <data name="Neck" xml:space="preserve">
     <value>목</value>
   </data>
-  <data name="Normal" xml:space="preserve">
-    <value>Normal</value>
-  </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>보조 무기</value>
   </data>
   <data name="Pets" xml:space="preserve">
     <value>소환수</value>
-  </data>
-  <data name="Ramuh_Egi" xml:space="preserve">
-    <value>Ramuh Egi</value>
   </data>
   <data name="Rings" xml:space="preserve">
     <value>손가락</value>
@@ -288,26 +243,14 @@
   <data name="Roegadyn" xml:space="preserve">
     <value>루가딘</value>
   </data>
-  <data name="Rook_Autoturret" xml:space="preserve">
-    <value>Rook Autoturret</value>
-  </data>
   <data name="SearchBox" xml:space="preserve">
     <value>검색 Textures</value>
-  </data>
-  <data name="Selene" xml:space="preserve">
-    <value>Selene</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>소울 크리스탈</value>
   </data>
-  <data name="Specular" xml:space="preserve">
-    <value>Specular</value>
-  </data>
   <data name="Tail" xml:space="preserve">
     <value>꼬리</value>
-  </data>
-  <data name="Titan_Egi" xml:space="preserve">
-    <value>Titan-Egi</value>
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>양손</value>
@@ -320,5 +263,14 @@
   </data>
   <data name="Wrists" xml:space="preserve">
     <value>팔</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>로딩 화면</value>
+  </data>
+  <data name="Housing" xml:space="preserve">
+    <value>하우징</value>
+  </data>
+  <data name="Ears" xml:space="preserve">
+    <value>귀</value>
   </data>
 </root>

@@ -67,6 +67,14 @@ namespace xivModdingFramework.Cache
 
         public XivTexFormat DefaultTextureFormat { get; set; } = XivTexFormat.A8R8G8B8;
 
+        public enum EPenumbraRedrawMode
+        {
+            RedrawAll,
+            RedrawSelf,
+            NoRedraw,
+        }
+
+        public EPenumbraRedrawMode PenumbraRedrawMode { get; set; } = EPenumbraRedrawMode.RedrawAll;
     }
 
     /// <summary>
@@ -741,11 +749,7 @@ namespace xivModdingFramework.Cache
                 var _companions = new Companions();
                 var list = await _companions.GetUncachedMountList(tx);
 
-                // Don't get the ornament list for the Chinese or Korean clients as they don't have them yet
-                if (_gameInfo.GameLanguage != XivLanguage.Chinese && _gameInfo.GameLanguage != XivLanguage.Korean)
-                {
-                    list.AddRange(await _companions.GetUncachedOrnamentList(tx));
-                }
+                list.AddRange(await _companions.GetUncachedOrnamentList(tx));
 
                 db.BusyTimeout = 3000;
                 db.Open();

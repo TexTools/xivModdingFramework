@@ -440,7 +440,9 @@ namespace xivModdingFramework.Models.Helpers
                     uniqueVertexIds.Sort();
 
                     // Maps old vertex ID to new vertex ID.
-                    var vertMap = new int[uniqueVertexIds.Max() + 1];
+                    var vertMap = Array.Empty<int>();
+                    if (uniqueVertexIds.Count > 0)
+                        vertMap = new int[uniqueVertexIds.Max() + 1];
 
                     // Now we need to loop through, copy over the vertex data, keeping track of the new vertex IDs.
                     ttPart.Vertices = new List<TTVertex>(uniqueVertexIds.Count);
@@ -1386,10 +1388,10 @@ namespace xivModdingFramework.Models.Helpers
                             }
 
                             v.Position = position;
-                            v.Normal = normal;
-                            v.Binormal = binormal;
-                            v.Tangent = tangent;
-                            v.FlowDirection = flow;
+                            v.Normal = normal.Normalized();
+                            v.Binormal = binormal.Normalized();
+                            v.Tangent = tangent.Normalized();
+                            v.FlowDirection = flow.Normalized();
                         }
 
                         // Same thing, but for the Shape Data parts.
@@ -1433,10 +1435,14 @@ namespace xivModdingFramework.Models.Helpers
                                 }
 
                                 v.Position = position;
-                                v.Normal = normal;
-                                v.Binormal = binormal;
-                                v.Tangent = tangent;
-                                v.FlowDirection = flow;
+                                v.Normal = normal.Normalized();
+                                v.Binormal = binormal.Normalized();
+                                v.Tangent = tangent.Normalized();
+
+                                if (v.FlowDirection != Vector3.Zero)
+                                {
+                                    v.FlowDirection = flow.Normalized();
+                                }
                             }
                         }
 

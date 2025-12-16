@@ -544,6 +544,7 @@ namespace xivModdingFramework.Exd.Enums
         recipe,
         recipeelement,
         recipeleveltable,
+        recipelookup,
         recipenotebooklist,
         recommendcontents,
         relic,

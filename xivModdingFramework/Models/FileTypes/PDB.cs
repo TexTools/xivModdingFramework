@@ -330,74 +330,60 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="def"></param>
         private static void BuildNewTransfromMatrices(SkeletonData node, Dictionary<string, SkeletonData> skeletonData, DeformationCollection def)
         {
+            // Already processed somehow.  Double listed?
             if (def.InvertedDeformations.ContainsKey(node.BoneName))
+                return;
+
+            if (def.Deformations.ContainsKey(node.BoneName))
             {
-                // Already processed somehow.  Double listed?
-            }
-            else if (node.BoneParent == -1)
-            {
-                if (!def.Deformations.ContainsKey(node.BoneName))
-                {
-                    def.Deformations.Add(node.BoneName, Matrix.Identity);
-                    def.InvertedDeformations.Add(node.BoneName, Matrix.Identity);
-                    def.NormalDeformations.Add(node.BoneName, Matrix.Identity);
-                    def.InvertedNormalDeformations.Add(node.BoneName, Matrix.Identity);
-                }
+                var invertedMatrix = def.Deformations[node.BoneName].Inverted();
+                def.InvertedDeformations.Add(node.BoneName, invertedMatrix);
+
+                var normalMatrix = invertedMatrix;
+                normalMatrix.Transpose();
+                def.NormalDeformations.Add(node.BoneName, normalMatrix);
+
+                var invertedNormalMatrix = normalMatrix.Inverted();
+                def.InvertedNormalDeformations.Add(node.BoneName, invertedNormalMatrix);
             }
             else
             {
-                if (def.Deformations.ContainsKey(node.BoneName))
+                if (node.BoneParent == -1 || !skeletonData.ContainsKey(node.BoneName))
                 {
-                    def.InvertedDeformations.Add(node.BoneName, def.Deformations[node.BoneName].Inverted());
-
-                    var normalMatrix = def.Deformations[node.BoneName];
-                    normalMatrix.Transpose();
-                    def.NormalDeformations.Add(node.BoneName, normalMatrix);
-
-                    var invertexNormalMatrix = def.Deformations[node.BoneName];
-                    normalMatrix.Transpose();
-                    invertexNormalMatrix.Invert();
-                    def.InvertedNormalDeformations.Add(node.BoneName, invertexNormalMatrix);
-
+                    def.Deformations[node.BoneName] = Matrix.Identity;
+                    def.InvertedDeformations[node.BoneName] = Matrix.Identity;
+                    def.NormalDeformations[node.BoneName] = Matrix.Identity;
+                    def.InvertedNormalDeformations[node.BoneName] = Matrix.Identity;
                 }
                 else
                 {
-                    if (!skeletonData.ContainsKey(node.BoneName))
+                    var skelEntry = skeletonData[node.BoneName];
+                    while (skelEntry != null)
+                    {
+                        if (def.Deformations.ContainsKey(skelEntry.BoneName))
+                        {
+                            // This parent has a deform.
+                            def.Deformations[node.BoneName] = def.Deformations[skelEntry.BoneName];
+                            def.InvertedDeformations[node.BoneName] = def.InvertedDeformations[skelEntry.BoneName];
+                            def.NormalDeformations[node.BoneName] = def.NormalDeformations[skelEntry.BoneName];
+                            def.InvertedNormalDeformations[node.BoneName] = def.InvertedNormalDeformations[skelEntry.BoneName];
+                            break;
+                        }
+
+                        // Seek our next parent.
+                        skelEntry = skeletonData.FirstOrDefault(x => x.Value.BoneNumber == skelEntry.BoneParent).Value;
+                    }
+
+                    if (skelEntry == null)
                     {
                         def.Deformations[node.BoneName] = Matrix.Identity;
                         def.InvertedDeformations[node.BoneName] = Matrix.Identity;
                         def.NormalDeformations[node.BoneName] = Matrix.Identity;
                         def.InvertedNormalDeformations[node.BoneName] = Matrix.Identity;
                     }
-                    else
-                    {
-                        var skelEntry = skeletonData[node.BoneName];
-                        while (skelEntry != null)
-                        {
-                            if (def.Deformations.ContainsKey(skelEntry.BoneName))
-                            {
-                                // This parent has a deform.
-                                def.Deformations[node.BoneName] = def.Deformations[skelEntry.BoneName];
-                                def.InvertedDeformations[node.BoneName] = def.InvertedDeformations[skelEntry.BoneName];
-                                def.NormalDeformations[node.BoneName] = def.NormalDeformations[skelEntry.BoneName];
-                                def.InvertedNormalDeformations[node.BoneName] = def.InvertedNormalDeformations[skelEntry.BoneName];
-                                break;
-                            }
-
-                            // Seek our next parent.
-                            skelEntry = skeletonData.FirstOrDefault(x => x.Value.BoneNumber == skelEntry.BoneParent).Value;
-                        }
-
-                        if (skelEntry == null)
-                        {
-                            def.Deformations[node.BoneName] = Matrix.Identity;
-                            def.InvertedDeformations[node.BoneName] = Matrix.Identity;
-                            def.NormalDeformations[node.BoneName] = Matrix.Identity;
-                            def.InvertedNormalDeformations[node.BoneName] = Matrix.Identity;
-                        }
-                    }
                 }
             }
+
             var children = skeletonData.Where(x => x.Value.BoneParent == node.BoneNumber);
             foreach (var c in children)
             {

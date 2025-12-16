@@ -43,6 +43,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public static class PMP
     {
         public const int _WriteFileVersion = 3;
+
+        private const char _PMPSafeNameReplacement = '_';
+
         private static bool _ImportActive = false;
         private static string _Source = null;
 
@@ -71,7 +74,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         // Unzip everything.
                         await IOUtil.UnzipFiles(path, tempFolder);
-                    } else
+
+                        // Quick check of tex file headers after unpacking from PMP modpacks
+                        // It is safe to rewrite the files here, as they are unzipped to a temporary path
+                        foreach (var filePath in IOUtil.GetFilesInFolder(tempFolder))
+                        {
+                            if (filePath.EndsWith(".tex"))
+                            {
+                                try
+                                {
+                                    _ = EndwalkerUpgrade.FastValidateTexFile(filePath);
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                    else
                     {
                         // Just JSON files.
                         await IOUtil.UnzipFiles(path, tempFolder, (file) =>
@@ -401,18 +419,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             var value = 1UL << i;
                             if ((selected & value) > 0)
                             {
-                                var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
-                                if (disableOpt != null)
+                                var opt = group.Options[i] as PmpImcOptionJson;
+                                if (opt.IsDisableSubMod)
                                 {
                                     // No options allowed >:|
                                     disabled = true;
                                     break;
                                 }
 
-                                var opt = group.Options[i] as PmpImcOptionJson;
                                 optionIdx++;
 
-                                xivImc.AttributeMask |= opt.AttributeMask;
+                                xivImc.AttributeMask ^= opt.AttributeMask;
                             }
                         }
 
@@ -420,6 +437,26 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         {
                             var root = imcGroup.GetRoot();
                             var metaData = await GetImportMetadata(imported, root, tx);
+
+                            // If the OnlyAttribute flag is set on the group, fill in the fields that should be ignored from the current values instead
+                            // ( The source can be null, in the case that we're going to be synthesizing new variants from thin air )
+                            void CopyNonMaskImcValues(XivImc xivImc, XivImc src)
+                            {
+                                xivImc.Animation = src?.Animation ?? 0;
+                                xivImc.SoundId = src?.SoundId ?? 0;
+                                xivImc.MaterialSet = src?.MaterialSet ?? 0;
+                                xivImc.Decal = src?.Decal ?? 0;
+                                xivImc.Vfx = src?.Vfx ?? 0;
+                            };
+
+                            if (imcGroup.OnlyAttributes)
+                            {
+                                XivImc copyFromEntry = null;
+                                if (imcGroup.Identifier.Variant < metaData.ImcEntries.Count)
+                                    copyFromEntry = metaData.ImcEntries[(int)imcGroup.Identifier.Variant];
+                                CopyNonMaskImcValues(xivImc, copyFromEntry);
+                            }
+
                             if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
                             {
                                 while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
@@ -436,7 +473,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             {
                                 for (int i = 0; i < metaData.ImcEntries.Count; i++)
                                 {
-                                    metaData.ImcEntries[i] = (XivImc)xivImc.Clone();
+                                    var variantXivImc = (XivImc)xivImc.Clone();
+                                    if (imcGroup.OnlyAttributes)
+                                        CopyNonMaskImcValues(variantXivImc, metaData.ImcEntries[i]);
+                                    metaData.ImcEntries[i] = variantXivImc;
                                 }
                             }
 
@@ -568,7 +608,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         try
                         {
-                            var resized = await EndwalkerUpgrade.ValidateTextureSizes(data);
+                            var resized = await EndwalkerUpgrade.ValidateTexFileData(data);
                             if(resized != null)
                             {
                                 data = resized;
@@ -815,7 +855,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             for(int i = 0; i < pmp.Groups.Count; i++)
             {
-                var gName = IOUtil.MakePathSafe(pmp.Groups[i].Name.ToLower());
+                var gName = PMP.MakePMPPathSafe(pmp.Groups[i].Name);
                 var groupPath = Path.Combine(workingDirectory, "group_" + (i+1).ToString("D3") + "_" + gName + ".json");
                 var groupString = JsonConvert.SerializeObject(pmp.Groups[i], Formatting.Indented);
                 File.WriteAllText(groupPath, groupString);
@@ -1038,6 +1078,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
                 var externalPath = Path.Combine(unzipPath, file.Value);
+
+                // Quick check of tex file headers after unpacking from PMP modpacks
+                // It is safe to rewrite the files here, as they are unzipped to a temporary path
+                if (!alreadyUnzipped && internalPath.EndsWith(".tex"))
+                {
+                    try
+                    {
+                        _ = EndwalkerUpgrade.FastValidateTexFile(externalPath);
+                    }
+                    catch { }
+                }
+
                 var fileInfo = new FileStorageInformation()
                 {
                     StorageType = EFileStorageType.UncompressedIndividual,
@@ -1261,9 +1313,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return (seenMetadata.Values.ToList(), seenRgsps.Values.ToList(), otherManipulations);
         }
 
+        private static string MakePMPPathSafe(string fileName)
+        {
+            // This method enforces the naming scheme that penumbra expects for its json components.
+            if (fileName == ".")
+                return new(_PMPSafeNameReplacement, 1);
+
+            if (fileName == "..")
+                return new(_PMPSafeNameReplacement, 2);
+
+            return IOUtil.MakePathSafe(fileName.Normalize(NormalizationForm.FormKC), _PMPSafeNameReplacement, true);
+        }
     }
-
-
 
     #region Penumbra Simple JSON Classes
     public class PMPJson
@@ -1339,6 +1400,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         [JsonIgnore] public ulong? SelectedSettings = null;
 
         // Either single Index or Bitflag.
+        [JsonConverter(typeof(CustomUInt64Converter))]
         public ulong DefaultSettings;
         
         [JsonIgnore]
@@ -1479,18 +1541,47 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public int Priority = 0;
     }
 
-    public class PmpDisableImcOptionJson : PMPOptionJson
-    {
-        public bool IsDisableSubMod = true;
-    }
-
-    [JsonConverter(typeof(JsonSubtypes))]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
     public class PmpImcOptionJson : PMPOptionJson
     {
-        public ushort AttributeMask;
+        public bool IsDisableSubMod = false;
+        public ushort AttributeMask = 0;
+
+        public bool ShouldSerializeIsDisableSubMod() { return IsDisableSubMod; }
+        public bool ShouldSerializeAttributeMask() { return !IsDisableSubMod; }
     }
 
     #endregion
 
+    #region JSON helper classes
+
+    // Handle negative numbers without crashing
+    internal class CustomUInt64Converter : JsonConverter<ulong>
+    {
+        public override ulong ReadJson(JsonReader reader, Type objectType, ulong existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            var token = JToken.ReadFrom(reader);
+
+            // TexTools was previously of writing -1 instead of 2^32 - 1
+            // Even though we know that was the intended value, we'll interpret it as 2^64 - 1 for bug-compatibility with Penumbra
+            if (token.ToString().StartsWith("-"))
+            {
+                var signedValue = JToken.ReadFrom(reader).Value<long>();
+                return (ulong)signedValue;
+            }
+            else
+            {
+                return JToken.ReadFrom(reader).Value<ulong>();
+            }
+        }
+
+        public override void WriteJson(JsonWriter writer, ulong value, JsonSerializer serializer)
+        {
+            writer.WriteValue(value);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanWrite => true;
+    }
+
+    #endregion
 }

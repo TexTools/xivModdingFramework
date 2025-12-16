@@ -284,7 +284,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
-            var shaderFn = GetShaderMapper(GetCustomColors(), mtrl, settings);
+            var shaderFn = GetShaderMapper(colors, mtrl, settings);
             bool invertNormalGreen = colors.InvertNormalGreen;
 
             await Task.Run(() =>
@@ -1439,7 +1439,7 @@ namespace xivModdingFramework.Models.ModelTextures
         public static (int RowId, float Blend) ReadColorIndex(float indexRed, float indexGreen)
         {
             int byteRed = (int) Math.Round(indexRed * 255.0f);
-            int rowNumber = (int) (byteRed / (_ColorsetMul));
+            int rowNumber = (int) Math.Round(byteRed / (_ColorsetMul));
 
             float blendAmount = 1.0f - indexGreen;
 

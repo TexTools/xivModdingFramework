@@ -58,10 +58,15 @@ namespace xivModdingFramework.Textures.FileTypes
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC4U"), 0) , XivTexFormat.BC4 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("ATI2"), 0) , XivTexFormat.BC5 },
             { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC5U"), 0) , XivTexFormat.BC5 },
-            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("AR15"), 0) , XivTexFormat.A1R5G5B5 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC7L"), 0) , XivTexFormat.BC7 },
+            { (uint)BitConverter.ToInt32(Encoding.ASCII.GetBytes("BC7\0"), 0) , XivTexFormat.BC7 },
 
-            //ARGB 16F
-            { 0x71, XivTexFormat.A16B16G16R16F },
+            // Floating point formats
+            { 112, XivTexFormat.G16R16F },
+            { 113, XivTexFormat.A16B16G16R16F },
+            { 114, XivTexFormat.R32F },
+            { 115, XivTexFormat.G32R32F },
+            { 116, XivTexFormat.A32B32G32R32F },
 
             //Uncompressed RGBA
             { 0, XivTexFormat.A8R8G8B8 }
@@ -157,7 +162,6 @@ namespace xivModdingFramework.Textures.FileTypes
 
         private static byte[] CreateDDSHeader(XivTexFormat format, int width, int height, int layers, int mipCount)
         {
-            uint dwPitchOrLinearSize, pfFlags;
             var header = new List<byte>();
 
             if(layers <= 0)
@@ -174,50 +178,73 @@ namespace xivModdingFramework.Textures.FileTypes
             header.AddRange(BitConverter.GetBytes(dwSize));
 
             // Flags to indicate which members contain valid data.
-            uint dwFlags = 528391;
-            if(layers > 1)
-            {
-                dwFlags = 0x00000004;
-            }
-            header.AddRange(BitConverter.GetBytes(dwFlags));
+            uint dwFlags = 0x21007; // DDSD_MIPMAPCOUNT | DDSD_PIXELFORMAT | DDSD_WIDTH | DDSD_HEIGHT | DDSD_CAPS
 
             // Surface height (in pixels). 
             var dwHeight = (uint)height;
-            header.AddRange(BitConverter.GetBytes(dwHeight));
 
             // Surface width (in pixels).
             var dwWidth = (uint)width;
-            header.AddRange(BitConverter.GetBytes(dwWidth));
 
             // The pitch or number of bytes per scan line in an uncompressed texture; the total number of bytes in the top level texture for a compressed texture.
-            if (format == XivTexFormat.A16B16G16R16F)
-            {
-                dwPitchOrLinearSize = 512;
-            }
-            else if (format == XivTexFormat.A8R8G8B8)
-            {
-                dwPitchOrLinearSize = (dwHeight * dwWidth) * 4;
-            }
-            else if (format == XivTexFormat.DXT1)
-            {
-                dwPitchOrLinearSize = (dwHeight * dwWidth) / 2;
-            }
-            else if (format == XivTexFormat.A4R4G4B4 || format == XivTexFormat.A1R5G5B5)
-            {
-                dwPitchOrLinearSize = (dwHeight * dwWidth) * 2;
-            }
-            else
-            {
-                dwPitchOrLinearSize = dwHeight * dwWidth;
-            }
-            header.AddRange(BitConverter.GetBytes(dwPitchOrLinearSize));
+            uint dwPitchOrLinearSize;
 
+            switch (format)
+            {
+                case XivTexFormat.DXT1:
+                case XivTexFormat.BC4:
+                    dwPitchOrLinearSize = dwHeight * dwWidth / 2;
+                    dwFlags |= 0x80000; // DDSD_LINEARSIZE
+                    break;
+                case XivTexFormat.DXT3:
+                case XivTexFormat.DXT5:
+                case XivTexFormat.BC5:
+                case XivTexFormat.BC7:
+                    dwPitchOrLinearSize = dwHeight * dwWidth;
+                    dwFlags |= 0x80000; // DDSD_LINEARSIZE
+                    break;
+                case XivTexFormat.L8:
+                case XivTexFormat.A8:
+                    dwPitchOrLinearSize = dwWidth;
+                    dwFlags |= 0x8; // DDSD_PITCH
+                    break;
+                case XivTexFormat.A4R4G4B4:
+                case XivTexFormat.A1R5G5B5:
+                case XivTexFormat.D16:
+                    dwPitchOrLinearSize = dwWidth * 2;
+                    dwFlags |= 0x8; // DDSD_PITCH
+                    break;
+                case XivTexFormat.A8R8G8B8:
+                case XivTexFormat.X8R8G8B8:
+                case XivTexFormat.R32F:
+                case XivTexFormat.G16R16F:
+                    dwPitchOrLinearSize = dwWidth * 4;
+                    dwFlags |= 0x8; // DDSD_PITCH
+                    break;
+                case XivTexFormat.G32R32F:
+                case XivTexFormat.A16B16G16R16F:
+                    dwPitchOrLinearSize = dwWidth * 8;
+                    dwFlags |= 0x8; // DDSD_PITCH
+                    break;
+                case XivTexFormat.A32B32G32R32F:
+                    dwPitchOrLinearSize = dwWidth * 16;
+                    dwFlags |= 0x8; // DDSD_PITCH
+                    break;
+                case XivTexFormat.INVALID:
+                default:
+                    throw new InvalidDataException("DDS Writer does not know how to write TexFormat: " + format.ToString());
+            }
+
+            header.AddRange(BitConverter.GetBytes(dwFlags));
+            header.AddRange(BitConverter.GetBytes(dwHeight));
+            header.AddRange(BitConverter.GetBytes(dwWidth));
+            header.AddRange(BitConverter.GetBytes(dwPitchOrLinearSize));
 
             // Depth of a volume texture (in pixels), otherwise unused.
             const uint dwDepth = 0;
             header.AddRange(BitConverter.GetBytes(dwDepth));
 
-            // Number of mipmap levels, otherwise unused.
+            // Number of mipmap levels.
             var dwMipMapCount = (uint)mipCount;
             header.AddRange(BitConverter.GetBytes(dwMipMapCount));
 
@@ -232,213 +259,109 @@ namespace xivModdingFramework.Textures.FileTypes
             const uint pfSize = 32;
             header.AddRange(BitConverter.GetBytes(pfSize));
 
-            switch (format)
-            {
-                // Values which indicate what type of data is in the surface.
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.A4R4G4B4:
-                case XivTexFormat.A1R5G5B5:
-                    pfFlags = 65;
-                    break;
-                case XivTexFormat.A8:
-                    pfFlags = 2;
-                    break;
-                default:
-                    pfFlags = 4;
-                    break;
-            }
-            header.AddRange(BitConverter.GetBytes(pfFlags));
-
+            // Compressed and floating point formats will be identified by a FourCC code
             uint dwFourCC = GetDDSType(format);
-            if (layers > 1 || (dwFourCC == 0 && format != XivTexFormat.A8R8G8B8))
-            {
+
+            uint pfFlags = 0;
+            uint dwRGBBitCount = 0;
+            uint dwRBitMask = 0;
+            uint dwGBitMask = 0;
+            uint dwBBitMask = 0;
+            uint dwABitMask = 0;
+            uint dwCaps = 0x1000; // DDSCAPS_TEXTURE
+
+            // Multi-layer images must use the DX10 extension
+            if (layers > 1)
                 dwFourCC = _DX10;
-            }
 
-            header.AddRange(BitConverter.GetBytes(dwFourCC));
+            // Use DX10 header for BC7 for better compatibility
+            if (format == XivTexFormat.BC7)
+                dwFourCC = _DX10;
 
+            // Define the pixel layout for uncompressed integer formats
             switch (format)
             {
                 case XivTexFormat.A8R8G8B8:
-                    {
-                        // Number of bits in an RGB (possibly including alpha) format.
-                        const uint dwRGBBitCount = 32;
-                        header.AddRange(BitConverter.GetBytes(dwRGBBitCount));
-
-                        // Red (or lumiannce or Y) mask for reading color data. 
-                        const uint dwRBitMask = 16711680;
-                        header.AddRange(BitConverter.GetBytes(dwRBitMask));
-
-                        // Green (or U) mask for reading color data.
-                        const uint dwGBitMask = 65280;
-                        header.AddRange(BitConverter.GetBytes(dwGBitMask));
-
-                        // Blue (or V) mask for reading color data.
-                        const uint dwBBitMask = 255;
-                        header.AddRange(BitConverter.GetBytes(dwBBitMask));
-
-                        // Alpha mask for reading alpha data.
-                        const uint dwABitMask = 4278190080;
-                        header.AddRange(BitConverter.GetBytes(dwABitMask));
-
-                        // DDS_PIXELFORMAT End
-
-                        // Specifies the complexity of the surfaces stored.
-                        const uint dwCaps = 4096;
-                        header.AddRange(BitConverter.GetBytes(dwCaps));
-
-                        // dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-                        // Unused.
-                        var blank1 = new byte[16];
-                        header.AddRange(blank1);
-
-                        break;
-                    }
-                case XivTexFormat.A8:
-                    {
-                        // Number of bits in an RGB (possibly including alpha) format.
-                        const uint dwRGBBitCount = 8;
-                        header.AddRange(BitConverter.GetBytes(dwRGBBitCount));
-
-                        // Red (or lumiannce or Y) mask for reading color data. 
-                        const uint dwRBitMask = 0;
-                        header.AddRange(BitConverter.GetBytes(dwRBitMask));
-
-                        // Green (or U) mask for reading color data.
-                        const uint dwGBitMask = 0;
-                        header.AddRange(BitConverter.GetBytes(dwGBitMask));
-
-                        // Blue (or V) mask for reading color data.
-                        const uint dwBBitMask = 0;
-                        header.AddRange(BitConverter.GetBytes(dwBBitMask));
-
-                        // Alpha mask for reading alpha data.
-                        const uint dwABitMask = 255;
-                        header.AddRange(BitConverter.GetBytes(dwABitMask));
-
-                        // DDS_PIXELFORMAT End
-
-                        // Specifies the complexity of the surfaces stored.
-                        const uint dwCaps = 4096;
-                        header.AddRange(BitConverter.GetBytes(dwCaps));
-
-                        // dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-                        // Unused.
-                        var blank1 = new byte[16];
-                        header.AddRange(blank1);
-                        break;
-                    }
-                case XivTexFormat.A1R5G5B5:
-                    {
-                        // Number of bits in an RGB (possibly including alpha) format.
-                        const uint dwRGBBitCount = 16;
-                        header.AddRange(BitConverter.GetBytes(dwRGBBitCount));
-
-                        // Red (or lumiannce or Y) mask for reading color data. 
-                        const uint dwRBitMask = 31744;
-                        header.AddRange(BitConverter.GetBytes(dwRBitMask));
-
-                        // Green (or U) mask for reading color data.
-                        const uint dwGBitMask = 992;
-                        header.AddRange(BitConverter.GetBytes(dwGBitMask));
-
-                        // Blue (or V) mask for reading color data.
-                        const uint dwBBitMask = 31;
-                        header.AddRange(BitConverter.GetBytes(dwBBitMask));
-
-                        // Alpha mask for reading alpha data.
-                        const uint dwABitMask = 32768;
-                        header.AddRange(BitConverter.GetBytes(dwABitMask));
-
-                        // DDS_PIXELFORMAT End
-
-                        // Specifies the complexity of the surfaces stored.
-                        const uint dwCaps = 4096;
-                        header.AddRange(BitConverter.GetBytes(dwCaps));
-
-                        // dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-                        // Unused.
-                        var blank1 = new byte[16];
-                        header.AddRange(blank1);
-                        break;
-                    }
+                    pfFlags |= 0x41; // DDPF_RGB | DDPF_ALPHAPIXELS
+                    dwRGBBitCount = 32;
+                    dwRBitMask = 0xFF0000;
+                    dwGBitMask = 0xFF00;
+                    dwBBitMask = 0xFF;
+                    dwABitMask = 0xFF000000;
+                    break;
+                case XivTexFormat.X8R8G8B8:
+                    pfFlags |= 0x40; // DDPF_RGB
+                    dwRGBBitCount = 32;
+                    dwRBitMask = 0xFF0000;
+                    dwGBitMask = 0xFF00;
+                    dwBBitMask = 0xFF;
+                    break;
                 case XivTexFormat.A4R4G4B4:
-                    {
-                        // Number of bits in an RGB (possibly including alpha) format.
-                        const uint dwRGBBitCount = 16;
-                        header.AddRange(BitConverter.GetBytes(dwRGBBitCount));
-
-                        // Red (or lumiannce or Y) mask for reading color data. 
-                        const uint dwRBitMask = 3840;
-                        header.AddRange(BitConverter.GetBytes(dwRBitMask));
-
-                        // Green (or U) mask for reading color data.
-                        const uint dwGBitMask = 240;
-                        header.AddRange(BitConverter.GetBytes(dwGBitMask));
-
-                        // Blue (or V) mask for reading color data.
-                        const uint dwBBitMask = 15;
-                        header.AddRange(BitConverter.GetBytes(dwBBitMask));
-
-                        // Alpha mask for reading alpha data.
-                        const uint dwABitMask = 61440;
-                        header.AddRange(BitConverter.GetBytes(dwABitMask));
-
-                        // DDS_PIXELFORMAT End
-
-                        // Specifies the complexity of the surfaces stored.
-                        const uint dwCaps = 4096;
-                        header.AddRange(BitConverter.GetBytes(dwCaps));
-
-                        // dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-                        // Unused.
-                        var blank1 = new byte[16];
-                        header.AddRange(blank1);
-                        break;
-                    }
+                    pfFlags |= 0x41; // DDPF_RGB | DDPF_ALPHAPIXELS
+                    dwRGBBitCount = 16;
+                    dwRBitMask = 0b0000111100000000;
+                    dwGBitMask = 0b0000000011110000;
+                    dwBBitMask = 0b0000000000001111;
+                    dwABitMask = 0b1111000000000000;
+                    break;
+                case XivTexFormat.A1R5G5B5:
+                    pfFlags |= 0x41; // DDPF_RGB | DDPF_ALPHAPIXELS
+                    dwRGBBitCount = 16;
+                    dwRBitMask = 0b0111110000000000;
+                    dwGBitMask = 0b0000001111100000;
+                    dwBBitMask = 0b0000000000011111;
+                    dwABitMask = 0b1000000000000000;
+                    break;
+                case XivTexFormat.L8:
+                    pfFlags |= 0x200000; // DDPF_LUMINANCE
+                    dwRGBBitCount = 8;
+                    dwRBitMask = 0xFF;
+                    break;
+                case XivTexFormat.A8:
+                    pfFlags |= 0x02; // DDPF_ALPHA
+                    dwRGBBitCount = 8;
+                    dwABitMask = 0xFF;
+                    break;
                 default:
-                    {
-                        // dwRGBBitCount, dwRBitMask, dwGBitMask, dwBBitMask, dwABitMask, dwCaps, dwCaps2, dwCaps3, dwCaps4, dwReserved2.
-                        // Unused.
-                        var blank1 = new byte[40];
-                        header.AddRange(blank1);
-                        break;
-                    }
+                    if (dwFourCC == 0)
+                        throw new InvalidDataException("DDS Writer does not know how to write TexFormat: " + format.ToString());
+                    break;
             }
 
-            // Need to write DX10 header here.
-            if(dwFourCC == _DX10)
+            if (dwFourCC != 0)
+                pfFlags = 0x04; // DDPF_FOURCC
+
+            if (mipCount > 1)
+                dwCaps |= 0x400000; // DDSCAPS_MIPMAP
+
+            header.AddRange(BitConverter.GetBytes(pfFlags));
+            header.AddRange(BitConverter.GetBytes(dwFourCC));
+            header.AddRange(BitConverter.GetBytes(dwRGBBitCount));
+            header.AddRange(BitConverter.GetBytes(dwRBitMask));
+            header.AddRange(BitConverter.GetBytes(dwGBitMask));
+            header.AddRange(BitConverter.GetBytes(dwBBitMask));
+            header.AddRange(BitConverter.GetBytes(dwABitMask));
+            header.AddRange(BitConverter.GetBytes(dwCaps));
+
+            // DDS_PIXELFORMAT End
+
+            // dwCaps2, dwCaps3, dwCaps4, dwReserved2
+            header.AddRange(BitConverter.GetBytes(0));
+            header.AddRange(BitConverter.GetBytes(0));
+            header.AddRange(BitConverter.GetBytes(0));
+            header.AddRange(BitConverter.GetBytes(0));
+
+            // Need to write DX10 header for some compressed formats or multi-layer images
+            if (dwFourCC == _DX10)
             {
                 // DXGI_FORMAT dxgiFormat
-                uint dxgiFormat = 0;
-                if (format == XivTexFormat.DXT1) {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM;
-                } else if (format == XivTexFormat.DXT3)
-                {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM;
-                } else if (format == XivTexFormat.DXT5)
-                {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM;
-                } else if (format == XivTexFormat.BC4)
-                {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC4_UNORM;					
-                } else if (format == XivTexFormat.BC5)
-                {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC5_UNORM;
-                } else if (format == XivTexFormat.BC7)
-                {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_BC7_UNORM;
-                } else if (format == XivTexFormat.A8R8G8B8) {
-                    dxgiFormat = (uint)DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM;
-                } else
-                {
+                uint dxgiFormat = GetDxgiType(format);
+                if (dxgiFormat == 0)
                     throw new InvalidDataException("DDS Writer does not know how to write TexFormat: " + format.ToString());
-                }
                 header.AddRange(BitConverter.GetBytes(dxgiFormat));
 
                 // D3D10_RESOURCE_DIMENSION resourceDimension
-                header.AddRange(BitConverter.GetBytes((int)3));
-
+                header.AddRange(BitConverter.GetBytes((int)3)); // DDS_DIMENSION_TEXTURE2D
 
                 // UINT miscFlag
                 header.AddRange(BitConverter.GetBytes((int)0));
@@ -451,6 +374,30 @@ namespace xivModdingFramework.Textures.FileTypes
             }
 
             return header.ToArray();
+        }
+
+        // Calculate a sequence of mipmap sizes given a texture format and size
+        public static List<int> CalculateMipMapSizes(XivTexFormat format, int width, int height)
+        {
+            var offsets = new List<int>();
+
+            int minDimension = format.GetMipMinDimension();
+            int mipBitsPerPixel = format.GetBitsPerPixel();
+            int mipWidth = width;
+            int mipHeight = height;
+            int mipLength = Math.Max(minDimension, mipWidth) * Math.Max(minDimension, mipHeight) * mipBitsPerPixel / 8;
+
+            offsets.Add(mipLength);
+
+            while (mipWidth > 1 || mipHeight > 1)
+            {
+                mipWidth = Math.Max(1, mipWidth / 2);
+                mipHeight = Math.Max(1, mipHeight / 2);
+                mipLength = Math.Max(minDimension, mipWidth) * Math.Max(minDimension, mipHeight) * mipBitsPerPixel / 8;
+                offsets.Add(mipLength);
+            }
+
+            return offsets;
         }
 
         /// <summary>
@@ -466,56 +413,19 @@ namespace xivModdingFramework.Textures.FileTypes
         {
             var ddsParts = new List<List<byte[]>>();
 
-            int mipLength;
+            var mipSizes = CalculateMipMapSizes(format, newWidth, newHeight);
 
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    mipLength = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.BC4:
-                case XivTexFormat.BC5:
-                case XivTexFormat.A8:
-                case XivTexFormat.BC7:
-                    mipLength = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    mipLength = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    mipLength = (newWidth * newHeight) * 4;
-                    break;
-            }
+            if (mipSizes.Count < newMipCount)
+                throw new InvalidDataException($"CompressDDSBody: newMipCount ({newMipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             // Queue all the compression tasks.
             var totalBytesRead = 0;
             var mipTasks = new List<Task<List<byte[]>>>();
             for (var i = 0; i < newMipCount; i++)
             {
-                var uncompBytes = br.ReadBytes(mipLength);
+                var uncompBytes = br.ReadBytes(mipSizes[i]);
                 totalBytesRead += uncompBytes.Length;
-
                 mipTasks.Add(Dat.CompressData(uncompBytes.ToList()));
-                if (mipLength > 32)
-                {
-                    mipLength = mipLength / 4;
-                }
-                else
-                {
-                    mipLength = 8;
-                }
             }
 
             // Wait for them to finish.
