@@ -319,8 +319,8 @@ namespace xivModdingFramework.Resources {
             get {
                 return ResourceManager.GetString("Body_Legs", resourceCulture);
             }
-        }		
-		
+        }
+        
         /// <summary>
         ///   Looks up a localized string similar to Body + Legs + Feet.
         /// </summary>

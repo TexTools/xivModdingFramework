@@ -117,6 +117,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="Accessory" xml:space="preserve">
+    <value>Accessoire</value>
+  </data>
   <data name="Actions" xml:space="preserve">
     <value>Kommandos</value>
   </data>
@@ -146,7 +149,7 @@
   </data>
   <data name="Body_Legs" xml:space="preserve">
     <value>Rumpf + Beine</value>
-  </data>  
+  </data>
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>Rumpf + Beine + Füße</value>
   </data>
@@ -279,7 +282,19 @@
   <data name="Cure" xml:space="preserve">
     <value>Vita</value>
   </data>
+  <data name="Accessories" xml:space="preserve">
+    <value>Accessoires</value>
+  </data>
   <data name="Ears" xml:space="preserve">
+    <value>Ohr</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>Ohrring</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
     <value>Ohren</value>
+  </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>Waffen</value>
   </data>
 </root>

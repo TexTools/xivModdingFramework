@@ -118,7 +118,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Accessory" xml:space="preserve">
-    <value>附件</value>
+    <value>饰品</value>
   </data>
   <data name="All" xml:space="preserve">
     <value>全部</value>
@@ -143,7 +143,7 @@
   </data>
   <data name="Body_Legs" xml:space="preserve">
     <value>身体 + 腿部</value>
-  </data>  
+  </data>
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>身体 + 腿部 + 脚部</value>
   </data>
@@ -328,7 +328,7 @@
     <value>腰带</value>
   </data>
   <data name="Weapon" xml:space="preserve">
-    <value>武具</value>
+    <value>武器</value>
   </data>
   <data name="Weather" xml:space="preserve">
     <value>天气</value>
@@ -522,8 +522,11 @@
   <data name="Viera_Male_NPC" xml:space="preserve">
     <value>维埃拉族男性NPC</value>
   </data>
+  <data name="Accessories" xml:space="preserve">
+    <value>饰品</value>
+  </data>
   <data name="Ears" xml:space="preserve">
-    <value>耳部</value>
+    <value>耳</value>
   </data>
   <data name="Furniture" xml:space="preserve">
     <value>家具</value>
@@ -569,5 +572,8 @@
   </data>
   <data name="Variant" xml:space="preserve">
     <value>变体</value>
+  </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>武器</value>
   </data>
 </root>

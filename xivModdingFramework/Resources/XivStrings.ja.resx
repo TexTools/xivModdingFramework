@@ -149,7 +149,7 @@
   </data>
   <data name="Body_Legs" xml:space="preserve">
     <value>胴 + 脚</value>
-  </data>  
+  </data>
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>胴 + 脚 + 足</value>
   </data>
@@ -327,10 +327,22 @@
   <data name="Cure" xml:space="preserve">
     <value>ケアル</value>
   </data>
+  <data name="Accessories" xml:space="preserve">
+    <value>アクセサリ</value>
+  </data>
   <data name="Ears" xml:space="preserve">
     <value>耳</value>
   </data>
   <data name="Language_Change_Ja" xml:space="preserve">
     <value>言語を変更するには、アプリケーションを再起動する必要があります。 \n今すぐ再起動？</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>イヤリング</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
+    <value>耳</value>
+  </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>武器</value>
   </data>
 </root>
