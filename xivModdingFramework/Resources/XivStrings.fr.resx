@@ -120,11 +120,24 @@
   <data name="Accessory" xml:space="preserve">
     <value>Accessoire</value>
   </data>
+  <data name="Actions" xml:space="preserve">
+    <value>Actions</value>
+    <comment>行動</comment>
+  </data>
   <data name="All" xml:space="preserve">
     <value>Tous</value>
   </data>
+  <data name="AuRa_Raen" xml:space="preserve">
+    <value>Ao Ra Rehn</value>
+  </data>
+  <data name="AuRa_Xaela" xml:space="preserve">
+    <value>Ao Ra Xaela</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>Ao Ra</value>
+  </data>
+  <data name="Bahamut_Egi" xml:space="preserve">
+    <value>Égide de Bahamut</value>
   </data>
   <data name="Beneficial" xml:space="preserve">
     <value>Renforcement</value>
@@ -153,8 +166,17 @@
   <data name="Buddy" xml:space="preserve">
     <value>Compagnon</value>
   </data>
+  <data name="BuddyAction" xml:space="preserve">
+    <value>Action de Compagnon</value>
+  </data>
+  <data name="Carbuncle" xml:space="preserve">
+    <value>Carbuncle</value>
+  </data>
   <data name="Character" xml:space="preserve">
     <value>Personnage</value>
+  </data>
+  <data name="ColorSet" xml:space="preserve">
+    <value>Coloris</value>
   </data>
   <data name="Companions" xml:space="preserve">
     <value>Compagnon</value>
@@ -162,20 +184,56 @@
   <data name="Company" xml:space="preserve">
     <value>Compagnie</value>
   </data>
+  <data name="CompanyAction" xml:space="preserve">
+    <value>Actions de compagnie</value>
+  </data>
   <data name="Craft" xml:space="preserve">
     <value>Artisanat</value>
+  </data>
+  <data name="CraftAction" xml:space="preserve">
+    <value>Action d'artisanat</value>
+  </data>
+  <data name="DemiHuman" xml:space="preserve">
+    <value>Demi-humain</value>
   </data>
   <data name="Detrimental" xml:space="preserve">
     <value>Fragilisation</value>
   </data>
+  <data name="Diffuse" xml:space="preserve">
+    <value>Diffusion</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>Boucle d'oreille</value>
+  </data>
   <data name="Elezen" xml:space="preserve">
     <value>Élézen</value>
+  </data>
+  <data name="Emote" xml:space="preserve">
+    <value>Emotes</value>
+  </data>
+  <data name="Eos" xml:space="preserve">
+    <value>Éos</value>
+  </data>
+  <data name="Equipment" xml:space="preserve">
+    <value>Équipement</value>
   </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>Blason</value>
   </data>
+  <data name="Error_DirectoryError" xml:space="preserve">
+    <value>Erreur de répertoire</value>
+  </data>
+  <data name="Error_FileNotFound" xml:space="preserve">
+    <value>Impossible de trouver le fichier. Veuillez vérifier vos répertoires dans les paramètres.</value>
+  </data>
+  <data name="Etc" xml:space="preserve">
+    <value>etc.</value>
+  </data>
   <data name="Event" xml:space="preserve">
     <value>Événement</value>
+  </data>
+  <data name="EventAction" xml:space="preserve">
+    <value>Action d'événement</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>Visage</value>
@@ -189,8 +247,14 @@
   <data name="Female" xml:space="preserve">
     <value>Femme</value>
   </data>
+  <data name="FieldMarker" xml:space="preserve">
+    <value>Marqueur</value>
+  </data>
   <data name="Food" xml:space="preserve">
     <value>Nourriture</value>
+  </data>
+  <data name="Garuda_Egi" xml:space="preserve">
+    <value>Égide de Garuda</value>
   </data>
   <data name="Gear" xml:space="preserve">
     <value>Équipement</value>
@@ -210,8 +274,26 @@
   <data name="Head_Body" xml:space="preserve">
     <value>Tête + Torse</value>
   </data>
+  <data name="Hyur_H" xml:space="preserve">
+    <value>Hyur (Grande-Terre)</value>
+  </data>
+  <data name="Hyur_M" xml:space="preserve">
+    <value>Hyur (Midlandais)</value>
+  </data>
+  <data name="Ifrit_Egi" xml:space="preserve">
+    <value>Égide d'Ifrit</value>
+  </data>
+  <data name="Index_Backup" xml:space="preserve">
+    <value>Aucun fichier de sauvegarde d'index détecté. \nVoulez-vous créer une sauvegarde maintenant ? \n\nAvertissement : Ceci désactivera toute modification active afin de créer une sauvegarde. Elles devront être réactivées manuellement.</value>
+  </data>
+  <data name="Iris" xml:space="preserve">
+    <value>Iris</value>
+  </data>
   <data name="Items" xml:space="preserve">
     <value>Objets</value>
+  </data>
+  <data name="Lalafell" xml:space="preserve">
+    <value>Lalafell</value>
   </data>
   <data name="Language" xml:space="preserve">
     <value>fr</value>
@@ -270,6 +352,9 @@
   <data name="Tail" xml:space="preserve">
     <value>Queue</value>
   </data>
+  <data name="Titan_Egi" xml:space="preserve">
+    <value>Égide de Titan</value>
+  </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>deux mains</value>
   </data>
@@ -285,14 +370,143 @@
   <data name="LoadingScreen" xml:space="preserve">
     <value>Ecran de chargement</value>
   </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>Hyur (Midlandais, masc.)</value>
+  </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>Ao Ra (fem.)</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>PNJ Ao Ra (fem.)</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>Ao Ra (m.)</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>PNJ Ao Ra (m.)</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>Élézen (fém.)</value>
+  </data>
+  <data name="Elezen_Female_NPC" xml:space="preserve">
+    <value>PNJ Élézen (fém.)</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>Élézen (m.)</value>
+  </data>
+  <data name="Elezen_Male_NPC" xml:space="preserve">
+    <value>PNJ Élézen (m.)</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>Hyur (Grande-Terre, fém.)</value>
+  </data>
+  <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Grande-Terre, fém.)</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>Hyur (Grande-Terre, masc.)</value>
+  </data>
+  <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Grande-Terre, masc.)</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>Hyur (Midlandais, fém.)</value>
+  </data>
+  <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Midlandais, fém.)</value>
+  </data>
+  <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Midlandais, masc.)</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>Lalafell (femme)</value>
+  </data>
+  <data name="Lalafell_Female_NPC" xml:space="preserve">
+    <value>PNJ Lalafell (femme)</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>Lalafell (homme)</value>
+  </data>
+  <data name="Lalafell_Male_NPC" xml:space="preserve">
+    <value>PNJ Lalafell (homme)</value>
+  </data>
+  <data name="Furniture_Indoor" xml:space="preserve">
+    <value>Meubles d'intérieur</value>
+  </data>
   <data name="Housing" xml:space="preserve">
     <value>Logement</value>
+  </data>
+  <data name="Furniture_Outdoor" xml:space="preserve">
+    <value>Meubles d'extérieur</value>
+  </data>
+  <data name="Hrothgar" xml:space="preserve">
+    <value>Hrothgar</value>
+  </data>
+  <data name="Hrothgar_NPC" xml:space="preserve">
+    <value>PNJ Hrothgar</value>
+  </data>
+  <data name="InnerEar" xml:space="preserve">
+    <value>Oreille interne</value>
+  </data>
+  <data name="Dual_Wield" xml:space="preserve">
+    <value>Double-mains</value>
   </data>
   <data name="Seraph" xml:space="preserve">
     <value>Séraphin</value>
   </data>
+  <data name="Decal" xml:space="preserve">
+    <value>Décalcomanie</value>
+  </data>
+  <data name="Human" xml:space="preserve">
+    <value>Humain</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
+    <value>Oreille</value>
+  </data>
+  <data name="HUD" xml:space="preserve">
+    <value>ATH</value>
+  </data>
+  <data name="Elezen_Duskwight" xml:space="preserve">
+    <value>Élézen Sombres-Lances</value>
+  </data>
+  <data name="Elezen_Wildwood" xml:space="preserve">
+    <value>Élézen Sylvestres</value>
+  </data>
+  <data name="Hrothgar_Helion" xml:space="preserve">
+    <value>Hrothgar – Helion</value>
+  </data>
+  <data name="Hrothgar_Lost" xml:space="preserve">
+    <value>Hrothgar – Perdus</value>
+  </data>
+  <data name="Hyur_Highlander" xml:space="preserve">
+    <value>Hyur – Grande-Terre</value>
+  </data>
+  <data name="Hyur_Midlander" xml:space="preserve">
+    <value>Hyur – Midlandais</value>
+  </data>
+  <data name="Lalafell_Dunesfolk" xml:space="preserve">
+    <value>Lalafell – Gens du désert</value>
+  </data>
+  <data name="Lalafell_Plainsfolk" xml:space="preserve">
+    <value>Lalafell – Gens des plaines</value>
+  </data>
   <data name="Cure" xml:space="preserve">
     <value>Soin</value>
+  </data>
+  <data name="Hrothgar_Female" xml:space="preserve">
+    <value>Hrothgar (femme)</value>
+  </data>
+  <data name="Hrothgar_Female_NPC" xml:space="preserve">
+    <value>PNJ Hrothgar (femme)</value>
+  </data>
+  <data name="Hrothgar_Male" xml:space="preserve">
+    <value>Hrothgar (homme)</value>
+  </data>
+  <data name="Hrothgar_Male_NPC" xml:space="preserve">
+    <value>PNJ Hrothgar (homme)</value>
+  </data>
+  <data name="Fish" xml:space="preserve">
+    <value>Poisson d'aquarium</value>
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>Armes</value>
@@ -306,11 +520,11 @@
   <data name="Furniture" xml:space="preserve">
     <value>Ameublement</value>
   </data>
-  <data name="Earring" xml:space="preserve">
-    <value>Boucle d'oreille</value>
+  <data name="Icon" xml:space="preserve">
+    <value>Icône</value>
   </data>
-  <data name="Ear" xml:space="preserve">
-    <value>Oreille</value>
+  <data name="Indoor_Furniture" xml:space="preserve">
+    <value>Meubles d'intérieur</value>
   </data>
   <data name="Shields" xml:space="preserve">
     <value>Boucliers</value>

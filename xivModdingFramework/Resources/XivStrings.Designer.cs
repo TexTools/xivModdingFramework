@@ -214,7 +214,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to AuRa Female.
+        ///   Looks up a localized string similar to Au Ra Female.
         /// </summary>
         internal static string AuRa_Female {
             get {
@@ -223,7 +223,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to AuRa Female NPC.
+        ///   Looks up a localized string similar to Au Ra Female NPC.
         /// </summary>
         internal static string AuRa_Female_NPC {
             get {
@@ -232,7 +232,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to AuRa Male.
+        ///   Looks up a localized string similar to Au Ra Male.
         /// </summary>
         internal static string AuRa_Male {
             get {
@@ -241,7 +241,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to AuRa Male NPC.
+        ///   Looks up a localized string similar to Au Ra Male NPC.
         /// </summary>
         internal static string AuRa_Male_NPC {
             get {
@@ -1159,7 +1159,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Fish.
+        ///   Looks up a localized string similar to Aquarium Fish.
         /// </summary>
         internal static string Fish {
             get {
@@ -1731,33 +1731,6 @@ namespace xivModdingFramework.Resources {
         internal static string Language {
             get {
                 return ResourceManager.GetString("Language", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Changing the language requires the application to restart. \nRestart now?.
-        /// </summary>
-        internal static string Language_Change {
-            get {
-                return ResourceManager.GetString("Language_Change", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Changing the language requires the application to restart. \nRestart now?.
-        /// </summary>
-        internal static string Language_Change_En {
-            get {
-                return ResourceManager.GetString("Language_Change_En", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Language_Change_Ja.
-        /// </summary>
-        internal static string Language_Change_Ja {
-            get {
-                return ResourceManager.GetString("Language_Change_Ja", resourceCulture);
             }
         }
         

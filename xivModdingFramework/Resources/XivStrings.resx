@@ -146,6 +146,7 @@
   </data>
   <data name="Actions" xml:space="preserve">
     <value>Actions</value>
+    <comment>行動</comment>
   </data>
   <data name="All" xml:space="preserve">
     <value>ALL</value>
@@ -456,12 +457,6 @@
   <data name="Language" xml:space="preserve">
     <value>en</value>
   </data>
-  <data name="Language_Change" xml:space="preserve">
-    <value>Changing the language requires the application to restart. \nRestart now?</value>
-  </data>
-  <data name="Language_Change_En" xml:space="preserve">
-    <value>Changing the language requires the application to restart. \nRestart now?</value>
-  </data>
   <data name="Legs" xml:space="preserve">
     <value>Legs</value>
   </data>
@@ -715,16 +710,16 @@
     <value>ALL</value>
   </data>
   <data name="AuRa_Female" xml:space="preserve">
-    <value>AuRa Female</value>
+    <value>Au Ra Female</value>
   </data>
   <data name="AuRa_Female_NPC" xml:space="preserve">
-    <value>AuRa Female NPC</value>
+    <value>Au Ra Female NPC</value>
   </data>
   <data name="AuRa_Male" xml:space="preserve">
-    <value>AuRa Male</value>
+    <value>Au Ra Male</value>
   </data>
   <data name="AuRa_Male_NPC" xml:space="preserve">
-    <value>AuRa Male NPC</value>
+    <value>Au Ra Male NPC</value>
   </data>
   <data name="Elezen_Female" xml:space="preserve">
     <value>Elezen Female</value>
@@ -973,7 +968,7 @@
     <value>Minimap</value>
   </data>
   <data name="Fish" xml:space="preserve">
-    <value>Fish</value>
+    <value>Aquarium Fish</value>
   </data>
   <data name="Painting" xml:space="preserve">
     <value>Painting</value>
@@ -992,9 +987,6 @@
   </data>
   <data name="Furniture" xml:space="preserve">
     <value>Furniture</value>
-  </data>
-  <data name="Language_Change_Ja" xml:space="preserve">
-    <value>Language_Change_Ja</value>
   </data>
   <data name="Icon" xml:space="preserve">
     <value>Icon</value>

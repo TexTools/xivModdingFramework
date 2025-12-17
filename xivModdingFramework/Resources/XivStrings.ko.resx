@@ -120,11 +120,30 @@
   <data name="Accessory" xml:space="preserve">
     <value>장신구</value>
   </data>
+  <data name="Actions" xml:space="preserve">
+    <value>행동</value>
+    <comment>行動</comment>
+  </data>
   <data name="All" xml:space="preserve">
     <value>모두</value>
   </data>
+  <data name="AuRa_Raen" xml:space="preserve">
+    <value>아우라 렌</value>
+  </data>
+  <data name="AuRa_Xaela" xml:space="preserve">
+    <value>아우라 젤라</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>아우라</value>
+  </data>
+  <data name="Bahamut_Egi" xml:space="preserve">
+    <value>바하무트 에기</value>
+  </data>
+  <data name="Beneficial" xml:space="preserve">
+    <value>유익함</value>
+  </data>
+  <data name="Bishop_Autoturret" xml:space="preserve">
+    <value>비숍 자동포탑</value>
   </data>
   <data name="Body" xml:space="preserve">
     <value>몸통</value>
@@ -144,20 +163,77 @@
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>몸통 +다리 + 발</value>
   </data>
+  <data name="Buddy" xml:space="preserve">
+    <value>버디</value>
+  </data>
+  <data name="BuddyAction" xml:space="preserve">
+    <value>버디 액션</value>
+  </data>
   <data name="Carbuncle" xml:space="preserve">
     <value>카벙클</value>
   </data>
   <data name="Character" xml:space="preserve">
     <value>캐릭터</value>
   </data>
+  <data name="ColorSet" xml:space="preserve">
+    <value>색상 세트</value>
+  </data>
   <data name="Companions" xml:space="preserve">
     <value>버디</value>
+  </data>
+  <data name="Company" xml:space="preserve">
+    <value>자유부대</value>
+  </data>
+  <data name="CompanyAction" xml:space="preserve">
+    <value>자유부대 작전</value>
+  </data>
+  <data name="Craft" xml:space="preserve">
+    <value>제작</value>
+  </data>
+  <data name="CraftAction" xml:space="preserve">
+    <value>제작 기술</value>
+  </data>
+  <data name="DemiHuman" xml:space="preserve">
+    <value>아인</value>
+  </data>
+  <data name="Detrimental" xml:space="preserve">
+    <value>약화</value>
+  </data>
+  <data name="Diffuse" xml:space="preserve">
+    <value>난반사</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>귀걸이</value>
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>엘레젠</value>
   </data>
+  <data name="Emote" xml:space="preserve">
+    <value>감정표현</value>
+  </data>
+  <data name="Eos" xml:space="preserve">
+    <value>요정 에오스</value>
+  </data>
+  <data name="Equipment" xml:space="preserve">
+    <value>장비</value>
+  </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>장비 문장</value>
+  </data>
+  <data name="Error_DirectoryError" xml:space="preserve">
+    <value>디렉터리 오류</value>
+  </data>
+  <data name="Error_FileNotFound" xml:space="preserve">
+    <value>파일을 찾을 수 없습니다. 설정에서 디렉터리를 확인해 주십시오.</value>
+  </data>
+  <data name="Etc" xml:space="preserve">
+    <value>등</value>
+  </data>
+  <data name="Event" xml:space="preserve">
+    <value>이벤트</value>
+  </data>
+  <data name="EventAction" xml:space="preserve">
+    <value>이벤트 액션</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>얼굴</value>
@@ -171,11 +247,20 @@
   <data name="Female" xml:space="preserve">
     <value>여성</value>
   </data>
+  <data name="FieldMarker" xml:space="preserve">
+    <value>마커</value>
+  </data>
   <data name="Food" xml:space="preserve">
     <value>음식</value>
   </data>
+  <data name="Garuda_Egi" xml:space="preserve">
+    <value>가루다 에기</value>
+  </data>
   <data name="Gear" xml:space="preserve">
     <value>장비</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>일반</value>
   </data>
   <data name="Hair" xml:space="preserve">
     <value>머리 모양</value>
@@ -195,8 +280,17 @@
   <data name="Hyur_M" xml:space="preserve">
     <value>휴런 중원 부족</value>
   </data>
+  <data name="Ifrit_Egi" xml:space="preserve">
+    <value>이프리트 에기</value>
+  </data>
+  <data name="Index_Backup" xml:space="preserve">
+    <value>인덱스 파일 백업이 감지되지 않았습니다. \n지금 백업을 만드시겠습니까? \n\n경고: 백업을 생성하기 위해 활성화된 수정 사항은 모두 비활성화됩니다. 수동으로 다시 활성화해야 합니다.</value>
+  </data>
   <data name="Iris" xml:space="preserve">
     <value>눈동자</value>
+  </data>
+  <data name="Items" xml:space="preserve">
+    <value>아이템</value>
   </data>
   <data name="Lalafell" xml:space="preserve">
     <value>라라펠</value>
@@ -255,6 +349,9 @@
   <data name="Tail" xml:space="preserve">
     <value>꼬리</value>
   </data>
+  <data name="Titan_Egi" xml:space="preserve">
+    <value>타이탄 에기</value>
+  </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>양손</value>
   </data>
@@ -270,8 +367,143 @@
   <data name="LoadingScreen" xml:space="preserve">
     <value>로딩 화면</value>
   </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>휴런 중원 부족 남성</value>
+  </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>아우라(여)</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>아우라(여) NPC</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>아우라(남)</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>아우라(남) NPC</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>엘레젠(여)</value>
+  </data>
+  <data name="Elezen_Female_NPC" xml:space="preserve">
+    <value>엘레젠(여) NPC</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>엘레젠(남)</value>
+  </data>
+  <data name="Elezen_Male_NPC" xml:space="preserve">
+    <value>엘레젠(남) NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>휴런 고원 부족 여성</value>
+  </data>
+  <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
+    <value>휴런 고원 부족 여성 NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>휴런 고원 부족 남성</value>
+  </data>
+  <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
+    <value>휴런 고원 부족 남성 NPC</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>휴런 중원 부족 여성</value>
+  </data>
+  <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
+    <value>휴런 중원 부족 여성 NPC</value>
+  </data>
+  <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
+    <value>휴런 중원 부족 남성 NPC</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>라라펠족 여성</value>
+  </data>
+  <data name="Lalafell_Female_NPC" xml:space="preserve">
+    <value>라라펠족 여성 NPC</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>라라펠족 남성</value>
+  </data>
+  <data name="Lalafell_Male_NPC" xml:space="preserve">
+    <value>라라펠족 남성 NPC</value>
+  </data>
+  <data name="Furniture_Indoor" xml:space="preserve">
+    <value>실내 가구</value>
+  </data>
   <data name="Housing" xml:space="preserve">
     <value>하우징</value>
+  </data>
+  <data name="Furniture_Outdoor" xml:space="preserve">
+    <value>실외 가구</value>
+  </data>
+  <data name="Hrothgar" xml:space="preserve">
+    <value>로스가르</value>
+  </data>
+  <data name="Hrothgar_NPC" xml:space="preserve">
+    <value>로스가르족 NPC</value>
+  </data>
+  <data name="InnerEar" xml:space="preserve">
+    <value>내이</value>
+  </data>
+  <data name="Dual_Wield" xml:space="preserve">
+    <value>쌍수</value>
+  </data>
+  <data name="Decal" xml:space="preserve">
+    <value>데칼</value>
+  </data>
+  <data name="Human" xml:space="preserve">
+    <value>인간</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
+    <value>귀</value>
+  </data>
+  <data name="HUD" xml:space="preserve">
+    <value>HUD</value>
+  </data>
+  <data name="Elezen_Duskwight" xml:space="preserve">
+    <value>엘레젠 덤스와이트</value>
+  </data>
+  <data name="Elezen_Wildwood" xml:space="preserve">
+    <value>엘레젠 와일드우드</value>
+  </data>
+  <data name="Hrothgar_Helion" xml:space="preserve">
+    <value>로스가르족: 헬리온</value>
+  </data>
+  <data name="Hrothgar_Lost" xml:space="preserve">
+    <value>로스가르족: 로스트</value>
+  </data>
+  <data name="Hyur_Highlander" xml:space="preserve">
+    <value>휴런 – 고원 부족</value>
+  </data>
+  <data name="Hyur_Midlander" xml:space="preserve">
+    <value>휴런 – 중원 부족</value>
+  </data>
+  <data name="Lalafell_Dunesfolk" xml:space="preserve">
+    <value>라라펠족: 사막 부족</value>
+  </data>
+  <data name="Lalafell_Plainsfolk" xml:space="preserve">
+    <value>라라펠족: 평원 부족</value>
+  </data>
+  <data name="Cure" xml:space="preserve">
+    <value>케알</value>
+  </data>
+  <data name="Hrothgar_Female" xml:space="preserve">
+    <value>로스가르족 여성</value>
+  </data>
+  <data name="Hrothgar_Female_NPC" xml:space="preserve">
+    <value>로스가르족 여성 NPC</value>
+  </data>
+  <data name="Hrothgar_Male" xml:space="preserve">
+    <value>로스가르족 남성</value>
+  </data>
+  <data name="Hrothgar_Male_NPC" xml:space="preserve">
+    <value>로스가르족 남성 NPC</value>
+  </data>
+  <data name="Fish" xml:space="preserve">
+    <value>수족관 물고기</value>
+  </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>무기</value>
   </data>
   <data name="Accessories" xml:space="preserve">
     <value>장신구</value>
@@ -279,14 +511,14 @@
   <data name="Ears" xml:space="preserve">
     <value>귀</value>
   </data>
-  <data name="Earring" xml:space="preserve">
-    <value>귀걸이</value>
+  <data name="Furniture" xml:space="preserve">
+    <value>가구</value>
   </data>
-  <data name="Ear" xml:space="preserve">
-    <value>귀</value>
+  <data name="Icon" xml:space="preserve">
+    <value>아이콘</value>
   </data>
-  <data name="Weapons" xml:space="preserve">
-    <value>무기</value>
+  <data name="Indoor_Furniture" xml:space="preserve">
+    <value>실내 가구</value>
   </data>
   <data name="Shields" xml:space="preserve">
     <value>방패</value>

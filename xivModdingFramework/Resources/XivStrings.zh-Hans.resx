@@ -120,11 +120,27 @@
   <data name="Accessory" xml:space="preserve">
     <value>饰品</value>
   </data>
+  <data name="Actions" xml:space="preserve">
+    <value>行动</value>
+    <comment>行動</comment>
+  </data>
   <data name="All" xml:space="preserve">
     <value>全部</value>
   </data>
+  <data name="AuRa_Raen" xml:space="preserve">
+    <value>敖龙族：光</value>
+  </data>
+  <data name="AuRa_Xaela" xml:space="preserve">
+    <value>敖龙族：暗</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>敖龙族</value>
+  </data>
+  <data name="Bahamut_Egi" xml:space="preserve">
+    <value>巴哈姆特之魂</value>
+  </data>
+  <data name="Beneficial" xml:space="preserve">
+    <value>有益</value>
   </data>
   <data name="Bishop_Autoturret" xml:space="preserve">
     <value>象式浮空炮塔</value>
@@ -147,6 +163,12 @@
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>身体 + 腿部 + 脚部</value>
   </data>
+  <data name="Buddy" xml:space="preserve">
+    <value>伙伴</value>
+  </data>
+  <data name="BuddyAction" xml:space="preserve">
+    <value>伙伴指令</value>
+  </data>
   <data name="Carbuncle" xml:space="preserve">
     <value>石兽</value>
   </data>
@@ -159,8 +181,23 @@
   <data name="Companions" xml:space="preserve">
     <value>同伴</value>
   </data>
+  <data name="Company" xml:space="preserve">
+    <value>部队</value>
+  </data>
+  <data name="CompanyAction" xml:space="preserve">
+    <value>部队特权</value>
+  </data>
+  <data name="Craft" xml:space="preserve">
+    <value>制作</value>
+  </data>
+  <data name="CraftAction" xml:space="preserve">
+    <value>制作技能</value>
+  </data>
   <data name="DemiHuman" xml:space="preserve">
     <value>半人</value>
+  </data>
+  <data name="Detrimental" xml:space="preserve">
+    <value>弱化</value>
   </data>
   <data name="Diffuse" xml:space="preserve">
     <value>漫反射</value>
@@ -170,6 +207,9 @@
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>精灵族</value>
+  </data>
+  <data name="Emote" xml:space="preserve">
+    <value>情感动作</value>
   </data>
   <data name="Eos" xml:space="preserve">
     <value>朝日小仙女</value>
@@ -187,7 +227,13 @@
     <value>无法找到文件，请确定设置的目录是否有误</value>
   </data>
   <data name="Etc" xml:space="preserve">
-    <value>等等</value>
+    <value>等</value>
+  </data>
+  <data name="Event" xml:space="preserve">
+    <value>活动</value>
+  </data>
+  <data name="EventAction" xml:space="preserve">
+    <value>活动操作</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>面对</value>
@@ -201,6 +247,9 @@
   <data name="Female" xml:space="preserve">
     <value>女性</value>
   </data>
+  <data name="FieldMarker" xml:space="preserve">
+    <value>目标标记</value>
+  </data>
   <data name="Food" xml:space="preserve">
     <value>食物</value>
   </data>
@@ -209,6 +258,9 @@
   </data>
   <data name="Gear" xml:space="preserve">
     <value>装备</value>
+  </data>
+  <data name="General" xml:space="preserve">
+    <value>综合</value>
   </data>
   <data name="Hair" xml:space="preserve">
     <value>发型</value>
@@ -231,8 +283,14 @@
   <data name="Ifrit_Egi" xml:space="preserve">
     <value>伊弗利特之灵</value>
   </data>
+  <data name="Index_Backup" xml:space="preserve">
+    <value>未检测到索引文件备份。\n您想现在创建备份吗？\n\n警告：这将禁用任何活动的修改以便创建备份。必须手动重新启用它们。</value>
+  </data>
   <data name="Iris" xml:space="preserve">
-    <value>眼</value>
+    <value>虹膜</value>
+  </data>
+  <data name="Items" xml:space="preserve">
+    <value>物品</value>
   </data>
   <data name="Lalafell" xml:space="preserve">
     <value>拉拉菲尔族</value>
@@ -342,6 +400,18 @@
   <data name="Hyur_Midlander_Male" xml:space="preserve">
     <value>人族 中原之民 男性</value>
   </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>敖龙族(女)</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>敖龙族(女) NPC</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>敖龙族(男)</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>敖龙族(男) NPC</value>
+  </data>
   <data name="Elezen_Female" xml:space="preserve">
     <value>精灵族 女性</value>
   </data>
@@ -411,8 +481,14 @@
   <data name="Roegadyn_Male_NPC" xml:space="preserve">
     <value>鲁加族男性NPC</value>
   </data>
+  <data name="Furniture_Indoor" xml:space="preserve">
+    <value>室内家具</value>
+  </data>
   <data name="Housing" xml:space="preserve">
-    <value>房屋</value>
+    <value>房区</value>
+  </data>
+  <data name="Furniture_Outdoor" xml:space="preserve">
+    <value>室外家具</value>
   </data>
   <data name="Paintings" xml:space="preserve">
     <value>绘画作品</value>
@@ -429,6 +505,9 @@
   <data name="Viera_NPC" xml:space="preserve">
     <value>维埃拉族NPC</value>
   </data>
+  <data name="InnerEar" xml:space="preserve">
+    <value>内耳</value>
+  </data>
   <data name="Ornaments" xml:space="preserve">
     <value>装饰品</value>
   </data>
@@ -444,11 +523,17 @@
   <data name="Seraph" xml:space="preserve">
     <value>Seraph</value>
   </data>
+  <data name="Decal" xml:space="preserve">
+    <value>贴花</value>
+  </data>
   <data name="Human" xml:space="preserve">
     <value>人族</value>
   </data>
   <data name="Ear" xml:space="preserve">
     <value>耳</value>
+  </data>
+  <data name="HUD" xml:space="preserve">
+    <value>界面</value>
   </data>
   <data name="Left" xml:space="preserve">
     <value>左</value>
@@ -498,6 +583,9 @@
   <data name="Viera_Veena" xml:space="preserve">
     <value>维埃拉族 - 山林之民</value>
   </data>
+  <data name="Cure" xml:space="preserve">
+    <value>治疗</value>
+  </data>
   <data name="Hrothgar_Female" xml:space="preserve">
     <value>硌狮族 女性</value>
   </data>
@@ -521,6 +609,12 @@
   </data>
   <data name="Viera_Male_NPC" xml:space="preserve">
     <value>维埃拉族男性NPC</value>
+  </data>
+  <data name="Fish" xml:space="preserve">
+    <value>观赏鱼</value>
+  </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>武器</value>
   </data>
   <data name="Accessories" xml:space="preserve">
     <value>饰品</value>
@@ -572,9 +666,6 @@
   </data>
   <data name="Variant" xml:space="preserve">
     <value>变体</value>
-  </data>
-  <data name="Weapons" xml:space="preserve">
-    <value>武器</value>
   </data>
   <data name="Shields" xml:space="preserve">
     <value>盾</value>

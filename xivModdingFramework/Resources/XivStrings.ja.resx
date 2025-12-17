@@ -122,12 +122,22 @@
   </data>
   <data name="Actions" xml:space="preserve">
     <value>アクション</value>
+    <comment>行動</comment>
   </data>
   <data name="All" xml:space="preserve">
     <value>すべて</value>
   </data>
+  <data name="AuRa_Raen" xml:space="preserve">
+    <value>アウラ・レン</value>
+  </data>
+  <data name="AuRa_Xaela" xml:space="preserve">
+    <value>アウラ・ゼラ</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>アウラ</value>
+  </data>
+  <data name="Bahamut_Egi" xml:space="preserve">
+    <value>バハムート・エギ</value>
   </data>
   <data name="Beneficial" xml:space="preserve">
     <value>強化</value>
@@ -156,11 +166,17 @@
   <data name="Buddy" xml:space="preserve">
     <value>バディ</value>
   </data>
+  <data name="BuddyAction" xml:space="preserve">
+    <value>バディアクション</value>
+  </data>
   <data name="Carbuncle" xml:space="preserve">
     <value>カーバンクル</value>
   </data>
   <data name="Character" xml:space="preserve">
     <value>キャラクター</value>
+  </data>
+  <data name="ColorSet" xml:space="preserve">
+    <value>カラーセット</value>
   </data>
   <data name="Companions" xml:space="preserve">
     <value>バディ</value>
@@ -168,11 +184,26 @@
   <data name="Company" xml:space="preserve">
     <value>カンパニー</value>
   </data>
+  <data name="CompanyAction" xml:space="preserve">
+    <value>カンパニーアクション</value>
+  </data>
   <data name="Craft" xml:space="preserve">
     <value>製作</value>
   </data>
+  <data name="CraftAction" xml:space="preserve">
+    <value>製作アクション</value>
+  </data>
+  <data name="DemiHuman" xml:space="preserve">
+    <value>亜人</value>
+  </data>
   <data name="Detrimental" xml:space="preserve">
     <value>弱体</value>
+  </data>
+  <data name="Diffuse" xml:space="preserve">
+    <value>拡散反射</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>イヤリング</value>
   </data>
   <data name="Elezen" xml:space="preserve">
     <value>エレゼン</value>
@@ -183,11 +214,26 @@
   <data name="Eos" xml:space="preserve">
     <value>フェアリー・エオス</value>
   </data>
+  <data name="Equipment" xml:space="preserve">
+    <value>装備</value>
+  </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>クレスト</value>
   </data>
+  <data name="Error_DirectoryError" xml:space="preserve">
+    <value>ディレクトリエラー</value>
+  </data>
+  <data name="Error_FileNotFound" xml:space="preserve">
+    <value>ファイルが見つかりません。設定内のディレクトリをご確認ください。</value>
+  </data>
+  <data name="Etc" xml:space="preserve">
+    <value>など</value>
+  </data>
   <data name="Event" xml:space="preserve">
     <value>イベント</value>
+  </data>
+  <data name="EventAction" xml:space="preserve">
+    <value>イベントアクション</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>顔</value>
@@ -200,6 +246,9 @@
   </data>
   <data name="Female" xml:space="preserve">
     <value>女性</value>
+  </data>
+  <data name="FieldMarker" xml:space="preserve">
+    <value>マーカ</value>
   </data>
   <data name="Food" xml:space="preserve">
     <value>食べ物</value>
@@ -225,8 +274,20 @@
   <data name="Head_Body" xml:space="preserve">
     <value>頭 + 胴</value>
   </data>
+  <data name="Hyur_H" xml:space="preserve">
+    <value>ヒューラン・ハイランダー</value>
+  </data>
+  <data name="Hyur_M" xml:space="preserve">
+    <value>ヒューラン・ミッドランダー</value>
+  </data>
   <data name="Ifrit_Egi" xml:space="preserve">
     <value>イフリート・エギ</value>
+  </data>
+  <data name="Index_Backup" xml:space="preserve">
+    <value>インデックスファイルのバックアップが検出されませんでした。 \n今すぐバックアップを作成しますか？ \n\n警告：バックアップを作成するため、現在適用されている変更は無効になります。これらの変更は手動で再有効化する必要があります。</value>
+  </data>
+  <data name="Iris" xml:space="preserve">
+    <value>虹彩</value>
   </data>
   <data name="Items" xml:space="preserve">
     <value>アイテム</value>
@@ -318,14 +379,146 @@
   <data name="Wrists" xml:space="preserve">
     <value>腕</value>
   </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>ヒューラン・ミッドランダー族男性</value>
+  </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>アウラ(女)</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>アウラ(女) NPC</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>アウラ(男)</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>アウラ(男) NPC</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>エレゼン(女)</value>
+  </data>
+  <data name="Elezen_Female_NPC" xml:space="preserve">
+    <value>エレゼン(女) NPC</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>エレゼン(男)</value>
+  </data>
+  <data name="Elezen_Male_NPC" xml:space="preserve">
+    <value>エレゼン(男) NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>ヒューラン・ハイランダー族女性</value>
+  </data>
+  <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
+    <value>ヒューラン・ハイランダー族女性NPC</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>ヒューラン・ハイランダー族男性</value>
+  </data>
+  <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
+    <value>ヒューラン・ハイランダー族男性NPC</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>ヒューラン・ミッドランダー族女性</value>
+  </data>
+  <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
+    <value>ヒューラン・ミッドランダー族女性NPC</value>
+  </data>
+  <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
+    <value>ヒューラン・ミッドランダー族男性NPC</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>ララフェル族女性</value>
+  </data>
+  <data name="Lalafell_Female_NPC" xml:space="preserve">
+    <value>ララフェル族女性NPC</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>ララフェル族男性</value>
+  </data>
+  <data name="Lalafell_Male_NPC" xml:space="preserve">
+    <value>ララフェル族男性NPC</value>
+  </data>
+  <data name="Furniture_Indoor" xml:space="preserve">
+    <value>室内用家具</value>
+  </data>
   <data name="Housing" xml:space="preserve">
     <value>ハウジング</value>
+  </data>
+  <data name="Furniture_Outdoor" xml:space="preserve">
+    <value>庭具</value>
+  </data>
+  <data name="Hrothgar" xml:space="preserve">
+    <value>ロスガル</value>
+  </data>
+  <data name="Hrothgar_NPC" xml:space="preserve">
+    <value>ロスガル族NPC</value>
+  </data>
+  <data name="InnerEar" xml:space="preserve">
+    <value>内耳</value>
+  </data>
+  <data name="Dual_Wield" xml:space="preserve">
+    <value>二刀流</value>
   </data>
   <data name="Seraph" xml:space="preserve">
     <value>セラフィム</value>
   </data>
+  <data name="Decal" xml:space="preserve">
+    <value>デカール</value>
+  </data>
+  <data name="Human" xml:space="preserve">
+    <value>ヒューマン</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
+    <value>耳</value>
+  </data>
+  <data name="HUD" xml:space="preserve">
+    <value>HUD</value>
+  </data>
+  <data name="Elezen_Duskwight" xml:space="preserve">
+    <value>エレゼン・フォレスター</value>
+  </data>
+  <data name="Elezen_Wildwood" xml:space="preserve">
+    <value>エレゼン・シェーダー</value>
+  </data>
+  <data name="Hrothgar_Helion" xml:space="preserve">
+    <value>ロスガル族：ヘリオン</value>
+  </data>
+  <data name="Hrothgar_Lost" xml:space="preserve">
+    <value>ロスガル族：ロスト</value>
+  </data>
+  <data name="Hyur_Highlander" xml:space="preserve">
+    <value>ヒューラン・ハイランダー</value>
+  </data>
+  <data name="Hyur_Midlander" xml:space="preserve">
+    <value>ヒューラン・ミッドランダー</value>
+  </data>
+  <data name="Lalafell_Dunesfolk" xml:space="preserve">
+    <value>ララフェル族：デューンフォーク</value>
+  </data>
+  <data name="Lalafell_Plainsfolk" xml:space="preserve">
+    <value>ララフェル族：プレーンフォーク</value>
+  </data>
   <data name="Cure" xml:space="preserve">
     <value>ケアル</value>
+  </data>
+  <data name="Hrothgar_Female" xml:space="preserve">
+    <value>ロスガル族女性</value>
+  </data>
+  <data name="Hrothgar_Female_NPC" xml:space="preserve">
+    <value>ロスガル族女性NPC</value>
+  </data>
+  <data name="Hrothgar_Male" xml:space="preserve">
+    <value>ロスガル族男性</value>
+  </data>
+  <data name="Hrothgar_Male_NPC" xml:space="preserve">
+    <value>ロスガル族男性NPC</value>
+  </data>
+  <data name="Fish" xml:space="preserve">
+    <value>アクアリウムの魚</value>
+  </data>
+  <data name="Weapons" xml:space="preserve">
+    <value>武器</value>
   </data>
   <data name="Accessories" xml:space="preserve">
     <value>アクセサリ</value>
@@ -333,17 +526,14 @@
   <data name="Ears" xml:space="preserve">
     <value>耳</value>
   </data>
-  <data name="Language_Change_Ja" xml:space="preserve">
-    <value>言語を変更するには、アプリケーションを再起動する必要があります。 \n今すぐ再起動？</value>
+  <data name="Furniture" xml:space="preserve">
+    <value>家具</value>
   </data>
-  <data name="Earring" xml:space="preserve">
-    <value>イヤリング</value>
+  <data name="Icon" xml:space="preserve">
+    <value>アイコン</value>
   </data>
-  <data name="Ear" xml:space="preserve">
-    <value>耳</value>
-  </data>
-  <data name="Weapons" xml:space="preserve">
-    <value>武器</value>
+  <data name="Indoor_Furniture" xml:space="preserve">
+    <value>室内用家具</value>
   </data>
   <data name="Shields" xml:space="preserve">
     <value>盾</value>
