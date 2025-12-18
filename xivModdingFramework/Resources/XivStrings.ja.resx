@@ -354,6 +354,9 @@
   <data name="Selene" xml:space="preserve">
     <value>フェアリー・セレネ</value>
   </data>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>セフィロト・エギ</value>
+  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>ソウルクリスタル</value>
   </data>
@@ -438,6 +441,30 @@
   <data name="Lalafell_Male_NPC" xml:space="preserve">
     <value>ララフェル族男性NPC</value>
   </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>ミコッテ族女性</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>ミコッテ族女性NPC</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>ミコッテ族男性</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>ミコッテ族男性NPC</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>ルガディン族女性</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>ルガディン族女性NPC</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>ルガディン族男性</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>ルガディン族男性NPC</value>
+  </data>
   <data name="Furniture_Indoor" xml:space="preserve">
     <value>室内用家具</value>
   </data>
@@ -452,6 +479,12 @@
   </data>
   <data name="Hrothgar_NPC" xml:space="preserve">
     <value>ロスガル族NPC</value>
+  </data>
+  <data name="Viera" xml:space="preserve">
+    <value>ヴィエラ族</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>ヴィエラ族NPC</value>
   </data>
   <data name="InnerEar" xml:space="preserve">
     <value>内耳</value>
@@ -498,6 +531,24 @@
   <data name="Lalafell_Plainsfolk" xml:space="preserve">
     <value>ララフェル族：プレーンフォーク</value>
   </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>ミコッテ：ムーンキーパー</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>ミコッテ：サンシーカー</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>ルガディン：ローエンガルデ</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>ルガディン：ゼーヴォルフ</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>ラヴァ・ヴィエラ</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>ヴィナ・ヴィエラ</value>
+  </data>
   <data name="Cure" xml:space="preserve">
     <value>ケアル</value>
   </data>
@@ -512,6 +563,18 @@
   </data>
   <data name="Hrothgar_Male_NPC" xml:space="preserve">
     <value>ロスガル族男性NPC</value>
+  </data>
+  <data name="Viera_Female" xml:space="preserve">
+    <value>ヴィエラ族女性</value>
+  </data>
+  <data name="Viera_Female_NPC" xml:space="preserve">
+    <value>ヴィエラ族女性NPC</value>
+  </data>
+  <data name="Viera_Male" xml:space="preserve">
+    <value>ヴィエラ族男性</value>
+  </data>
+  <data name="Viera_Male_NPC" xml:space="preserve">
+    <value>ヴィエラ族男性NPC</value>
   </data>
   <data name="Fish" xml:space="preserve">
     <value>アクアリウムの魚</value>

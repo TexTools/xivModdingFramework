@@ -146,7 +146,6 @@
   </data>
   <data name="Actions" xml:space="preserve">
     <value>Actions</value>
-    <comment>行動</comment>
   </data>
   <data name="All" xml:space="preserve">
     <value>ALL</value>
@@ -515,7 +514,7 @@
     <value>24</value>
   </data>
   <data name="Miqote" xml:space="preserve">
-    <value>Miqote</value>
+    <value>Miqo'te</value>
   </data>
   <data name="ModelCharaFile" xml:space="preserve">
     <value>modelchara_0.exd</value>
@@ -587,7 +586,7 @@
     <value>placename_0_{0}.exd</value>
   </data>
   <data name="Ramuh_Egi" xml:space="preserve">
-    <value>Ramuh Egi</value>
+    <value>Ramuh-Egi</value>
   </data>
   <data name="Rings" xml:space="preserve">
     <value>Rings</value>
@@ -767,16 +766,16 @@
     <value>Lalafell Male NPC</value>
   </data>
   <data name="Miqote_Female" xml:space="preserve">
-    <value>Miqote Female</value>
+    <value>Miqo'te Female</value>
   </data>
   <data name="Miqote_Female_NPC" xml:space="preserve">
-    <value>Miqote Female NPC</value>
+    <value>Miqo'te Female NPC</value>
   </data>
   <data name="Miqote_Male" xml:space="preserve">
-    <value>Miqote Male</value>
+    <value>Miqo'te Male</value>
   </data>
   <data name="Miqote_Male_NPC" xml:space="preserve">
-    <value>Miqote Male NPC</value>
+    <value>Miqo'te Male NPC</value>
   </data>
   <data name="NPC_Female" xml:space="preserve">
     <value>NPC Female</value>
@@ -1096,9 +1095,6 @@
   <data name="ViperArms" xml:space="preserve">
     <value>Viper Arms</value>
   </data>
-  <data name="Whips" xml:space="preserve">
-    <value>Whips</value>
-  </data>
   <data name="CarpenterArms" xml:space="preserve">
     <value>Carpenter Arms</value>
   </data>
@@ -1131,5 +1127,8 @@
   </data>
   <data name="FisherArms" xml:space="preserve">
     <value>Fisher Arms</value>
+  </data>
+  <data name="Whips" xml:space="preserve">
+    <value>Whips</value>
   </data>
 </root>

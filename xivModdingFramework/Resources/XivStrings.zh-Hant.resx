@@ -122,7 +122,6 @@
   </data>
   <data name="Actions" xml:space="preserve">
     <value>行動</value>
-    <comment>行動</comment>
   </data>
   <data name="All" xml:space="preserve">
     <value>全部</value>
@@ -364,6 +363,9 @@
   <data name="Selene" xml:space="preserve">
     <value>夕月小仙女</value>
   </data>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>薩菲洛特之靈</value>
+  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>靈魂水晶</value>
   </data>
@@ -521,7 +523,7 @@
     <value>雙持</value>
   </data>
   <data name="Seraph" xml:space="preserve">
-    <value>Seraph</value>
+    <value>熾天使</value>
   </data>
   <data name="Decal" xml:space="preserve">
     <value>貼花</value>

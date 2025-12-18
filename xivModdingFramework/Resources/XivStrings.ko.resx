@@ -333,6 +333,9 @@
   <data name="Pets" xml:space="preserve">
     <value>소환수</value>
   </data>
+  <data name="Ramuh_Egi" xml:space="preserve">
+    <value>라무 에기</value>
+  </data>
   <data name="Rings" xml:space="preserve">
     <value>손가락</value>
   </data>
@@ -341,6 +344,9 @@
   </data>
   <data name="SearchBox" xml:space="preserve">
     <value>검색 Textures</value>
+  </data>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>세피로트 에기</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>소울 크리스탈</value>
@@ -426,6 +432,30 @@
   <data name="Lalafell_Male_NPC" xml:space="preserve">
     <value>라라펠족 남성 NPC</value>
   </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>미코테(여)</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>미코테(여) NPC</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>미코테(남)</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>미코테(남) NPC</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>루가딘(여)</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>루가딘(여) NPC</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>루가딘(남)</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>루가딘(남) NPC</value>
+  </data>
   <data name="Furniture_Indoor" xml:space="preserve">
     <value>실내 가구</value>
   </data>
@@ -441,11 +471,20 @@
   <data name="Hrothgar_NPC" xml:space="preserve">
     <value>로스가르족 NPC</value>
   </data>
+  <data name="Viera" xml:space="preserve">
+    <value>비에라족</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>비에라족 NPC</value>
+  </data>
   <data name="InnerEar" xml:space="preserve">
     <value>내이</value>
   </data>
   <data name="Dual_Wield" xml:space="preserve">
     <value>쌍수</value>
+  </data>
+  <data name="Seraph" xml:space="preserve">
+    <value>세라핌</value>
   </data>
   <data name="Decal" xml:space="preserve">
     <value>데칼</value>
@@ -483,6 +522,24 @@
   <data name="Lalafell_Plainsfolk" xml:space="preserve">
     <value>라라펠족: 평원 부족</value>
   </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>미코테: 달의 수호자</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>미코테: 태양의 추종자</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>루가딘: 불꽃의 수호자</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>루가딘: 바다의 늑대</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>라바 비에라</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>비나 비에라</value>
+  </data>
   <data name="Cure" xml:space="preserve">
     <value>케알</value>
   </data>
@@ -497,6 +554,18 @@
   </data>
   <data name="Hrothgar_Male_NPC" xml:space="preserve">
     <value>로스가르족 남성 NPC</value>
+  </data>
+  <data name="Viera_Female" xml:space="preserve">
+    <value>비에라족 여성</value>
+  </data>
+  <data name="Viera_Female_NPC" xml:space="preserve">
+    <value>비에라족 여성 NPC</value>
+  </data>
+  <data name="Viera_Male" xml:space="preserve">
+    <value>비에라족 남성</value>
+  </data>
+  <data name="Viera_Male_NPC" xml:space="preserve">
+    <value>비에라족 남성 NPC</value>
   </data>
   <data name="Fish" xml:space="preserve">
     <value>수족관 물고기</value>

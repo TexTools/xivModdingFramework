@@ -274,10 +274,10 @@
     <value>Kopf + Rumpf</value>
   </data>
   <data name="Hyur_H" xml:space="preserve">
-    <value>Hyuraner (Hochländer)</value>
+    <value>Hyuran (Hochländer)</value>
   </data>
   <data name="Hyur_M" xml:space="preserve">
-    <value>Hyuraner (Mittelländer)</value>
+    <value>Hyuran (Wiesländer)</value>
   </data>
   <data name="Ifrit_Egi" xml:space="preserve">
     <value>Ifrit-Egi</value>
@@ -321,6 +321,9 @@
   <data name="Minions" xml:space="preserve">
     <value>Begleiter</value>
   </data>
+  <data name="Miqote" xml:space="preserve">
+    <value>Miqo'te</value>
+  </data>
   <data name="Mounts" xml:space="preserve">
     <value>Reittiere</value>
   </data>
@@ -336,8 +339,17 @@
   <data name="Pets" xml:space="preserve">
     <value>Familiare</value>
   </data>
+  <data name="Ramuh_Egi" xml:space="preserve">
+    <value>Ramuh-Egi</value>
+  </data>
+  <data name="Roegadyn" xml:space="preserve">
+    <value>Roegadyn</value>
+  </data>
   <data name="Rook_Autoturret" xml:space="preserve">
     <value>Selbstschuss-Gyrocopter TURM</value>
+  </data>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>Sephirot-Egi</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>Jobkristall</value>
@@ -361,7 +373,7 @@
     <value>Handgelenke</value>
   </data>
   <data name="Hyur_Midlander_Male" xml:space="preserve">
-    <value>Hyuraner (Mittelländer)</value>
+    <value>Hyuran (Wiesländer) männl.</value>
   </data>
   <data name="AuRa_Female" xml:space="preserve">
     <value>Au Ra (weibl.)</value>
@@ -376,49 +388,73 @@
     <value>Au Ra (männl.) NPC</value>
   </data>
   <data name="Elezen_Female" xml:space="preserve">
-    <value>Elezen (weibl.)</value>
+    <value>Elezen weibl.</value>
   </data>
   <data name="Elezen_Female_NPC" xml:space="preserve">
-    <value>Elezen (weibl.) NPC</value>
+    <value>Elezen weibl. NPC</value>
   </data>
   <data name="Elezen_Male" xml:space="preserve">
-    <value>Elezen (männl.)</value>
+    <value>Elezen männl.</value>
   </data>
   <data name="Elezen_Male_NPC" xml:space="preserve">
-    <value>Elezen (männl.) NPC</value>
+    <value>Elezen männl. NPC</value>
   </data>
   <data name="Hyur_Highlander_Female" xml:space="preserve">
-    <value>Hyuraner (Hochländerin)</value>
+    <value>Hyuran (Hochländer) weibl.</value>
   </data>
   <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
-    <value>Hyuranerin (Hochländerin) NPC</value>
+    <value>Hyuran (Hochländer) weibl. NPC</value>
   </data>
   <data name="Hyur_Highlander_Male" xml:space="preserve">
-    <value>Hyuraner (Hochländer)</value>
+    <value>Hyuran (Hochländer) männl.</value>
   </data>
   <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
-    <value>Hyuraner (Hochländer) NPC</value>
+    <value>Hyuran (Hochländer) männl. NPC</value>
   </data>
   <data name="Hyur_Midlander_Female" xml:space="preserve">
-    <value>Hyuraner (Mittelländerin)</value>
+    <value>Hyuran (Wiesländer) weibl.</value>
   </data>
   <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
-    <value>Hyuranerin (Mittelländerin) NPC</value>
+    <value>Hyuran (Wiesländer) weibl. NPC</value>
   </data>
   <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
-    <value>Hyuraner (Mittelländer) NPC</value>
+    <value>Hyuran (Wiesländer) männl. NPC</value>
   </data>
   <data name="Lalafell_Female" xml:space="preserve">
-    <value>Lalafell (weibl.)</value>
+    <value>Lalafell weibl.</value>
   </data>
   <data name="Lalafell_Female_NPC" xml:space="preserve">
-    <value>Lalafell (weibl.) NPC</value>
+    <value>Lalafell weibl. NPC</value>
   </data>
   <data name="Lalafell_Male" xml:space="preserve">
-    <value>Lalafell (männl.)</value>
+    <value>Lalafell männl.</value>
   </data>
   <data name="Lalafell_Male_NPC" xml:space="preserve">
-    <value>Lalafell (männl.) NPC</value>
+    <value>Lalafell männl. NPC</value>
+  </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>Miqo'te weibl.</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>Miqo'te weibl. NPC</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>Miqo'te männl.</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>Miqo'te männl. NPC</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>Roegadyn weibl.</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>Roegadyn weibl. NPC</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>Roegadyn männl.</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>Roegadyn männl. NPC</value>
   </data>
   <data name="Furniture_Indoor" xml:space="preserve">
     <value>Einrichtungsgegenstände</value>
@@ -435,11 +471,20 @@
   <data name="Hrothgar_NPC" xml:space="preserve">
     <value>Hrothgar NPC</value>
   </data>
+  <data name="Viera" xml:space="preserve">
+    <value>Viera</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>Viera NPC</value>
+  </data>
   <data name="InnerEar" xml:space="preserve">
     <value>Innenohr</value>
   </data>
   <data name="Dual_Wield" xml:space="preserve">
     <value>Zweihand</value>
+  </data>
+  <data name="Seraph" xml:space="preserve">
+    <value>Seraph</value>
   </data>
   <data name="Decal" xml:space="preserve">
     <value>Abzeichen</value>
@@ -454,28 +499,46 @@
     <value>HUD</value>
   </data>
   <data name="Elezen_Duskwight" xml:space="preserve">
-    <value>Elezen Dämmerpirscher</value>
+    <value>Elezen – Dunkelalben</value>
   </data>
   <data name="Elezen_Wildwood" xml:space="preserve">
-    <value>Elezen Waldläufer</value>
+    <value>Elezen – Erlschatten</value>
   </data>
   <data name="Hrothgar_Helion" xml:space="preserve">
     <value>Hrothgar – Helion</value>
   </data>
   <data name="Hrothgar_Lost" xml:space="preserve">
-    <value>Hrothgar – Lost</value>
+    <value>Hrothgar – Die Losgesagten</value>
   </data>
   <data name="Hyur_Highlander" xml:space="preserve">
-    <value>Hyuraner – Hochländer</value>
+    <value>Hyuran – Hochländer</value>
   </data>
   <data name="Hyur_Midlander" xml:space="preserve">
-    <value>Hyuraner – Mittelländer</value>
+    <value>Hyuran – Wiesländer</value>
   </data>
   <data name="Lalafell_Dunesfolk" xml:space="preserve">
-    <value>Lalafell – Dünenvolk</value>
+    <value>Lalafell – Sandlinge</value>
   </data>
   <data name="Lalafell_Plainsfolk" xml:space="preserve">
-    <value>Lalafell – Steppenvolk</value>
+    <value>Lalafell – Halmlinge</value>
+  </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>Miqo'te – Mondstreuner</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>Miqo'te – Goldtatzen</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>Roegadyn – Lohengarde</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>Roegadyn – Seewölfe</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>Viera – Rava</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>Viera – Veena</value>
   </data>
   <data name="Cure" xml:space="preserve">
     <value>Vita</value>
@@ -491,6 +554,18 @@
   </data>
   <data name="Hrothgar_Male_NPC" xml:space="preserve">
     <value>Hrothgar (männl.) NPC</value>
+  </data>
+  <data name="Viera_Female" xml:space="preserve">
+    <value>Viera weibl.</value>
+  </data>
+  <data name="Viera_Female_NPC" xml:space="preserve">
+    <value>Viera weibl. NPC</value>
+  </data>
+  <data name="Viera_Male" xml:space="preserve">
+    <value>Viera männl.</value>
+  </data>
+  <data name="Viera_Male_NPC" xml:space="preserve">
+    <value>Viera männl. NPC</value>
   </data>
   <data name="Fish" xml:space="preserve">
     <value>Aquarienfisch</value>

@@ -1996,7 +1996,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Miqote.
+        ///   Looks up a localized string similar to Miqo&apos;te.
         /// </summary>
         internal static string Miqote {
             get {
@@ -2005,7 +2005,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Miqote Female.
+        ///   Looks up a localized string similar to Miqo&apos;te Female.
         /// </summary>
         internal static string Miqote_Female {
             get {
@@ -2014,7 +2014,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Miqote Female NPC.
+        ///   Looks up a localized string similar to Miqo&apos;te Female NPC.
         /// </summary>
         internal static string Miqote_Female_NPC {
             get {
@@ -2032,7 +2032,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Miqote Male.
+        ///   Looks up a localized string similar to Miqo&apos;te Male.
         /// </summary>
         internal static string Miqote_Male {
             get {
@@ -2041,7 +2041,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Miqote Male NPC.
+        ///   Looks up a localized string similar to Miqo&apos;te Male NPC.
         /// </summary>
         internal static string Miqote_Male_NPC {
             get {
@@ -2437,7 +2437,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Ramuh Egi.
+        ///   Looks up a localized string similar to Ramuh-Egi.
         /// </summary>
         internal static string Ramuh_Egi {
             get {

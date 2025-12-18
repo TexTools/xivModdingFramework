@@ -127,7 +127,7 @@
     <value>Tous</value>
   </data>
   <data name="AuRa_Raen" xml:space="preserve">
-    <value>Ao Ra Rehn</value>
+    <value>Ao Ra Raen</value>
   </data>
   <data name="AuRa_Xaela" xml:space="preserve">
     <value>Ao Ra Xaela</value>
@@ -136,7 +136,7 @@
     <value>Ao Ra</value>
   </data>
   <data name="Bahamut_Egi" xml:space="preserve">
-    <value>Égide de Bahamut</value>
+    <value>Bahamut-Egi</value>
   </data>
   <data name="Beneficial" xml:space="preserve">
     <value>Renforcement</value>
@@ -253,7 +253,7 @@
     <value>Nourriture</value>
   </data>
   <data name="Garuda_Egi" xml:space="preserve">
-    <value>Égide de Garuda</value>
+    <value>Garuda-Egi</value>
   </data>
   <data name="Gear" xml:space="preserve">
     <value>Équipement</value>
@@ -274,13 +274,13 @@
     <value>Tête + Torse</value>
   </data>
   <data name="Hyur_H" xml:space="preserve">
-    <value>Hyur (Grande-Terre)</value>
+    <value>Hyur (Hyurgoths)</value>
   </data>
   <data name="Hyur_M" xml:space="preserve">
-    <value>Hyur (Midlandais)</value>
+    <value>Hyur (Hyurois)</value>
   </data>
   <data name="Ifrit_Egi" xml:space="preserve">
-    <value>Égide d'Ifrit</value>
+    <value>Ifrit-Egi</value>
   </data>
   <data name="Index_Backup" xml:space="preserve">
     <value>Aucun fichier de sauvegarde d'index détecté. \nVoulez-vous créer une sauvegarde maintenant ? \n\nAvertissement : Ceci désactivera toute modification active afin de créer une sauvegarde. Elles devront être réactivées manuellement.</value>
@@ -321,6 +321,9 @@
   <data name="Minions" xml:space="preserve">
     <value>Mascottes</value>
   </data>
+  <data name="Miqote" xml:space="preserve">
+    <value>Miqo'tes</value>
+  </data>
   <data name="Mounts" xml:space="preserve">
     <value>Montures</value>
   </data>
@@ -336,11 +339,20 @@
   <data name="Pets" xml:space="preserve">
     <value>Familiers</value>
   </data>
+  <data name="Ramuh_Egi" xml:space="preserve">
+    <value>Ramuh Egi</value>
+  </data>
   <data name="Rings" xml:space="preserve">
     <value>Bagues</value>
   </data>
+  <data name="Roegadyn" xml:space="preserve">
+    <value>Roegadyns</value>
+  </data>
   <data name="Rook_Autoturret" xml:space="preserve">
     <value>Auto-tourelle Tour</value>
+  </data>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>Sephirot-Egi</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>Cristal d'âme</value>
@@ -352,7 +364,7 @@
     <value>Queue</value>
   </data>
   <data name="Titan_Egi" xml:space="preserve">
-    <value>Égide de Titan</value>
+    <value>Titan-Egi</value>
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>deux mains</value>
@@ -370,7 +382,7 @@
     <value>Ecran de chargement</value>
   </data>
   <data name="Hyur_Midlander_Male" xml:space="preserve">
-    <value>Hyur (Midlandais, masc.)</value>
+    <value>Hyur (Hyurois, masc.)</value>
   </data>
   <data name="AuRa_Female" xml:space="preserve">
     <value>Ao Ra (fem.)</value>
@@ -397,37 +409,61 @@
     <value>PNJ Élézen (m.)</value>
   </data>
   <data name="Hyur_Highlander_Female" xml:space="preserve">
-    <value>Hyur (Grande-Terre, fém.)</value>
+    <value>Hyur (Hyurgoths, fém.)</value>
   </data>
   <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
-    <value>PNJ Hyur (Grande-Terre, fém.)</value>
+    <value>PNJ Hyur (Hyurgoths, fém.)</value>
   </data>
   <data name="Hyur_Highlander_Male" xml:space="preserve">
-    <value>Hyur (Grande-Terre, masc.)</value>
+    <value>Hyur (Hyurgoths, masc.)</value>
   </data>
   <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
-    <value>PNJ Hyur (Grande-Terre, masc.)</value>
+    <value>PNJ Hyur (Hyurgoths, masc.)</value>
   </data>
   <data name="Hyur_Midlander_Female" xml:space="preserve">
-    <value>Hyur (Midlandais, fém.)</value>
+    <value>Hyur (Hyurois, fém.)</value>
   </data>
   <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
-    <value>PNJ Hyur (Midlandais, fém.)</value>
+    <value>PNJ Hyur (Hyurois, fém.)</value>
   </data>
   <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
-    <value>PNJ Hyur (Midlandais, masc.)</value>
+    <value>PNJ Hyur (Hyurois, masc.)</value>
   </data>
   <data name="Lalafell_Female" xml:space="preserve">
-    <value>Lalafell (femme)</value>
+    <value>Lalafell (fém.)</value>
   </data>
   <data name="Lalafell_Female_NPC" xml:space="preserve">
-    <value>PNJ Lalafell (femme)</value>
+    <value>PNJ Lalafell (fém.)</value>
   </data>
   <data name="Lalafell_Male" xml:space="preserve">
-    <value>Lalafell (homme)</value>
+    <value>Lalafell (masc.)</value>
   </data>
   <data name="Lalafell_Male_NPC" xml:space="preserve">
-    <value>PNJ Lalafell (homme)</value>
+    <value>PNJ Lalafell (masc.)</value>
+  </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>Miqo'tes (fém.)</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>PNJ Miqo'tes (fém.)</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>Miqo'tes (masc.)</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>PNJ Miqo'tes (masc.)</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>Roegadyns (fém.)</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>PNJ Roegadyns (fém.)</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>Roegadyns (masc.)</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>PNJ Roegadyns (masc.)</value>
   </data>
   <data name="Furniture_Indoor" xml:space="preserve">
     <value>Meubles d'intérieur</value>
@@ -443,6 +479,12 @@
   </data>
   <data name="Hrothgar_NPC" xml:space="preserve">
     <value>PNJ Hrothgar</value>
+  </data>
+  <data name="Viera" xml:space="preserve">
+    <value>Viéra</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>PNJ Viéra</value>
   </data>
   <data name="InnerEar" xml:space="preserve">
     <value>Oreille interne</value>
@@ -466,28 +508,46 @@
     <value>ATH</value>
   </data>
   <data name="Elezen_Duskwight" xml:space="preserve">
-    <value>Élézen Sombres-Lances</value>
+    <value>Élézen – Crépusculaires</value>
   </data>
   <data name="Elezen_Wildwood" xml:space="preserve">
-    <value>Élézen Sylvestres</value>
+    <value>Élézen – Sylvestres</value>
   </data>
   <data name="Hrothgar_Helion" xml:space="preserve">
-    <value>Hrothgar – Helion</value>
+    <value>Hrothgar – Hélions</value>
   </data>
   <data name="Hrothgar_Lost" xml:space="preserve">
-    <value>Hrothgar – Perdus</value>
+    <value>Hrothgar – Éloignés</value>
   </data>
   <data name="Hyur_Highlander" xml:space="preserve">
-    <value>Hyur – Grande-Terre</value>
+    <value>Hyur – Hyurgoths</value>
   </data>
   <data name="Hyur_Midlander" xml:space="preserve">
-    <value>Hyur – Midlandais</value>
+    <value>Hyur – Hyurois</value>
   </data>
   <data name="Lalafell_Dunesfolk" xml:space="preserve">
-    <value>Lalafell – Gens du désert</value>
+    <value>Lalafell – Peuple des dunes</value>
   </data>
   <data name="Lalafell_Plainsfolk" xml:space="preserve">
-    <value>Lalafell – Gens des plaines</value>
+    <value>Lalafell – Peuple des plaines</value>
+  </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>Miqo'tes – Tribu de la Lune</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>Miqo'tes – Tribu du Soleil</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>Roegadyns (Clan du feu)</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>Roegadyns (Clan de la mer)</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>Rava - Viéra</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>Veena - Viéra</value>
   </data>
   <data name="Cure" xml:space="preserve">
     <value>Soin</value>
@@ -503,6 +563,18 @@
   </data>
   <data name="Hrothgar_Male_NPC" xml:space="preserve">
     <value>PNJ Hrothgar (homme)</value>
+  </data>
+  <data name="Viera_Female" xml:space="preserve">
+    <value>Viéra (fém.)</value>
+  </data>
+  <data name="Viera_Female_NPC" xml:space="preserve">
+    <value>PNJ Viéra (fém.)</value>
+  </data>
+  <data name="Viera_Male" xml:space="preserve">
+    <value>Viéra (masc.)</value>
+  </data>
+  <data name="Viera_Male_NPC" xml:space="preserve">
+    <value>PNJ Viéra (masc.)</value>
   </data>
   <data name="Fish" xml:space="preserve">
     <value>Poisson d'aquarium</value>

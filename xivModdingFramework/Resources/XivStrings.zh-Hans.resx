@@ -363,6 +363,9 @@
   <data name="Selene" xml:space="preserve">
     <value>夕月小仙女</value>
   </data>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>萨菲洛特之灵</value>
+  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>灵魂水晶</value>
   </data>
@@ -520,7 +523,7 @@
     <value>双持</value>
   </data>
   <data name="Seraph" xml:space="preserve">
-    <value>Seraph</value>
+    <value>炽天使</value>
   </data>
   <data name="Decal" xml:space="preserve">
     <value>贴花</value>
