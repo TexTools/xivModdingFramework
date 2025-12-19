@@ -339,8 +339,23 @@
   <data name="Fish" xml:space="preserve">
     <value>Aquarienfisch</value>
   </data>
+  <data name="FishAquarium" xml:space="preserve">
+    <value />
+  </data>
   <data name="FisherArms" xml:space="preserve">
     <value>Fischer-Waffen</value>
+  </data>
+  <data name="FishLarge" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishMedium" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishSmall" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishXLarge" xml:space="preserve">
+    <value />
   </data>
   <data name="Food" xml:space="preserve">
     <value>Essen</value>
@@ -362,6 +377,9 @@
   </data>
   <data name="General" xml:space="preserve">
     <value>Allgemein</value>
+  </data>
+  <data name="GeneralAction" xml:space="preserve">
+    <value>Allgemeine Kommandos</value>
   </data>
   <data name="GoldsmithArms" xml:space="preserve">
     <value>Goldschmied-Waffen</value>
@@ -498,11 +516,20 @@
   <data name="LeatherworkerArms" xml:space="preserve">
     <value>Gerber-Waffen</value>
   </data>
+  <data name="Left" xml:space="preserve">
+    <value>Links</value>
+  </data>
+  <data name="LeftRing" xml:space="preserve">
+    <value>Linker Ring</value>
+  </data>
   <data name="Legs" xml:space="preserve">
     <value>Beine</value>
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>Beine + Füße</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>Ladebildschirm</value>
   </data>
   <data name="MachinistArms" xml:space="preserve">
     <value>Maschinist-Waffen</value>
@@ -516,14 +543,32 @@
   <data name="Male" xml:space="preserve">
     <value>Männlich</value>
   </data>
-  <data name="Maps" xml:space="preserve">
+  <data name="Map" xml:space="preserve">
     <value>Karte</value>
+  </data>
+  <data name="Maps" xml:space="preserve">
+    <value>Karten</value>
+  </data>
+  <data name="MapSymbol" xml:space="preserve">
+    <value>Kartensymbole</value>
   </data>
   <data name="Marker" xml:space="preserve">
     <value>Markierung</value>
   </data>
+  <data name="Mask" xml:space="preserve">
+    <value>Maske</value>
+  </data>
+  <data name="Material" xml:space="preserve">
+    <value>Material</value>
+  </data>
+  <data name="Mesh" xml:space="preserve">
+    <value>Mesh</value>
+  </data>
   <data name="MinerArms" xml:space="preserve">
     <value>Minenarbeiter-Waffen</value>
+  </data>
+  <data name="Minimap" xml:space="preserve">
+    <value>Minikarte</value>
   </data>
   <data name="Minions" xml:space="preserve">
     <value>Begleiter</value>
@@ -552,6 +597,9 @@
   <data name="MonkArms" xml:space="preserve">
     <value>Mönch-Waffen</value>
   </data>
+  <data name="Monster" xml:space="preserve">
+    <value>Monster</value>
+  </data>
   <data name="Mounts" xml:space="preserve">
     <value>Reittiere</value>
   </data>
@@ -561,20 +609,62 @@
   <data name="NinjaArms" xml:space="preserve">
     <value>Ninja-Waffen</value>
   </data>
+  <data name="None" xml:space="preserve">
+    <value>Keine</value>
+  </data>
+  <data name="Normal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="NPC_Female" xml:space="preserve">
+    <value>NPC (weibl.)</value>
+  </data>
+  <data name="NPC_Male" xml:space="preserve">
+    <value>NPC (männl.)</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>Nummer</value>
+  </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>Nebenhand</value>
+  </data>
+  <data name="OnlineStatus" xml:space="preserve">
+    <value>Online-Status</value>
+  </data>
+  <data name="Ornaments" xml:space="preserve">
+    <value>Ornamente</value>
   </data>
   <data name="Other" xml:space="preserve">
     <value>Anderes</value>
   </data>
+  <data name="Outdoor_Furniture" xml:space="preserve">
+    <value>Gartenmöbel</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>Gemälde</value>
+  </data>
+  <data name="Painting Icons" xml:space="preserve">
+    <value>Gemälde-Icons</value>
+  </data>
+  <data name="Paintings" xml:space="preserve">
+    <value>Gemälde</value>
+  </data>
   <data name="PaladinArms" xml:space="preserve">
     <value>Paladin-Waffen</value>
+  </data>
+  <data name="Part" xml:space="preserve">
+    <value>Teil</value>
   </data>
   <data name="Pets" xml:space="preserve">
     <value>Familiare</value>
   </data>
   <data name="PictomancerArms" xml:space="preserve">
     <value>Piktomant-Waffen</value>
+  </data>
+  <data name="Primary" xml:space="preserve">
+    <value>Primär</value>
+  </data>
+  <data name="Race" xml:space="preserve">
+    <value>Volk</value>
   </data>
   <data name="Ramuh_Egi" xml:space="preserve">
     <value>Ramuh-Egi</value>
@@ -584,6 +674,18 @@
   </data>
   <data name="RedMageArms" xml:space="preserve">
     <value>Rotmagier-Waffen</value>
+  </data>
+  <data name="Right" xml:space="preserve">
+    <value>Rechts</value>
+  </data>
+  <data name="Rings" xml:space="preserve">
+    <value>Ringe</value>
+  </data>
+  <data name="Ring_Left" xml:space="preserve">
+    <value>Linker Ring</value>
+  </data>
+  <data name="Ring_Right" xml:space="preserve">
+    <value>Rechter Ring</value>
   </data>
   <data name="Roegadyn" xml:space="preserve">
     <value>Roegadyn</value>
@@ -615,6 +717,12 @@
   <data name="SamuraiArms" xml:space="preserve">
     <value>Samurai-Waffen</value>
   </data>
+  <data name="Secondary" xml:space="preserve">
+    <value>Sekundär</value>
+  </data>
+  <data name="Selene" xml:space="preserve">
+    <value>Selene</value>
+  </data>
   <data name="Sephirot_Egi" xml:space="preserve">
     <value>Sephirot-Egi</value>
   </data>
@@ -624,8 +732,17 @@
   <data name="Shields" xml:space="preserve">
     <value>Schilde</value>
   </data>
+  <data name="Skin" xml:space="preserve">
+    <value>Haut</value>
+  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>Jobkristall</value>
+  </data>
+  <data name="Specular" xml:space="preserve">
+    <value>Spekular</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>Status</value>
   </data>
   <data name="SummonerScholarArms" xml:space="preserve">
     <value>Beschwörer/Gelehrter/Waffen</value>
@@ -633,11 +750,29 @@
   <data name="Tail" xml:space="preserve">
     <value>Schwanz</value>
   </data>
+  <data name="Texture_Map" xml:space="preserve">
+    <value>Texture-Map</value>
+  </data>
   <data name="Titan_Egi" xml:space="preserve">
     <value>Titan-Egi</value>
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>Zweihändig</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="TypePart" xml:space="preserve">
+    <value>Teil-Typ</value>
+  </data>
+  <data name="UI" xml:space="preserve">
+    <value>UI</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Unbekannt</value>
+  </data>
+  <data name="Variant" xml:space="preserve">
+    <value>Variante</value>
   </data>
   <data name="Viera" xml:space="preserve">
     <value>Viera</value>
@@ -677,6 +812,9 @@
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>Waffen</value>
+  </data>
+  <data name="Weather" xml:space="preserve">
+    <value>Wetter</value>
   </data>
   <data name="WeaverArms" xml:space="preserve">
     <value>Weber-Waffen</value>

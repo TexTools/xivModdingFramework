@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+using Cyotek.Drawing.BitmapFont;
 using HelixToolkit.SharpDX.Core;
 using System;
 using System.Collections.Generic;
@@ -231,10 +232,10 @@ namespace xivModdingFramework.Items.Categories
             allTasks.AddRange(tasksXL);
             await Task.WhenAll(allTasks);
 
-            AddFish(fishList, tasksS, 1, "Small");
-            AddFish(fishList, tasksM, 2, "Medium");
-            AddFish(fishList, tasksL, 3, "Large");
-            AddFish(fishList, tasksXL, 4, "X-Large");
+            AddFish(fishList, tasksS, 1, XivStrings.FishSmall);
+            AddFish(fishList, tasksM, 2, XivStrings.FishMedium);
+            AddFish(fishList, tasksL, 3, XivStrings.FishLarge);
+            AddFish(fishList, tasksXL, 4, XivStrings.FishXLarge);
 
             return fishList;
         }
@@ -247,7 +248,8 @@ namespace xivModdingFramework.Items.Categories
                 {
                     var item = new XivFish()
                     {
-                        Name = sizeName + " Aquarium Fish #" + r,
+                        // Result example: "Small Aquarium Fish #123" localized
+                        Name = $"{sizeName} {XivStrings.FishAquarium} #{r}",
                         PrimaryCategory = XivStrings.Housing,
                         SecondaryCategory = XivStrings.Fish,
                         ModelInfo = new XivModelInfo()

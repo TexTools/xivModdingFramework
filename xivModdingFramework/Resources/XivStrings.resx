@@ -486,8 +486,23 @@
   <data name="Fish" xml:space="preserve">
     <value>Aquarium Fish</value>
   </data>
+  <data name="FishAquarium" xml:space="preserve">
+    <value>Aquarium Fish</value>
+  </data>
   <data name="FisherArms" xml:space="preserve">
     <value>Fisher Arms</value>
+  </data>
+  <data name="FishLarge" xml:space="preserve">
+    <value>Large</value>
+  </data>
+  <data name="FishMedium" xml:space="preserve">
+    <value>Medium</value>
+  </data>
+  <data name="FishSmall" xml:space="preserve">
+    <value>Small</value>
+  </data>
+  <data name="FishXLarge" xml:space="preserve">
+    <value>X-Large</value>
   </data>
   <data name="Food" xml:space="preserve">
     <value>Food</value>
@@ -511,7 +526,7 @@
     <value>General</value>
   </data>
   <data name="GeneralAction" xml:space="preserve">
-    <value>generalaction_0_{0}.exd</value>
+    <value>General Actions</value>
   </data>
   <data name="GoldsmithArms" xml:space="preserve">
     <value>Goldsmith Arms</value>
@@ -960,9 +975,6 @@
   <data name="SamuraiArms" xml:space="preserve">
     <value>Samurai Arms</value>
   </data>
-  <data name="SearchBox" xml:space="preserve">
-    <value>Search Textures</value>
-  </data>
   <data name="Secondary" xml:space="preserve">
     <value>Secondary</value>
   </data>
@@ -1015,7 +1027,7 @@
     <value>chara/human/c{0}/obj/tail/t{1}/material/v{2}</value>
   </data>
   <data name="Texture_Map" xml:space="preserve">
-    <value>Texture Mao</value>
+    <value>Texture Map</value>
   </data>
   <data name="Titan_Egi" xml:space="preserve">
     <value>Titan-Egi</value>

@@ -339,8 +339,23 @@
   <data name="Fish" xml:space="preserve">
     <value>觀賞魚</value>
   </data>
+  <data name="FishAquarium" xml:space="preserve">
+    <value />
+  </data>
   <data name="FisherArms" xml:space="preserve">
     <value>捕魚人武器</value>
+  </data>
+  <data name="FishLarge" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishMedium" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishSmall" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishXLarge" xml:space="preserve">
+    <value />
   </data>
   <data name="Food" xml:space="preserve">
     <value>食物</value>
@@ -362,6 +377,9 @@
   </data>
   <data name="General" xml:space="preserve">
     <value>綜合</value>
+  </data>
+  <data name="GeneralAction" xml:space="preserve">
+    <value>通用行動</value>
   </data>
   <data name="GoldsmithArms" xml:space="preserve">
     <value>雕金匠武器</value>
@@ -501,6 +519,9 @@
   <data name="Left" xml:space="preserve">
     <value>左</value>
   </data>
+  <data name="LeftRing" xml:space="preserve">
+    <value>左戒指</value>
+  </data>
   <data name="Legs" xml:space="preserve">
     <value>腿部</value>
   </data>
@@ -522,8 +543,17 @@
   <data name="Male" xml:space="preserve">
     <value>男性</value>
   </data>
+  <data name="Map" xml:space="preserve">
+    <value>地圖</value>
+  </data>
   <data name="Maps" xml:space="preserve">
     <value>地圖</value>
+  </data>
+  <data name="MapSymbol" xml:space="preserve">
+    <value>地圖符號</value>
+  </data>
+  <data name="Marker" xml:space="preserve">
+    <value>標記</value>
   </data>
   <data name="Mask" xml:space="preserve">
     <value>遮罩</value>
@@ -536,6 +566,9 @@
   </data>
   <data name="MinerArms" xml:space="preserve">
     <value>採礦工武器</value>
+  </data>
+  <data name="Minimap" xml:space="preserve">
+    <value>小地圖</value>
   </data>
   <data name="Minions" xml:space="preserve">
     <value>寵物</value>
@@ -576,8 +609,17 @@
   <data name="NinjaArms" xml:space="preserve">
     <value>忍者武器</value>
   </data>
+  <data name="None" xml:space="preserve">
+    <value>無</value>
+  </data>
   <data name="Normal" xml:space="preserve">
     <value>法線</value>
+  </data>
+  <data name="NPC_Female" xml:space="preserve">
+    <value>女性NPC</value>
+  </data>
+  <data name="NPC_Male" xml:space="preserve">
+    <value>男性NPC</value>
   </data>
   <data name="Number" xml:space="preserve">
     <value>數</value>
@@ -591,8 +633,17 @@
   <data name="Ornaments" xml:space="preserve">
     <value>裝飾品</value>
   </data>
+  <data name="Other" xml:space="preserve">
+    <value>其他</value>
+  </data>
   <data name="Outdoor_Furniture" xml:space="preserve">
     <value>戶外傢俱</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>繪畫</value>
+  </data>
+  <data name="Painting Icons" xml:space="preserve">
+    <value>繪畫圖標</value>
   </data>
   <data name="Paintings" xml:space="preserve">
     <value>繪畫作品</value>
@@ -666,9 +717,6 @@
   <data name="SamuraiArms" xml:space="preserve">
     <value>武士武器</value>
   </data>
-  <data name="SearchBox" xml:space="preserve">
-    <value>搜索 Textures</value>
-  </data>
   <data name="Secondary" xml:space="preserve">
     <value>次要的</value>
   </data>
@@ -683,6 +731,9 @@
   </data>
   <data name="Shields" xml:space="preserve">
     <value>盾</value>
+  </data>
+  <data name="Skin" xml:space="preserve">
+    <value>皮膚</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>靈魂水晶</value>
@@ -713,6 +764,12 @@
   </data>
   <data name="TypePart" xml:space="preserve">
     <value>類型部件</value>
+  </data>
+  <data name="UI" xml:space="preserve">
+    <value>UI</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>未知</value>
   </data>
   <data name="Variant" xml:space="preserve">
     <value>變體</value>

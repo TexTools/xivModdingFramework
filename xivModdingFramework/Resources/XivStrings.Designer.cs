@@ -1168,11 +1168,56 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Aquarium Fish.
+        /// </summary>
+        internal static string FishAquarium {
+            get {
+                return ResourceManager.GetString("FishAquarium", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Fisher Arms.
         /// </summary>
         internal static string FisherArms {
             get {
                 return ResourceManager.GetString("FisherArms", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Large.
+        /// </summary>
+        internal static string FishLarge {
+            get {
+                return ResourceManager.GetString("FishLarge", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Medium.
+        /// </summary>
+        internal static string FishMedium {
+            get {
+                return ResourceManager.GetString("FishMedium", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Small.
+        /// </summary>
+        internal static string FishSmall {
+            get {
+                return ResourceManager.GetString("FishSmall", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to X-Large.
+        /// </summary>
+        internal static string FishXLarge {
+            get {
+                return ResourceManager.GetString("FishXLarge", resourceCulture);
             }
         }
         
@@ -1240,7 +1285,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to generalaction_0_{0}.exd.
+        ///   Looks up a localized string similar to General Actions.
         /// </summary>
         internal static string GeneralAction {
             get {
@@ -2590,15 +2635,6 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Search Textures.
-        /// </summary>
-        internal static string SearchBox {
-            get {
-                return ResourceManager.GetString("SearchBox", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Secondary.
         /// </summary>
         internal static string Secondary {
@@ -2752,7 +2788,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Texture Mao.
+        ///   Looks up a localized string similar to Texture Map.
         /// </summary>
         internal static string Texture_Map {
             get {

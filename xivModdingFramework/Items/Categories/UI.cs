@@ -695,7 +695,7 @@ namespace xivModdingFramework.Items.Categories
                     IconNumber = id,
                 };
                 //painting.IconId = (ushort)itemRow.GetColumnByName("Icon");
-                painting.Name = (string)itemRow.GetColumnByName("Name") + " Icon";
+                painting.Name = $"{(string)itemRow.GetColumnByName("Name")} {XivStrings.Icon}";
 
 
                 lock (paintingsLock)

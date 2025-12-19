@@ -339,8 +339,23 @@
   <data name="Fish" xml:space="preserve">
     <value>アクアリウムの魚</value>
   </data>
+  <data name="FishAquarium" xml:space="preserve">
+    <value />
+  </data>
   <data name="FisherArms" xml:space="preserve">
     <value>漁師武器</value>
+  </data>
+  <data name="FishLarge" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishMedium" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishSmall" xml:space="preserve">
+    <value />
+  </data>
+  <data name="FishXLarge" xml:space="preserve">
+    <value />
   </data>
   <data name="Food" xml:space="preserve">
     <value>食べ物</value>
@@ -362,6 +377,9 @@
   </data>
   <data name="General" xml:space="preserve">
     <value>全般</value>
+  </data>
+  <data name="GeneralAction" xml:space="preserve">
+    <value>ジェネラルアクション</value>
   </data>
   <data name="GoldsmithArms" xml:space="preserve">
     <value>彫金師武器</value>
@@ -498,11 +516,20 @@
   <data name="LeatherworkerArms" xml:space="preserve">
     <value>革細工師武器</value>
   </data>
+  <data name="Left" xml:space="preserve">
+    <value>左</value>
+  </data>
+  <data name="LeftRing" xml:space="preserve">
+    <value>左指輪</value>
+  </data>
   <data name="Legs" xml:space="preserve">
     <value>脚</value>
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>脚 + 足</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>ロード画面</value>
   </data>
   <data name="MachinistArms" xml:space="preserve">
     <value>機工士武器</value>
@@ -516,14 +543,32 @@
   <data name="Male" xml:space="preserve">
     <value>男性</value>
   </data>
+  <data name="Map" xml:space="preserve">
+    <value>マップ</value>
+  </data>
   <data name="Maps" xml:space="preserve">
     <value>マップ</value>
+  </data>
+  <data name="MapSymbol" xml:space="preserve">
+    <value>マップシンボル</value>
   </data>
   <data name="Marker" xml:space="preserve">
     <value>マーカー</value>
   </data>
+  <data name="Mask" xml:space="preserve">
+    <value>マスク</value>
+  </data>
+  <data name="Material" xml:space="preserve">
+    <value>マテリアル</value>
+  </data>
+  <data name="Mesh" xml:space="preserve">
+    <value>メッシュ</value>
+  </data>
   <data name="MinerArms" xml:space="preserve">
     <value>採掘師武器</value>
+  </data>
+  <data name="Minimap" xml:space="preserve">
+    <value>ミニマップ</value>
   </data>
   <data name="Minions" xml:space="preserve">
     <value>ミニオン</value>
@@ -552,6 +597,9 @@
   <data name="MonkArms" xml:space="preserve">
     <value>モンク武器</value>
   </data>
+  <data name="Monster" xml:space="preserve">
+    <value>モンスター</value>
+  </data>
   <data name="Mounts" xml:space="preserve">
     <value>マウント</value>
   </data>
@@ -561,20 +609,62 @@
   <data name="NinjaArms" xml:space="preserve">
     <value>忍者武器</value>
   </data>
+  <data name="None" xml:space="preserve">
+    <value>なし</value>
+  </data>
+  <data name="Normal" xml:space="preserve">
+    <value>ノーマル</value>
+  </data>
+  <data name="NPC_Female" xml:space="preserve">
+    <value>NPC女性</value>
+  </data>
+  <data name="NPC_Male" xml:space="preserve">
+    <value>NPC男性</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>数値</value>
+  </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>サブアーム</value>
+  </data>
+  <data name="OnlineStatus" xml:space="preserve">
+    <value>オンラインステータス</value>
+  </data>
+  <data name="Ornaments" xml:space="preserve">
+    <value>装飾品</value>
   </data>
   <data name="Other" xml:space="preserve">
     <value>その他</value>
   </data>
+  <data name="Outdoor_Furniture" xml:space="preserve">
+    <value>庭具</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>絵画</value>
+  </data>
+  <data name="Painting Icons" xml:space="preserve">
+    <value>絵画アイコン</value>
+  </data>
+  <data name="Paintings" xml:space="preserve">
+    <value>絵画</value>
+  </data>
   <data name="PaladinArms" xml:space="preserve">
     <value>ナイト武器</value>
+  </data>
+  <data name="Part" xml:space="preserve">
+    <value>パーツ</value>
   </data>
   <data name="Pets" xml:space="preserve">
     <value>ペット</value>
   </data>
   <data name="PictomancerArms" xml:space="preserve">
     <value>ピクトマンサー武器</value>
+  </data>
+  <data name="Primary" xml:space="preserve">
+    <value>プライマリ</value>
+  </data>
+  <data name="Race" xml:space="preserve">
+    <value>種族</value>
   </data>
   <data name="Ramuh_Egi" xml:space="preserve">
     <value>ラムウ・エギ</value>
@@ -585,8 +675,17 @@
   <data name="RedMageArms" xml:space="preserve">
     <value>赤魔道士武器</value>
   </data>
+  <data name="Right" xml:space="preserve">
+    <value>右</value>
+  </data>
   <data name="Rings" xml:space="preserve">
     <value>指</value>
+  </data>
+  <data name="Ring_Left" xml:space="preserve">
+    <value>左指輪</value>
+  </data>
+  <data name="Ring_Right" xml:space="preserve">
+    <value>右指輪</value>
   </data>
   <data name="Roegadyn" xml:space="preserve">
     <value>ルガディン</value>
@@ -618,6 +717,9 @@
   <data name="SamuraiArms" xml:space="preserve">
     <value>侍武器</value>
   </data>
+  <data name="Secondary" xml:space="preserve">
+    <value>セカンダリ</value>
+  </data>
   <data name="Selene" xml:space="preserve">
     <value>フェアリー・セレネ</value>
   </data>
@@ -630,8 +732,14 @@
   <data name="Shields" xml:space="preserve">
     <value>盾</value>
   </data>
+  <data name="Skin" xml:space="preserve">
+    <value>スキン</value>
+  </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>ソウルクリスタル</value>
+  </data>
+  <data name="Specular" xml:space="preserve">
+    <value>スペキュラ</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>ステータス</value>
@@ -642,11 +750,29 @@
   <data name="Tail" xml:space="preserve">
     <value>尾</value>
   </data>
+  <data name="Texture_Map" xml:space="preserve">
+    <value>テクスチャマップ</value>
+  </data>
   <data name="Titan_Egi" xml:space="preserve">
     <value>タイタン・エギ</value>
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>両手</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>タイプ</value>
+  </data>
+  <data name="TypePart" xml:space="preserve">
+    <value>パーツタイプ</value>
+  </data>
+  <data name="UI" xml:space="preserve">
+    <value>UI</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>不明</value>
+  </data>
+  <data name="Variant" xml:space="preserve">
+    <value>バリアント</value>
   </data>
   <data name="Viera" xml:space="preserve">
     <value>ヴィエラ族</value>
@@ -686,6 +812,9 @@
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>武器</value>
+  </data>
+  <data name="Weather" xml:space="preserve">
+    <value>天候</value>
   </data>
   <data name="WeaverArms" xml:space="preserve">
     <value>裁縫師武器</value>
