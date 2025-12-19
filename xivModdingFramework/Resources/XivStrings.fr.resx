@@ -340,22 +340,22 @@
     <value>Poisson d'aquarium</value>
   </data>
   <data name="FishAquarium" xml:space="preserve">
-    <value />
+    <value>Poisson d'aquarium</value>
   </data>
   <data name="FisherArms" xml:space="preserve">
     <value>Armes Pêcheur</value>
   </data>
   <data name="FishLarge" xml:space="preserve">
-    <value />
+    <value>Grand</value>
   </data>
   <data name="FishMedium" xml:space="preserve">
-    <value />
+    <value>Moyen</value>
   </data>
   <data name="FishSmall" xml:space="preserve">
-    <value />
+    <value>Petit</value>
   </data>
   <data name="FishXLarge" xml:space="preserve">
-    <value />
+    <value>Très grand</value>
   </data>
   <data name="Food" xml:space="preserve">
     <value>Nourriture</value>

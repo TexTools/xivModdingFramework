@@ -340,22 +340,22 @@
     <value>觀賞魚</value>
   </data>
   <data name="FishAquarium" xml:space="preserve">
-    <value />
+    <value>觀賞魚</value>
   </data>
   <data name="FisherArms" xml:space="preserve">
     <value>捕魚人武器</value>
   </data>
   <data name="FishLarge" xml:space="preserve">
-    <value />
+    <value>大型</value>
   </data>
   <data name="FishMedium" xml:space="preserve">
-    <value />
+    <value>中型</value>
   </data>
   <data name="FishSmall" xml:space="preserve">
-    <value />
+    <value>小型</value>
   </data>
   <data name="FishXLarge" xml:space="preserve">
-    <value />
+    <value>特大型</value>
   </data>
   <data name="Food" xml:space="preserve">
     <value>食物</value>
