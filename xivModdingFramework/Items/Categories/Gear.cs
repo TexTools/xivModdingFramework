@@ -359,7 +359,8 @@ namespace xivModdingFramework.Items.Categories
             {19, XivStrings.All },
             {20, XivStrings.Body_Hands_Legs },
             {21, XivStrings.Body_Legs_Feet },
-            {22, XivStrings.Body_Hands }
+            {22, XivStrings.Body_Hands },
+            {23, XivStrings.Body_Legs }
         };
 
     }

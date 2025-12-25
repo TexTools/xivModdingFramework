@@ -202,7 +202,6 @@ namespace xivModdingFramework.Exd.FileTypes
             if (language == XivLanguage.Korean)
             {
                 // Set up overrides here if necessary for KR.
-                columnExpectations["Icon"] = (26, ExcelColumnDataType.UInt16);
             }
             else if (language == XivLanguage.Chinese)
             {
@@ -570,16 +569,23 @@ namespace xivModdingFramework.Exd.FileTypes
                 { "Timeline4", ( 5, ExcelColumnDataType.UInt16 ) },
                 { "Timeline5", ( 6, ExcelColumnDataType.UInt16 ) },
                 { "Timeline6", ( 7, ExcelColumnDataType.UInt16 ) },
-                { "Icon", ( 20, ExcelColumnDataType.UInt16 ) },
+                { "Icon", ( 20, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
             {
                 // Set up overrides here if necessary for KR.
+                columnExpectations["Icon"] = (20, ExcelColumnDataType.UInt16);
             }
             else if (language == XivLanguage.Chinese)
             {
                 // Set up overrides here if necessary for CN.
+                columnExpectations["Icon"] = (20, ExcelColumnDataType.UInt16);
+            }
+            else if (language == XivLanguage.TraditionalChinese)
+            {
+                // Set up overrides here if necessary for CN.
+                columnExpectations["Icon"] = (20, ExcelColumnDataType.UInt16);
             }
 
             return columnExpectations;

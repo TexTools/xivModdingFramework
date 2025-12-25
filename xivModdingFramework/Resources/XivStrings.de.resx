@@ -117,9 +117,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="Accessory" xml:space="preserve">
-    <value>Accessory</value>
-  </data>
   <data name="Actions" xml:space="preserve">
     <value>Kommandos</value>
   </data>
@@ -147,6 +144,9 @@
   <data name="Body_Hands_Legs_Feet" xml:space="preserve">
     <value>Rumpf + Hände +Beine + Füße</value>
   </data>
+  <data name="Body_Legs" xml:space="preserve">
+    <value>Rumpf + Beine</value>
+  </data>  
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>Rumpf + Beine + Füße</value>
   </data>
@@ -159,9 +159,6 @@
   <data name="Character" xml:space="preserve">
     <value>Charakter</value>
   </data>
-  <data name="ColorSet" xml:space="preserve">
-    <value>ColorSet</value>
-  </data>
   <data name="Companions" xml:space="preserve">
     <value>Mitstreiter</value>
   </data>
@@ -171,38 +168,11 @@
   <data name="Craft" xml:space="preserve">
     <value>Synthese</value>
   </data>
-  <data name="Cure" xml:space="preserve">
-    <value>Vita</value>
-  </data>
   <data name="Detrimental" xml:space="preserve">
     <value>Schwächung</value>
   </data>
-  <data name="Diffuse" xml:space="preserve">
-    <value>Diffuse</value>
-  </data>
-  <data name="Ears" xml:space="preserve">
-    <value>Ohren</value>
-  </data>
-  <data name="Elezen" xml:space="preserve">
-    <value>Elezen</value>
-  </data>
-  <data name="Emote" xml:space="preserve">
-    <value>Emotes</value>
-  </data>
-  <data name="Eos" xml:space="preserve">
-    <value>Eos</value>
-  </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>Wappen</value>
-  </data>
-  <data name="Error_DirectoryError" xml:space="preserve">
-    <value>Directory Error</value>
-  </data>
-  <data name="Error_FileNotFound" xml:space="preserve">
-    <value>Unable to find file, please check your directories under settings</value>
-  </data>
-  <data name="Etc" xml:space="preserve">
-    <value>Etc</value>
   </data>
   <data name="Event" xml:space="preserve">
     <value>Ereignis</value>
@@ -222,9 +192,6 @@
   <data name="Food" xml:space="preserve">
     <value>Gericht</value>
   </data>
-  <data name="Garuda_Egi" xml:space="preserve">
-    <value>Garuda-Egi</value>
-  </data>
   <data name="Gear" xml:space="preserve">
     <value>Ausrüstung</value>
   </data>
@@ -243,26 +210,8 @@
   <data name="Head_Body" xml:space="preserve">
     <value>Kopf + Rumpf</value>
   </data>
-  <data name="Housing" xml:space="preserve">
-    <value>Housing</value>
-  </data>
-  <data name="Hyur_H" xml:space="preserve">
-    <value>Hyur Highlander</value>
-  </data>
-  <data name="Hyur_M" xml:space="preserve">
-    <value>Hyur Midlander</value>
-  </data>
-  <data name="Ifrit_Egi" xml:space="preserve">
-    <value>Ifrit-Egi</value>
-  </data>
-  <data name="Iris" xml:space="preserve">
-    <value>Iris</value>
-  </data>
   <data name="Items" xml:space="preserve">
     <value>Gegenständen</value>
-  </data>
-  <data name="Lalafell" xml:space="preserve">
-    <value>Lalafell</value>
   </data>
   <data name="Language" xml:space="preserve">
     <value>de</value>
@@ -272,9 +221,6 @@
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>Beine + Füße</value>
-  </data>
-  <data name="LoadingScreen" xml:space="preserve">
-    <value>Loading Screen</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>Haupthand</value>
@@ -291,26 +237,14 @@
   <data name="Marker" xml:space="preserve">
     <value>Markierung</value>
   </data>
-  <data name="Mask" xml:space="preserve">
-    <value>Mask</value>
-  </data>
   <data name="Minions" xml:space="preserve">
     <value>Begleiter</value>
-  </data>
-  <data name="Miqote" xml:space="preserve">
-    <value>Miqo'te</value>
-  </data>
-  <data name="Monster" xml:space="preserve">
-    <value>Monster</value>
   </data>
   <data name="Mounts" xml:space="preserve">
     <value>Reittiere</value>
   </data>
   <data name="Neck" xml:space="preserve">
     <value>Hals</value>
-  </data>
-  <data name="Normal" xml:space="preserve">
-    <value>Normal</value>
   </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>Nebenhand</value>
@@ -321,35 +255,14 @@
   <data name="Pets" xml:space="preserve">
     <value>Familiare</value>
   </data>
-  <data name="Ramuh_Egi" xml:space="preserve">
-    <value>Ramuh Egi</value>
-  </data>
-  <data name="Rings" xml:space="preserve">
-    <value>Rings</value>
-  </data>
-  <data name="Roegadyn" xml:space="preserve">
-    <value>Roegadyn</value>
-  </data>
   <data name="Rook_Autoturret" xml:space="preserve">
     <value>Selbstschuss-Gyrocopter TURM</value>
-  </data>
-  <data name="Selene" xml:space="preserve">
-    <value>Selene</value>
   </data>
   <data name="Soul_Crystal" xml:space="preserve">
     <value>Jobkristall</value>
   </data>
-  <data name="Specular" xml:space="preserve">
-    <value>Specular</value>
-  </data>
-  <data name="Status" xml:space="preserve">
-    <value>Status</value>
-  </data>
   <data name="Tail" xml:space="preserve">
     <value>Schwanz</value>
-  </data>
-  <data name="Titan_Egi" xml:space="preserve">
-    <value>Titan-Egi</value>
   </data>
   <data name="Two_Handed" xml:space="preserve">
     <value>Zweihändig</value>
@@ -362,5 +275,11 @@
   </data>
   <data name="Wrists" xml:space="preserve">
     <value>Handgelenke</value>
+  </data>
+  <data name="Cure" xml:space="preserve">
+    <value>Vita</value>
+  </data>
+  <data name="Ears" xml:space="preserve">
+    <value>Ohren</value>
   </data>
 </root>

@@ -847,7 +847,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict, null, false);
 
             await PenumbraAPI.ReloadMod(di.Name);
-            await PenumbraAPI.Redraw();
+            if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawAll)
+                await PenumbraAPI.Redraw();
+            else if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawSelf)
+                await PenumbraAPI.RedrawSelf();
 
             // Don't have real offsets to update to, since we don't write to game files.
             return null;

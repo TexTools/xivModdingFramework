@@ -1388,10 +1388,10 @@ namespace xivModdingFramework.Models.Helpers
                             }
 
                             v.Position = position;
-                            v.Normal = normal;
-                            v.Binormal = binormal;
-                            v.Tangent = tangent;
-                            v.FlowDirection = flow;
+                            v.Normal = normal.Normalized();
+                            v.Binormal = binormal.Normalized();
+                            v.Tangent = tangent.Normalized();
+                            v.FlowDirection = flow.Normalized();
                         }
 
                         // Same thing, but for the Shape Data parts.
@@ -1435,10 +1435,14 @@ namespace xivModdingFramework.Models.Helpers
                                 }
 
                                 v.Position = position;
-                                v.Normal = normal;
-                                v.Binormal = binormal;
-                                v.Tangent = tangent;
-                                v.FlowDirection = flow;
+                                v.Normal = normal.Normalized();
+                                v.Binormal = binormal.Normalized();
+                                v.Tangent = tangent.Normalized();
+
+                                if (v.FlowDirection != Vector3.Zero)
+                                {
+                                    v.FlowDirection = flow.Normalized();
+                                }
                             }
                         }
 

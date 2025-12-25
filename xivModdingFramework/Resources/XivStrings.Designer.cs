@@ -313,6 +313,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Body + Legs.
+        /// </summary>
+        internal static string Body_Legs {
+            get {
+                return ResourceManager.GetString("Body_Legs", resourceCulture);
+            }
+        }		
+		
+        /// <summary>
         ///   Looks up a localized string similar to Body + Legs + Feet.
         /// </summary>
         internal static string Body_Legs_Feet {
@@ -583,24 +592,6 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to DX11.
-        /// </summary>
-        internal static string DX11 {
-            get {
-                return ResourceManager.GetString("DX11", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to DX9.
-        /// </summary>
-        internal static string DX9 {
-            get {
-                return ResourceManager.GetString("DX9", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   Looks up a localized string similar to Ear.
         /// </summary>
         internal static string Ear {
@@ -615,6 +606,15 @@ namespace xivModdingFramework.Resources {
         internal static string Earring {
             get {
                 return ResourceManager.GetString("Earring", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Ears.
+        /// </summary>
+        internal static string Ears {
+            get {
+                return ResourceManager.GetString("Ears", resourceCulture);
             }
         }
         
@@ -718,7 +718,7 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Emote.
+        ///   Looks up a localized string similar to Emotes.
         /// </summary>
         internal static string Emote {
             get {
@@ -1060,6 +1060,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Furniture.
+        /// </summary>
+        internal static string Furniture {
+            get {
+                return ResourceManager.GetString("Furniture", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Indoor Furniture.
         /// </summary>
         internal static string Furniture_Indoor {
@@ -1393,6 +1402,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Icon.
+        /// </summary>
+        internal static string Icon {
+            get {
+                return ResourceManager.GetString("Icon", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to ui/icon/{0}.
         /// </summary>
         internal static string IconFolder {
@@ -1434,6 +1452,15 @@ namespace xivModdingFramework.Resources {
         internal static string Index_Backup {
             get {
                 return ResourceManager.GetString("Index_Backup", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Indoor Furniture.
+        /// </summary>
+        internal static string Indoor_Furniture {
+            get {
+                return ResourceManager.GetString("Indoor_Furniture", resourceCulture);
             }
         }
         
@@ -1578,6 +1605,15 @@ namespace xivModdingFramework.Resources {
         internal static string Language_Change_En {
             get {
                 return ResourceManager.GetString("Language_Change_En", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Language_Change_Ja.
+        /// </summary>
+        internal static string Language_Change_Ja {
+            get {
+                return ResourceManager.GetString("Language_Change_Ja", resourceCulture);
             }
         }
         
@@ -1758,6 +1794,24 @@ namespace xivModdingFramework.Resources {
         internal static string Mask {
             get {
                 return ResourceManager.GetString("Mask", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Material.
+        /// </summary>
+        internal static string Material {
+            get {
+                return ResourceManager.GetString("Material", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Mesh.
+        /// </summary>
+        internal static string Mesh {
+            get {
+                return ResourceManager.GetString("Mesh", resourceCulture);
             }
         }
         
@@ -2032,6 +2086,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Number.
+        /// </summary>
+        internal static string Number {
+            get {
+                return ResourceManager.GetString("Number", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Off Hand.
         /// </summary>
         internal static string Off_Hand {
@@ -2086,6 +2149,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Outdoor Furniture.
+        /// </summary>
+        internal static string Outdoor_Furniture {
+            get {
+                return ResourceManager.GetString("Outdoor_Furniture", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Outer Ear.
         /// </summary>
         internal static string OuterEar {
@@ -2118,6 +2190,15 @@ namespace xivModdingFramework.Resources {
         internal static string Paintings {
             get {
                 return ResourceManager.GetString("Paintings", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Part.
+        /// </summary>
+        internal static string Part {
+            get {
+                return ResourceManager.GetString("Part", resourceCulture);
             }
         }
         
@@ -2167,6 +2248,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Race.
+        /// </summary>
+        internal static string Race {
+            get {
+                return ResourceManager.GetString("Race", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Ramuh Egi.
         /// </summary>
         internal static string Ramuh_Egi {
@@ -2181,6 +2271,24 @@ namespace xivModdingFramework.Resources {
         internal static string Right {
             get {
                 return ResourceManager.GetString("Right", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Ring Left.
+        /// </summary>
+        internal static string Ring_Left {
+            get {
+                return ResourceManager.GetString("Ring_Left", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Ring Right.
+        /// </summary>
+        internal static string Ring_Right {
+            get {
+                return ResourceManager.GetString("Ring_Right", resourceCulture);
             }
         }
         
@@ -2410,6 +2518,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Texture Mao.
+        /// </summary>
+        internal static string Texture_Map {
+            get {
+                return ResourceManager.GetString("Texture_Map", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Titan-Egi.
         /// </summary>
         internal static string Titan_Egi {
@@ -2424,6 +2541,24 @@ namespace xivModdingFramework.Resources {
         internal static string Two_Handed {
             get {
                 return ResourceManager.GetString("Two_Handed", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Type.
+        /// </summary>
+        internal static string Type {
+            get {
+                return ResourceManager.GetString("Type", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Part Type.
+        /// </summary>
+        internal static string TypePart {
+            get {
+                return ResourceManager.GetString("TypePart", resourceCulture);
             }
         }
         
@@ -2460,6 +2595,15 @@ namespace xivModdingFramework.Resources {
         internal static string Unknown {
             get {
                 return ResourceManager.GetString("Unknown", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Variant.
+        /// </summary>
+        internal static string Variant {
+            get {
+                return ResourceManager.GetString("Variant", resourceCulture);
             }
         }
         

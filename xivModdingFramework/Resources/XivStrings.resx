@@ -192,6 +192,9 @@
   <data name="Body_Hands_Legs_Feet" xml:space="preserve">
     <value>Body + Hands + Legs + Feet</value>
   </data>
+    <data name="Body_Legs" xml:space="preserve">
+    <value>Body + Legs</value>
+  </data>
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>Body + Legs + Feet</value>
   </data>
@@ -258,12 +261,6 @@
   <data name="Diffuse" xml:space="preserve">
     <value>Diffuse</value>
   </data>
-  <data name="DX11" xml:space="preserve">
-    <value>DX11</value>
-  </data>
-  <data name="DX9" xml:space="preserve">
-    <value>DX9</value>
-  </data>
   <data name="Earring" xml:space="preserve">
     <value>Earring</value>
   </data>
@@ -271,7 +268,7 @@
     <value>Elezen</value>
   </data>
   <data name="Emote" xml:space="preserve">
-    <value>Emote</value>
+    <value>Emotes</value>
   </data>
   <data name="EmoteEXD" xml:space="preserve">
     <value>emote_0_{0}.exd</value>
@@ -989,5 +986,56 @@
   </data>
   <data name="Accessories" xml:space="preserve">
     <value>Accessories</value>
+  </data>
+  <data name="Ears" xml:space="preserve">
+    <value>Ears</value>
+  </data>
+  <data name="Furniture" xml:space="preserve">
+    <value>Furniture</value>
+  </data>
+  <data name="Language_Change_Ja" xml:space="preserve">
+    <value>Language_Change_Ja</value>
+  </data>
+  <data name="Icon" xml:space="preserve">
+    <value>Icon</value>
+  </data>
+  <data name="Indoor_Furniture" xml:space="preserve">
+    <value>Indoor Furniture</value>
+  </data>
+  <data name="Material" xml:space="preserve">
+    <value>Material</value>
+  </data>
+  <data name="Mesh" xml:space="preserve">
+    <value>Mesh</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>Number</value>
+  </data>
+  <data name="Outdoor_Furniture" xml:space="preserve">
+    <value>Outdoor Furniture</value>
+  </data>
+  <data name="Part" xml:space="preserve">
+    <value>Part</value>
+  </data>
+  <data name="Race" xml:space="preserve">
+    <value>Race</value>
+  </data>
+  <data name="Ring_Left" xml:space="preserve">
+    <value>Ring Left</value>
+  </data>
+  <data name="Ring_Right" xml:space="preserve">
+    <value>Ring Right</value>
+  </data>
+  <data name="Texture_Map" xml:space="preserve">
+    <value>Texture Mao</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="TypePart" xml:space="preserve">
+    <value>Part Type</value>
+  </data>
+  <data name="Variant" xml:space="preserve">
+    <value>Variant</value>
   </data>
 </root>

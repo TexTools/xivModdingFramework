@@ -5343,6 +5343,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Head_Body, "top"},
             {XivStrings.Body_Hands, "top"},
             {XivStrings.Body_Hands_Legs, "top"},
+            {XivStrings.Body_Legs, "top"},			
             {XivStrings.Body_Legs_Feet, "top"},
             {XivStrings.Body_Hands_Legs_Feet, "top"},
             {XivStrings.Legs_Feet, "dwn"},
