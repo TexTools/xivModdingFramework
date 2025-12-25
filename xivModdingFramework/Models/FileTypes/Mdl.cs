@@ -90,7 +90,7 @@ namespace xivModdingFramework.Models.FileTypes
         // Simple internal use hashable pair of Halfs.
         private struct HalfUV
         {
-            public HalfUV(Half _x, Half _y)
+            public HalfUV(SharpDX.Half _x, SharpDX.Half _y)
             {
                 x = _x;
                 y = _y;
@@ -101,8 +101,8 @@ namespace xivModdingFramework.Models.FileTypes
                 y = _y;
             }
 
-            public Half x;
-            public Half y;
+            public SharpDX.Half x;
+            public SharpDX.Half y;
 
             public override int GetHashCode()
             {
@@ -4120,20 +4120,20 @@ namespace xivModdingFramework.Models.FileTypes
 
         private static bool WriteVectorData(List<byte> buffer, VertexDataType dataType, Vector3 data, bool handedness = true, int wDefault = 0)
         {
-            Half hx, hy, hz;
+            SharpDX.Half hx, hy, hz;
 
             if (dataType == VertexDataType.Half4)
             {
-                hx = new Half(data[0]);
-                hy = new Half(data[1]);
-                hz = new Half(data[2]);
+                hx = new SharpDX.Half(data[0]);
+                hy = new SharpDX.Half(data[1]);
+                hz = new SharpDX.Half(data[2]);
 
                 buffer.AddRange(BitConverter.GetBytes(hx.RawValue));
                 buffer.AddRange(BitConverter.GetBytes(hy.RawValue));
                 buffer.AddRange(BitConverter.GetBytes(hz.RawValue));
 
                 // Half float positions have a W coordinate that is typically defaulted to either 0 (position data) or 1 (normal data).
-                var w = new Half(wDefault);
+                var w = new SharpDX.Half(wDefault);
                 buffer.AddRange(BitConverter.GetBytes(w.RawValue));
 
             }
@@ -4248,12 +4248,12 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 } else if (texCoordDataType == VertexDataType.Half2 || texCoordDataType == VertexDataType.Half4)
                 {
-                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV1[0]).RawValue));
-                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV1[1]).RawValue));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((SharpDX.Half)v.UV1[0]).RawValue));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((SharpDX.Half)v.UV1[1]).RawValue));
                     if (texCoordDataType == VertexDataType.Half4)
                     {
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV2[0]).RawValue));
-                        importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV2[1]).RawValue));
+                        importData.VertexData1.AddRange(BitConverter.GetBytes(((SharpDX.Half)v.UV2[0]).RawValue));
+                        importData.VertexData1.AddRange(BitConverter.GetBytes(((SharpDX.Half)v.UV2[1]).RawValue));
                     }
                 }
             }
@@ -4268,8 +4268,8 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else if (texCoordDataType == VertexDataType.Half2)
                 {
-                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV3[0]).RawValue));
-                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV3[1]).RawValue));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((SharpDX.Half)v.UV3[0]).RawValue));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((SharpDX.Half)v.UV3[1]).RawValue));
                 }
             }
 

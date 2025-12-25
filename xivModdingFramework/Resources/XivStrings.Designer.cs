@@ -22,7 +22,7 @@ namespace xivModdingFramework.Resources {
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    internal class XivStrings {
+    public class XivStrings {
         
         private static global::System.Resources.ResourceManager resourceMan;
         
@@ -279,7 +279,7 @@ namespace xivModdingFramework.Resources {
         /// <summary>
         ///   Looks up a localized string similar to Body.
         /// </summary>
-        internal static string Body {
+        public static string Body {
             get {
                 return ResourceManager.GetString("Body", resourceCulture);
             }
@@ -936,7 +936,7 @@ namespace xivModdingFramework.Resources {
         /// <summary>
         ///   Looks up a localized string similar to Face.
         /// </summary>
-        internal static string Face {
+        public static string Face {
             get {
                 return ResourceManager.GetString("Face", resourceCulture);
             }

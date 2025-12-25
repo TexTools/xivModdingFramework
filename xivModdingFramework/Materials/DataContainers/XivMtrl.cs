@@ -137,7 +137,7 @@ namespace xivModdingFramework.Materials.DataContainers
         /// <summary>
         /// The list of half floats containing the ColorSet data
         /// </summary>
-        public List<Half> ColorSetData { get; set; } = new List<Half>(new Half[1024]);
+        public List<SharpDX.Half> ColorSetData { get; set; } = new List<SharpDX.Half>(new SharpDX.Half[1024]);
         /// <summary>
         /// The byte array containing the extra ColorSet data
         /// </summary>

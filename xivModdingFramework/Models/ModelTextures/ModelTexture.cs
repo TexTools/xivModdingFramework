@@ -62,6 +62,7 @@ namespace xivModdingFramework.Models.ModelTextures
         public Color EyeColor;      // Off eye color customization isn't really sanely doable since it's managed by Vertex Color.
         public Color LipColor;
         public Color HairColor;
+        public Color LightColor;
 
         // Also known as Limbal Color or Etc. Color.  Just depends on race.
         // Most have tattoo color, so that's the default name.
@@ -89,6 +90,7 @@ namespace xivModdingFramework.Models.ModelTextures
             EyeColor = new Color(172, 113, 159, 255);
             LipColor = new Color(139, 55, 46, 153);
             HairColor = new Color(110, 77, 35, 255);
+            LightColor = new Color(0, 0, 0, 255);
             HairHighlightColor = new Color(91, 110, 129, 255);
             TattooColor = new Color(48, 112, 102, 255);
             FurnitureColor = new Color(141, 60, 204, 255);
@@ -647,7 +649,7 @@ namespace xivModdingFramework.Models.ModelTextures
             specularColorMul *= specularColorMul;
             emissiveColorMul *= emissiveColorMul;
 
-            List<Half> colorset = null;
+            List<SharpDX.Half> colorset = null;
             if(mtrl.ColorSetData != null && mtrl.ColorSetData.Count >= 1024)
             {
                 // Clone the list in case the data is accessed or changed while we're working.
@@ -920,6 +922,7 @@ namespace xivModdingFramework.Models.ModelTextures
             {
                 var hairColor = (Color4)colors.HairColor;
                 var bonusColor = GetHairBonusColor(mtrl, colors, colors.HairHighlightColor != null ? colors.HairHighlightColor.Value : colors.HairColor);
+                var lightColor = SrgbToLinear(new Color4(1, 0, 1, 1));
 
                 //bonusColor = SrgbToLinear(bonusColor);
 
@@ -928,14 +931,23 @@ namespace xivModdingFramework.Models.ModelTextures
                     var metalness = 0.0f;
                     var occlusion = 1.0f;
                     float bonusInfluence = normal.Blue;
+                    float lightInfluence = mask.Alpha * mask.Alpha;
 
-
+                    //Console.WriteLine($"light influence: {lightInfluence}");
 
                     roughness = mask.Green;
                     var specular = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
 
-                    diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    var baseHairColor = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    // var strandColor = baseHairColor * (colors.LightColor * lightInfluence);
+
+                    // diffuse = Color4.Lerp(baseHairColor, strandColor, lightInfluence);
+
+                    diffuse = baseHairColor;
+
                     diffuse *= diffuseColorMul;
+
+                    diffuse *= lightInfluence;
 
                     occlusion = (mask.Alpha * mask.Alpha);
                     if (!settings.GeneratePbrMaps)
@@ -947,7 +959,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                     var sss = mask.Blue;
 
-                    var alpha = normal.Alpha * alphaMultiplier;
+                    var alpha = normal.Alpha;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
                     diffuse.Alpha = alpha;
@@ -1336,7 +1348,7 @@ namespace xivModdingFramework.Models.ModelTextures
         /// <param name="colorsetData"></param>
         /// <param name="rowNumber"></param>
         /// <returns></returns>
-        public static Half[] GetColorsetRow(List<Half> colorsetData, float indexRed, float indexGreen, bool visualizeOnly = false, int highlightRow = -1)
+        public static SharpDX.Half[] GetColorsetRow(List<SharpDX.Half> colorsetData, float indexRed, float indexGreen, bool visualizeOnly = false, int highlightRow = -1)
         {
             if(colorsetData == null || colorsetData.Count == 0) {
                 return null;
@@ -1365,7 +1377,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
 
 
-            var rowData = new Half[_RowSize];
+            var rowData = new SharpDX.Half[_RowSize];
             if (visualizeOnly)
             {
                 for(int i = 0; i < 3; i++) { 
@@ -1430,7 +1442,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Half LerpHalf(Half a, Half b, float f)
+        public static SharpDX.Half LerpHalf(SharpDX.Half a, SharpDX.Half b, float f)
         {
             return a * (1.0f - f) + (b * f);
         }
