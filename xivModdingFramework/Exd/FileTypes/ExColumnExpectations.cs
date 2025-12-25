@@ -580,7 +580,7 @@ namespace xivModdingFramework.Exd.FileTypes
             else if (language == XivLanguage.Chinese)
             {
                 // Set up overrides here if necessary for CN.
-                columnExpectations["Icon"] = (20, ExcelColumnDataType.UInt16);
+                columnExpectations["Icon"] = (20, ExcelColumnDataType.UInt32);
             }
             else if (language == XivLanguage.TraditionalChinese)
             {
