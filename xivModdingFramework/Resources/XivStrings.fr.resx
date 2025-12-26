@@ -117,20 +117,68 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="Accessories" xml:space="preserve">
+    <value>Accessoires</value>
+  </data>
   <data name="Accessory" xml:space="preserve">
     <value>Accessoire</value>
+  </data>
+  <data name="Actions" xml:space="preserve">
+    <value>Actions</value>
+  </data>
+  <data name="AlchemistArms" xml:space="preserve">
+    <value>Armes Alchimiste</value>
   </data>
   <data name="All" xml:space="preserve">
     <value>Tous</value>
   </data>
+  <data name="ArmorerArms" xml:space="preserve">
+    <value>Armes Armurier</value>
+  </data>
+  <data name="AstrologianArms" xml:space="preserve">
+    <value>Armes Astromancien</value>
+  </data>
+  <data name="AuRa_Female" xml:space="preserve">
+    <value>Ao Ra (fem.)</value>
+  </data>
+  <data name="AuRa_Female_NPC" xml:space="preserve">
+    <value>PNJ Ao Ra (fem.)</value>
+  </data>
+  <data name="AuRa_Male" xml:space="preserve">
+    <value>Ao Ra (m.)</value>
+  </data>
+  <data name="AuRa_Male_NPC" xml:space="preserve">
+    <value>PNJ Ao Ra (m.)</value>
+  </data>
+  <data name="AuRa_Raen" xml:space="preserve">
+    <value>Ao Ra - Raen</value>
+  </data>
+  <data name="AuRa_Xaela" xml:space="preserve">
+    <value>Ao Ra - Xaela</value>
+  </data>
   <data name="Au_Ra" xml:space="preserve">
     <value>Ao Ra</value>
+  </data>
+  <data name="Bahamut_Egi" xml:space="preserve">
+    <value>Bahamut-Egi</value>
+  </data>
+  <data name="BardArms" xml:space="preserve">
+    <value>Armes Barde</value>
   </data>
   <data name="Beneficial" xml:space="preserve">
     <value>Renforcement</value>
   </data>
   <data name="Bishop_Autoturret" xml:space="preserve">
     <value>Auto-tourelle Fou</value>
+  </data>
+  <data name="BlackMageArms" xml:space="preserve">
+    <value>Armes Mage Noir</value>
+  </data>
+  <data name="BlacksmithArms" xml:space="preserve">
+    <value>Armes Forgeron</value>
+  </data>
+  <data name="BlueMageArms" xml:space="preserve">
+    <value>Armes Mage Bleu</value>
   </data>
   <data name="Body" xml:space="preserve">
     <value>Torse</value>
@@ -150,11 +198,26 @@
   <data name="Body_Legs_Feet" xml:space="preserve">
     <value>Torse + Jambes + Pieds</value>
   </data>
+  <data name="BotanistArms" xml:space="preserve">
+    <value>Armes Botaniste</value>
+  </data>
   <data name="Buddy" xml:space="preserve">
     <value>Compagnon</value>
   </data>
+  <data name="BuddyAction" xml:space="preserve">
+    <value>Action de Compagnon</value>
+  </data>
+  <data name="Carbuncle" xml:space="preserve">
+    <value>Carbuncle</value>
+  </data>
+  <data name="CarpenterArms" xml:space="preserve">
+    <value>Armes Menuisier</value>
+  </data>
   <data name="Character" xml:space="preserve">
     <value>Personnage</value>
+  </data>
+  <data name="ColorSet" xml:space="preserve">
+    <value>Coloris</value>
   </data>
   <data name="Companions" xml:space="preserve">
     <value>Compagnon</value>
@@ -162,20 +225,101 @@
   <data name="Company" xml:space="preserve">
     <value>Compagnie</value>
   </data>
+  <data name="CompanyAction" xml:space="preserve">
+    <value>Actions de compagnie</value>
+  </data>
   <data name="Craft" xml:space="preserve">
     <value>Artisanat</value>
+  </data>
+  <data name="CraftAction" xml:space="preserve">
+    <value>Action d'artisanat</value>
+  </data>
+  <data name="CulinarianArms" xml:space="preserve">
+    <value>Armes Cuisinier</value>
+  </data>
+  <data name="Cure" xml:space="preserve">
+    <value>Soin</value>
+  </data>
+  <data name="DancerArms" xml:space="preserve">
+    <value>Armes Danseur</value>
+  </data>
+  <data name="DarkKnightArms" xml:space="preserve">
+    <value>Armes Chevalier Noir</value>
+  </data>
+  <data name="Decal" xml:space="preserve">
+    <value>Décalcomanie</value>
+  </data>
+  <data name="DemiHuman" xml:space="preserve">
+    <value>Demi-humain</value>
   </data>
   <data name="Detrimental" xml:space="preserve">
     <value>Fragilisation</value>
   </data>
+  <data name="Diffuse" xml:space="preserve">
+    <value>Diffusion</value>
+  </data>
+  <data name="DragoonArms" xml:space="preserve">
+    <value>Armes Chevalier Dragon</value>
+  </data>
+  <data name="Dual_Wield" xml:space="preserve">
+    <value>Double-mains</value>
+  </data>
+  <data name="Ear" xml:space="preserve">
+    <value>Oreille</value>
+  </data>
+  <data name="Earring" xml:space="preserve">
+    <value>Boucle d'oreille</value>
+  </data>
+  <data name="Ears" xml:space="preserve">
+    <value>Oreilles</value>
+  </data>
   <data name="Elezen" xml:space="preserve">
     <value>Élézen</value>
+  </data>
+  <data name="Elezen_Duskwight" xml:space="preserve">
+    <value>Élézen – Crépusculaires</value>
+  </data>
+  <data name="Elezen_Female" xml:space="preserve">
+    <value>Élézen (fém.)</value>
+  </data>
+  <data name="Elezen_Female_NPC" xml:space="preserve">
+    <value>PNJ Élézen (fém.)</value>
+  </data>
+  <data name="Elezen_Male" xml:space="preserve">
+    <value>Élézen (m.)</value>
+  </data>
+  <data name="Elezen_Male_NPC" xml:space="preserve">
+    <value>PNJ Élézen (m.)</value>
+  </data>
+  <data name="Elezen_Wildwood" xml:space="preserve">
+    <value>Élézen – Sylvestres</value>
+  </data>
+  <data name="Emote" xml:space="preserve">
+    <value>Emotes</value>
+  </data>
+  <data name="Eos" xml:space="preserve">
+    <value>Éos</value>
+  </data>
+  <data name="Equipment" xml:space="preserve">
+    <value>Équipement</value>
   </data>
   <data name="Equipment_Decals" xml:space="preserve">
     <value>Blason</value>
   </data>
+  <data name="Error_DirectoryError" xml:space="preserve">
+    <value>Erreur de répertoire</value>
+  </data>
+  <data name="Error_FileNotFound" xml:space="preserve">
+    <value>Impossible de trouver le fichier. Veuillez vérifier vos répertoires dans les paramètres.</value>
+  </data>
+  <data name="Etc" xml:space="preserve">
+    <value>etc.</value>
+  </data>
   <data name="Event" xml:space="preserve">
     <value>Événement</value>
+  </data>
+  <data name="EventAction" xml:space="preserve">
+    <value>Action d'événement</value>
   </data>
   <data name="Face" xml:space="preserve">
     <value>Visage</value>
@@ -189,14 +333,59 @@
   <data name="Female" xml:space="preserve">
     <value>Femme</value>
   </data>
+  <data name="FieldMarker" xml:space="preserve">
+    <value>Marqueur</value>
+  </data>
+  <data name="Fish" xml:space="preserve">
+    <value>Poisson d'aquarium</value>
+  </data>
+  <data name="FishAquarium" xml:space="preserve">
+    <value>Poisson d'aquarium</value>
+  </data>
+  <data name="FisherArms" xml:space="preserve">
+    <value>Armes Pêcheur</value>
+  </data>
+  <data name="FishLarge" xml:space="preserve">
+    <value>Grand</value>
+  </data>
+  <data name="FishMedium" xml:space="preserve">
+    <value>Moyen</value>
+  </data>
+  <data name="FishSmall" xml:space="preserve">
+    <value>Petit</value>
+  </data>
+  <data name="FishXLarge" xml:space="preserve">
+    <value>Très grand</value>
+  </data>
   <data name="Food" xml:space="preserve">
-    <value>Plat ou boisson</value>
+    <value>Nourriture</value>
+  </data>
+  <data name="Furniture" xml:space="preserve">
+    <value>Ameublement</value>
+  </data>
+  <data name="Furniture_Indoor" xml:space="preserve">
+    <value>Meubles d'intérieur</value>
+  </data>
+  <data name="Furniture_Outdoor" xml:space="preserve">
+    <value>Meubles d'extérieur</value>
+  </data>
+  <data name="Garuda_Egi" xml:space="preserve">
+    <value>Garuda-Egi</value>
   </data>
   <data name="Gear" xml:space="preserve">
     <value>Équipement</value>
   </data>
   <data name="General" xml:space="preserve">
     <value>Général</value>
+  </data>
+  <data name="GeneralAction" xml:space="preserve">
+    <value>Action générale</value>
+  </data>
+  <data name="GoldsmithArms" xml:space="preserve">
+    <value>Armes Orfèvre</value>
+  </data>
+  <data name="GunbreakerArms" xml:space="preserve">
+    <value>Armes Pistosabreur</value>
   </data>
   <data name="Hair" xml:space="preserve">
     <value>Cheveux</value>
@@ -210,17 +399,140 @@
   <data name="Head_Body" xml:space="preserve">
     <value>Tête + Torse</value>
   </data>
+  <data name="Housing" xml:space="preserve">
+    <value>Logement</value>
+  </data>
+  <data name="Hrothgar" xml:space="preserve">
+    <value>Hrothgar</value>
+  </data>
+  <data name="Hrothgar_Female" xml:space="preserve">
+    <value>Hrothgar (femme)</value>
+  </data>
+  <data name="Hrothgar_Female_NPC" xml:space="preserve">
+    <value>PNJ Hrothgar (femme)</value>
+  </data>
+  <data name="Hrothgar_Helion" xml:space="preserve">
+    <value>Hrothgar – Hélions</value>
+  </data>
+  <data name="Hrothgar_Lost" xml:space="preserve">
+    <value>Hrothgar – Éloignés</value>
+  </data>
+  <data name="Hrothgar_Male" xml:space="preserve">
+    <value>Hrothgar (homme)</value>
+  </data>
+  <data name="Hrothgar_Male_NPC" xml:space="preserve">
+    <value>PNJ Hrothgar (homme)</value>
+  </data>
+  <data name="Hrothgar_NPC" xml:space="preserve">
+    <value>PNJ Hrothgar</value>
+  </data>
+  <data name="HUD" xml:space="preserve">
+    <value>ATH</value>
+  </data>
+  <data name="Human" xml:space="preserve">
+    <value>Humain</value>
+  </data>
+  <data name="Hyur_H" xml:space="preserve">
+    <value>Hyur (Hyurgoths)</value>
+  </data>
+  <data name="Hyur_Highlander" xml:space="preserve">
+    <value>Hyur – Hyurgoths</value>
+  </data>
+  <data name="Hyur_Highlander_Female" xml:space="preserve">
+    <value>Hyur (Hyurgoths, fém.)</value>
+  </data>
+  <data name="Hyur_Highlander_Female_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Hyurgoths, fém.)</value>
+  </data>
+  <data name="Hyur_Highlander_Male" xml:space="preserve">
+    <value>Hyur (Hyurgoths, masc.)</value>
+  </data>
+  <data name="Hyur_Highlander_Male_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Hyurgoths, masc.)</value>
+  </data>
+  <data name="Hyur_M" xml:space="preserve">
+    <value>Hyur (Hyurois)</value>
+  </data>
+  <data name="Hyur_Midlander" xml:space="preserve">
+    <value>Hyur – Hyurois</value>
+  </data>
+  <data name="Hyur_Midlander_Female" xml:space="preserve">
+    <value>Hyur (Hyurois, fém.)</value>
+  </data>
+  <data name="Hyur_Midlander_Female_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Hyurois, fém.)</value>
+  </data>
+  <data name="Hyur_Midlander_Male" xml:space="preserve">
+    <value>Hyur (Hyurois, masc.)</value>
+  </data>
+  <data name="Hyur_Midlander_Male_NPC" xml:space="preserve">
+    <value>PNJ Hyur (Hyurois, masc.)</value>
+  </data>
+  <data name="Icon" xml:space="preserve">
+    <value>Icône</value>
+  </data>
+  <data name="Ifrit_Egi" xml:space="preserve">
+    <value>Ifrit-Egi</value>
+  </data>
+  <data name="Index_Backup" xml:space="preserve">
+    <value>Aucun fichier de sauvegarde d'index détecté. \nVoulez-vous créer une sauvegarde maintenant ? \n\nAvertissement : Ceci désactivera toute modification active afin de créer une sauvegarde. Elles devront être réactivées manuellement.</value>
+  </data>
+  <data name="Indoor_Furniture" xml:space="preserve">
+    <value>Meubles d'intérieur</value>
+  </data>
+  <data name="InnerEar" xml:space="preserve">
+    <value>Oreille interne</value>
+  </data>
+  <data name="Iris" xml:space="preserve">
+    <value>Iris</value>
+  </data>
   <data name="Items" xml:space="preserve">
     <value>Objets</value>
   </data>
+  <data name="Lalafell" xml:space="preserve">
+    <value>Lalafell</value>
+  </data>
+  <data name="Lalafell_Dunesfolk" xml:space="preserve">
+    <value>Lalafell – Peuple des dunes</value>
+  </data>
+  <data name="Lalafell_Female" xml:space="preserve">
+    <value>Lalafell (fém.)</value>
+  </data>
+  <data name="Lalafell_Female_NPC" xml:space="preserve">
+    <value>PNJ Lalafell (fém.)</value>
+  </data>
+  <data name="Lalafell_Male" xml:space="preserve">
+    <value>Lalafell (masc.)</value>
+  </data>
+  <data name="Lalafell_Male_NPC" xml:space="preserve">
+    <value>PNJ Lalafell (masc.)</value>
+  </data>
+  <data name="Lalafell_Plainsfolk" xml:space="preserve">
+    <value>Lalafell – Peuple des plaines</value>
+  </data>
   <data name="Language" xml:space="preserve">
     <value>fr</value>
+  </data>
+  <data name="LeatherworkerArms" xml:space="preserve">
+    <value>Armes Tanneur</value>
+  </data>
+  <data name="Left" xml:space="preserve">
+    <value>Gauche</value>
+  </data>
+  <data name="LeftRing" xml:space="preserve">
+    <value>Bague gauche</value>
   </data>
   <data name="Legs" xml:space="preserve">
     <value>Jambes</value>
   </data>
   <data name="Legs_Feet" xml:space="preserve">
     <value>Jambes + Pieds</value>
+  </data>
+  <data name="LoadingScreen" xml:space="preserve">
+    <value>Ecran de chargement</value>
+  </data>
+  <data name="MachinistArms" xml:space="preserve">
+    <value>Armes Machiniste</value>
   </data>
   <data name="Main_Hand" xml:space="preserve">
     <value>Main directrice</value>
@@ -231,14 +543,62 @@
   <data name="Male" xml:space="preserve">
     <value>Homme</value>
   </data>
-  <data name="Maps" xml:space="preserve">
+  <data name="Map" xml:space="preserve">
     <value>Carte</value>
+  </data>
+  <data name="Maps" xml:space="preserve">
+    <value>Cartes</value>
+  </data>
+  <data name="MapSymbol" xml:space="preserve">
+    <value>Symboles de carte</value>
   </data>
   <data name="Marker" xml:space="preserve">
     <value>Signes</value>
   </data>
+  <data name="Mask" xml:space="preserve">
+    <value>Masque</value>
+  </data>
+  <data name="Material" xml:space="preserve">
+    <value>Matériau</value>
+  </data>
+  <data name="Mesh" xml:space="preserve">
+    <value>Maillage</value>
+  </data>
+  <data name="MinerArms" xml:space="preserve">
+    <value>Armes Mineur</value>
+  </data>
+  <data name="Minimap" xml:space="preserve">
+    <value>Minicarte</value>
+  </data>
   <data name="Minions" xml:space="preserve">
     <value>Mascottes</value>
+  </data>
+  <data name="Miqote" xml:space="preserve">
+    <value>Miqo'tes</value>
+  </data>
+  <data name="Miqote_Female" xml:space="preserve">
+    <value>Miqo'tes (fém.)</value>
+  </data>
+  <data name="Miqote_Female_NPC" xml:space="preserve">
+    <value>PNJ Miqo'tes (fém.)</value>
+  </data>
+  <data name="Miqote_Keeper" xml:space="preserve">
+    <value>Miqo'tes – Tribu de la Lune</value>
+  </data>
+  <data name="Miqote_Male" xml:space="preserve">
+    <value>Miqo'tes (masc.)</value>
+  </data>
+  <data name="Miqote_Male_NPC" xml:space="preserve">
+    <value>PNJ Miqo'tes (masc.)</value>
+  </data>
+  <data name="Miqote_Seeker" xml:space="preserve">
+    <value>Miqo'tes – Tribu du Soleil</value>
+  </data>
+  <data name="MonkArms" xml:space="preserve">
+    <value>Armes Moine</value>
+  </data>
+  <data name="Monster" xml:space="preserve">
+    <value>Monstre</value>
   </data>
   <data name="Mounts" xml:space="preserve">
     <value>Montures</value>
@@ -246,70 +606,223 @@
   <data name="Neck" xml:space="preserve">
     <value>Cou</value>
   </data>
+  <data name="NinjaArms" xml:space="preserve">
+    <value>Armes Ninja</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>Aucun</value>
+  </data>
+  <data name="Normal" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="NPC_Female" xml:space="preserve">
+    <value>PNJ (femme)</value>
+  </data>
+  <data name="NPC_Male" xml:space="preserve">
+    <value>PNJ (homme)</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>Nombre</value>
+  </data>
   <data name="Off_Hand" xml:space="preserve">
     <value>Main non directrice</value>
+  </data>
+  <data name="OnlineStatus" xml:space="preserve">
+    <value>Statut en ligne</value>
+  </data>
+  <data name="Ornaments" xml:space="preserve">
+    <value>Ornements</value>
   </data>
   <data name="Other" xml:space="preserve">
     <value>Autre</value>
   </data>
+  <data name="Outdoor_Furniture" xml:space="preserve">
+    <value>Meubles d'extérieur</value>
+  </data>
+  <data name="Painting" xml:space="preserve">
+    <value>Peinture</value>
+  </data>
+  <data name="Painting Icons" xml:space="preserve">
+    <value>Icônes de peinture</value>
+  </data>
+  <data name="Paintings" xml:space="preserve">
+    <value>Peintures</value>
+  </data>
+  <data name="PaladinArms" xml:space="preserve">
+    <value>Armes Paladin</value>
+  </data>
+  <data name="Part" xml:space="preserve">
+    <value>Partie</value>
+  </data>
   <data name="Pets" xml:space="preserve">
     <value>Familiers</value>
+  </data>
+  <data name="PictomancerArms" xml:space="preserve">
+    <value>Armes Pictomancien</value>
+  </data>
+  <data name="Primary" xml:space="preserve">
+    <value>Primaire</value>
+  </data>
+  <data name="Race" xml:space="preserve">
+    <value>Race</value>
+  </data>
+  <data name="Ramuh_Egi" xml:space="preserve">
+    <value>Ramuh Egi</value>
+  </data>
+  <data name="ReaperArms" xml:space="preserve">
+    <value>Armes Faucheur</value>
+  </data>
+  <data name="RedMageArms" xml:space="preserve">
+    <value>Armes Mage Rouge</value>
+  </data>
+  <data name="Right" xml:space="preserve">
+    <value>Droite</value>
   </data>
   <data name="Rings" xml:space="preserve">
     <value>Bagues</value>
   </data>
+  <data name="Ring_Left" xml:space="preserve">
+    <value>Bague gauche</value>
+  </data>
+  <data name="Ring_Right" xml:space="preserve">
+    <value>Bague droite</value>
+  </data>
+  <data name="Roegadyn" xml:space="preserve">
+    <value>Roegadyns</value>
+  </data>
+  <data name="Roegadyn_Female" xml:space="preserve">
+    <value>Roegadyns (fém.)</value>
+  </data>
+  <data name="Roegadyn_Female_NPC" xml:space="preserve">
+    <value>PNJ Roegadyns (fém.)</value>
+  </data>
+  <data name="Roegadyn_Hellsguard" xml:space="preserve">
+    <value>Roegadyns (Clan du feu)</value>
+  </data>
+  <data name="Roegadyn_Male" xml:space="preserve">
+    <value>Roegadyns (masc.)</value>
+  </data>
+  <data name="Roegadyn_Male_NPC" xml:space="preserve">
+    <value>PNJ Roegadyns (masc.)</value>
+  </data>
+  <data name="Roegadyn_SeaWolf" xml:space="preserve">
+    <value>Roegadyns (Clan de la mer)</value>
+  </data>
   <data name="Rook_Autoturret" xml:space="preserve">
     <value>Auto-tourelle Tour</value>
   </data>
-  <data name="Soul_Crystal" xml:space="preserve">
-    <value>Cristal d'âme</value>
+  <data name="SageArms" xml:space="preserve">
+    <value>Armes Sage</value>
   </data>
-  <data name="Status" xml:space="preserve">
-    <value>États</value>
+  <data name="SamuraiArms" xml:space="preserve">
+    <value>Armes Samurai</value>
   </data>
-  <data name="Tail" xml:space="preserve">
-    <value>Queue</value>
+  <data name="Secondary" xml:space="preserve">
+    <value>Secondaire</value>
   </data>
-  <data name="Two_Handed" xml:space="preserve">
-    <value>deux mains</value>
+  <data name="Selene" xml:space="preserve">
+    <value>Selene</value>
   </data>
-  <data name="Waist" xml:space="preserve">
-    <value>Ceinture</value>
-  </data>
-  <data name="Weapon" xml:space="preserve">
-    <value>Arme</value>
-  </data>
-  <data name="Wrists" xml:space="preserve">
-    <value>Poignets</value>
-  </data>
-  <data name="LoadingScreen" xml:space="preserve">
-    <value>Ecran de chargement</value>
-  </data>
-  <data name="Housing" xml:space="preserve">
-    <value>Logement</value>
+  <data name="Sephirot_Egi" xml:space="preserve">
+    <value>Sephirot-Egi</value>
   </data>
   <data name="Seraph" xml:space="preserve">
     <value>Séraphin</value>
   </data>
-  <data name="Cure" xml:space="preserve">
-    <value>Soin</value>
+  <data name="Shields" xml:space="preserve">
+    <value>Boucliers</value>
+  </data>
+  <data name="Skin" xml:space="preserve">
+    <value>Peau</value>
+  </data>
+  <data name="Soul_Crystal" xml:space="preserve">
+    <value>Cristal d'âme</value>
+  </data>
+  <data name="Specular" xml:space="preserve">
+    <value>Spéculaire</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>États</value>
+  </data>
+  <data name="SummonerScholarArms" xml:space="preserve">
+    <value>Armes Invocateur/Erudit</value>
+  </data>
+  <data name="Tail" xml:space="preserve">
+    <value>Queue</value>
+  </data>
+  <data name="Texture_Map" xml:space="preserve">
+    <value>Texture</value>
+  </data>
+  <data name="Titan_Egi" xml:space="preserve">
+    <value>Titan-Egi</value>
+  </data>
+  <data name="Two_Handed" xml:space="preserve">
+    <value>deux mains</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="TypePart" xml:space="preserve">
+    <value>Type de partie</value>
+  </data>
+  <data name="UI" xml:space="preserve">
+    <value>UI</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Inconnu</value>
+  </data>
+  <data name="Variant" xml:space="preserve">
+    <value>Variante</value>
+  </data>
+  <data name="Viera" xml:space="preserve">
+    <value>Viéra</value>
+  </data>
+  <data name="Viera_Female" xml:space="preserve">
+    <value>Viéra (fém.)</value>
+  </data>
+  <data name="Viera_Female_NPC" xml:space="preserve">
+    <value>PNJ Viéra (fém.)</value>
+  </data>
+  <data name="Viera_Male" xml:space="preserve">
+    <value>Viéra (masc.)</value>
+  </data>
+  <data name="Viera_Male_NPC" xml:space="preserve">
+    <value>PNJ Viéra (masc.)</value>
+  </data>
+  <data name="Viera_NPC" xml:space="preserve">
+    <value>PNJ Viéra</value>
+  </data>
+  <data name="Viera_Rava" xml:space="preserve">
+    <value>Rava - Viéra</value>
+  </data>
+  <data name="Viera_Veena" xml:space="preserve">
+    <value>Veena - Viéra</value>
+  </data>
+  <data name="ViperArms" xml:space="preserve">
+    <value>Armes Rôdeur Vipère</value>
+  </data>
+  <data name="Waist" xml:space="preserve">
+    <value>Ceinture</value>
+  </data>
+  <data name="WarriorArms" xml:space="preserve">
+    <value>Armes Guerrier</value>
+  </data>
+  <data name="Weapon" xml:space="preserve">
+    <value>Arme</value>
   </data>
   <data name="Weapons" xml:space="preserve">
     <value>Armes</value>
   </data>
-  <data name="Accessories" xml:space="preserve">
-    <value>Accessoires</value>
+  <data name="Weather" xml:space="preserve">
+    <value>Météo</value>
   </data>
-  <data name="Ears" xml:space="preserve">
-    <value>Oreille</value>
+  <data name="WeaverArms" xml:space="preserve">
+    <value>Armes Couturier</value>
   </data>
-  <data name="Furniture" xml:space="preserve">
-    <value>Ameublement</value>
+  <data name="WhiteMageArms" xml:space="preserve">
+    <value>Armes Mage Blanc</value>
   </data>
-  <data name="Earring" xml:space="preserve">
-    <value>Boucle d'oreille</value>
-  </data>
-  <data name="Ear" xml:space="preserve">
-    <value>Oreilles</value>
+  <data name="Wrists" xml:space="preserve">
+    <value>Poignets</value>
   </data>
 </root>
