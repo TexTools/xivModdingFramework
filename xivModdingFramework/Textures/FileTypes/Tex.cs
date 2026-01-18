@@ -135,15 +135,6 @@ namespace xivModdingFramework.Textures.FileTypes
             /// <returns>Byte array containing the header data.</returns>
             internal byte[] ToBytes()
             {
-                if (this.LoDMips[1] < this.LoDMips[0] || this.LoDMips[2] < this.LoDMips[1])
-                    throw new InvalidOperationException("LoDMips is not in non-descending order.");
-                if (this.LoDMips[2] >= this.MipCount)
-                    throw new InvalidOperationException("All LoDMips must be strictly lesser than MipCount.");
-                if (this.MipFlag > 15)
-                    throw new InvalidOperationException("MipFlag must be strictly lesser than 16.");
-                if (this.MipCount > 13)
-                    throw new InvalidOperationException("MipCount must be strictly lesser than 14.");
-
                 var res = new byte[_TexHeaderSize];
                 var bw = new BinaryWriter(new MemoryStream(res, true));
                 bw.Write(this.Attributes);
@@ -209,7 +200,9 @@ namespace xivModdingFramework.Textures.FileTypes
                     header.MipCount = (byte)(mipLevel + 1);
                 }
 
+                uint maxLodMip = 0;
                 // Update LoDMips in case we removed a referenced mipmap
+                // ... or if the values are not correctly in ascending order
                 for (int lodLevel = 0; lodLevel < 3; ++lodLevel)
                 {
                     if (header.LoDMips[lodLevel] >= header.MipCount)
@@ -217,6 +210,12 @@ namespace xivModdingFramework.Textures.FileTypes
                         modified = true;
                         header.LoDMips[lodLevel] = (uint)(header.MipCount - 1);
                     }
+                    if (header.LoDMips[lodLevel] < maxLodMip)
+                    {
+                        modified = true;
+                        header.LoDMips[lodLevel] = maxLodMip;
+                    }
+                    maxLodMip = header.LoDMips[lodLevel];
                 }
 
                 // Fill out the rest of table with zeroes
@@ -1124,7 +1123,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
             headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
             headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
-            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
+            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : (newMipCount - 1))); // LoD 2 Mip
 
             var mipMapUncompressedOffset = 80;
 
