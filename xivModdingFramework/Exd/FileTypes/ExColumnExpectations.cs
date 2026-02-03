@@ -575,7 +575,6 @@ namespace xivModdingFramework.Exd.FileTypes
             if (language == XivLanguage.Korean)
             {
                 // Set up overrides here if necessary for KR.
-                columnExpectations["Icon"] = (20, ExcelColumnDataType.UInt16);
             }
             else if (language == XivLanguage.Chinese)
             {
