@@ -85,6 +85,7 @@ namespace xivModdingFramework.Cache
         private static GameInfo _gameInfo;
         private static DirectoryInfo _dbPath;
         private static DirectoryInfo _rootCachePath;
+        private static string _localCacheDirectory;
         public static readonly Version CacheVersion = new Version("1.0.3.5");
         private const string dbFileName = "mod_cache.db";
         private const string rootCacheFileName = "item_sets.db";
@@ -141,6 +142,20 @@ namespace xivModdingFramework.Cache
         }
 
         public static FrameworkSettings FrameworkSettings { get; set; } = new FrameworkSettings();
+
+        public static string LocalCacheDirectory
+        {
+            get => _localCacheDirectory;
+            set
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    value = Path.GetFullPath(value);
+                    Directory.CreateDirectory(value);
+                }
+                _localCacheDirectory = value;
+            }
+        }
 
         private static bool _GameWriteEnbled = false;
         public static bool GameWriteEnabled {
@@ -291,9 +306,10 @@ namespace xivModdingFramework.Cache
             }
 
 
+            var cacheBase = !string.IsNullOrWhiteSpace(_localCacheDirectory) ? _localCacheDirectory : _gameInfo.GameDirectory.Parent.Parent.FullName;
 
-            _dbPath = new DirectoryInfo(Path.Combine(_gameInfo.GameDirectory.Parent.Parent.FullName, dbFileName));
-            _rootCachePath = new DirectoryInfo(Path.Combine(_gameInfo.GameDirectory.Parent.Parent.FullName, rootCacheFileName));
+            _dbPath = new DirectoryInfo(Path.Combine(cacheBase, dbFileName));
+            _rootCachePath = new DirectoryInfo(Path.Combine(cacheBase, rootCacheFileName));
 
             if (!_REBUILDING)
             {
