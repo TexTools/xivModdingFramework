@@ -27,6 +27,9 @@ namespace xivModdingFramework.General.DataContainers
             if (data.Length <= rspDataSize)
                 throw new Exception("CMP Format Changed - Unable to read all CMP data.");
 
+            /// <summary>
+            /// The point in the human.cmp file at which the racial scaling metadata begins.
+            /// </summary>
             var metadataStart = data.Length - rspDataSize;
 
             ColorPixels.Capacity = metadataStart / 4;
