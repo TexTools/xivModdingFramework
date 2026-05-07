@@ -109,15 +109,44 @@ namespace xivModdingFramework.Materials.FileTypes
             var ex = new Ex();
             var exData = await ex.ReadExData(XivEx.stain, tx);
 
+            int nameColumn = -1;
+            bool lookupFailed = false;
+            if (exData.Count > 0)
+            {
+                var sample = exData.First().Value;
+                if (sample.Columns.Count > 6 && sample.Columns[6].Type == ExcelColumnDataType.String)
+                {
+                    nameColumn = 6;
+                }
+                else if (sample.Columns.Count > 3 && sample.Columns[3].Type == ExcelColumnDataType.String)
+                {
+                    nameColumn = 3;
+                }
+                else
+                {
+                    lookupFailed = true;
+                    var layout = string.Join(", ", sample.Columns.Select((c, i) => i + ":" + c.Type));
+                    Trace.WriteLine(
+                        "STM.GetDyeNames: Dye names are no longer accessible at the expected " +
+                        "stain.exh columns (global=6, legacy=3). Observed: [" + layout + "]");
+                }
+            }
 
             foreach (var kv in exData)
             {
                 if (kv.Key == 0) continue;
 
-                var name = (string) kv.Value.GetColumn(3);
                 var dyeId = kv.Key - 1;
+                string name = null;
+                if (nameColumn >= 0)
+                {
+                    name = kv.Value.GetColumn(nameColumn) as string;
+                }
+
                 if (String.IsNullOrEmpty(name)) {
-                    name = "Dye " + dyeId.ToString();
+                    name = lookupFailed
+                        ? "Dye " + dyeId.ToString() + " (name lookup failed - framework needs updating)"
+                        : "Dye " + dyeId.ToString();
                 }
 
                 Dyes.Add(dyeId, name);
