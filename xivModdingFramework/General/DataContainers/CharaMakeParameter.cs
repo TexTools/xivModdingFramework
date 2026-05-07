@@ -19,17 +19,19 @@ namespace xivModdingFramework.General.DataContainers
         private List<RacialScalingParameter> RawRacialData = new List<RacialScalingParameter>();
         private List<byte[]> ColorPixels = new List<byte[]>();
 
-        /// <summary>
-        /// The point in the human.cmp file at which the racial scaling metadata begins.
-        /// </summary>
-        public const int MetadataStart = 0x2a800;
-
         public CharaMakeParameterSet(byte[] data)
         {
-            ColorPixels.Capacity = MetadataStart / 4;
+            // SE adds new color blocks between patches, so calculate the RSP offset from the back instead of hardcoding it
+            var rspDataSize = 8 * 10 * RacialScalingParameter.TotalByteSize;
 
-            var nextOffset = 0;
-            for(int i = 0; i < MetadataStart; i+= 4)
+            if (data.Length <= rspDataSize)
+                throw new Exception("CMP Format Changed - Unable to read all CMP data.");
+
+            var metadataStart = data.Length - rspDataSize;
+
+            ColorPixels.Capacity = metadataStart / 4;
+
+            for(int i = 0; i < metadataStart; i += 4)
             {
                 var r = data[i];
                 var g = data[i + 1];
@@ -37,29 +39,19 @@ namespace xivModdingFramework.General.DataContainers
                 var a = data[i + 3];
 
                 ColorPixels.Add(new byte[4] { r, g, b, a });
-                nextOffset = i + 4;
             }
 
-            if (nextOffset != MetadataStart) throw new Exception("CMP Format Changed - Unable to read all CMP data.");
-
-            var rem = data.Length - MetadataStart;
-            var entries = rem / RacialScalingParameter.TotalByteSize;
+            var entries = rspDataSize / RacialScalingParameter.TotalByteSize;
 
             for (int i = 0; i < entries; i++)
             {
-                var offset = MetadataStart + (i * RacialScalingParameter.TotalByteSize);
+                var offset = metadataStart + (i * RacialScalingParameter.TotalByteSize);
                 var arr = new byte[RacialScalingParameter.TotalByteSize];
 
                 Array.Copy(data, offset, arr, 0, RacialScalingParameter.TotalByteSize);
 
-                var rsp = new RacialScalingParameter(arr);
-                RawRacialData.Add(rsp);
-
-                nextOffset = offset + RacialScalingParameter.TotalByteSize;
+                RawRacialData.Add(new RacialScalingParameter(arr));
             }
-
-            if (nextOffset != data.Length) throw new Exception("CMP Format Changed - Unable to read all CMP data.");
-
         }
 
         public RacialGenderScalingParameter GetScalingParameter(XivSubRace Race, XivGender Gender)
