@@ -22,7 +22,12 @@ namespace xivModdingFramework.General.DataContainers
         public CharaMakeParameterSet(byte[] data)
         {
             // SE adds new color blocks between patches, so calculate the RSP offset from the back instead of hardcoding it
-            var metadataStart = data.Length - (8 * 10 * RacialScalingParameter.TotalByteSize);
+            var rspDataSize = 8 * 10 * RacialScalingParameter.TotalByteSize;
+
+            if (data.Length <= rspDataSize)
+                throw new Exception("CMP Format Changed - Unable to read all CMP data.");
+
+            var metadataStart = data.Length - rspDataSize;
 
             ColorPixels.Capacity = metadataStart / 4;
 
@@ -36,11 +41,7 @@ namespace xivModdingFramework.General.DataContainers
                 ColorPixels.Add(new byte[4] { r, g, b, a });
             }
 
-            var rem = data.Length - metadataStart;
-            var entries = rem / RacialScalingParameter.TotalByteSize;
-
-            if (rem % RacialScalingParameter.TotalByteSize != 0)
-                throw new Exception("CMP Format Changed - Unable to read all CMP data.");
+            var entries = rspDataSize / RacialScalingParameter.TotalByteSize;
 
             for (int i = 0; i < entries; i++)
             {
