@@ -665,7 +665,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
 
             if (shaderPack == EShaderPack.Character || shaderPack == EShaderPack.CharacterLegacy || shaderPack == EShaderPack.CharacterGlass
-             || shaderPack == EShaderPack.CharacterScroll || shaderPack == EShaderPack.CharacterInc)
+             || shaderPack == EShaderPack.CharacterScroll || shaderPack == EShaderPack.CharacterInc || shaderPack == EShaderPack.CharacterTransparency)
             {
                 // This is the most common family of shaders that appears on gear, monsters, etc.
                 // Many of its features should be controlled by shader parameters that aren't implemented
@@ -679,6 +679,10 @@ namespace xivModdingFramework.Models.ModelTextures
                     var metalness = 0.0f;
                     var occlusion = 1.0f;
 
+                    var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
+                    uint effectId = (uint)row[24];
+                    bool blueMaskIsAo = effectId == 0 || effectId == 7 || effectId == 10 || effectId == 12 || effectId >= 17;
+
                     if (useTextures)
                     {
                         if (!hasDiffuse)
@@ -686,16 +690,16 @@ namespace xivModdingFramework.Models.ModelTextures
                             diffuse = new Color4(1.0f);
                         }
 
-
                         if (hasMulti)
                         {
-                            float diffuseMask, specMask;
+                            float diffuseMask = 1.0f, specMask;
                             // Construct specular from mask
                             if (shaderPack == EShaderPack.CharacterLegacy)
                             {
                                 // Specular/Gloss flow
 
-                                diffuseMask = mask.Blue;
+                                if (blueMaskIsAo)
+                                    diffuseMask = mask.Blue;
                                 specMask = mask.Red;
                                 roughness = 1 - mask.Green;
 
@@ -706,14 +710,15 @@ namespace xivModdingFramework.Models.ModelTextures
                             }
                             else
                             {
-                                diffuseMask = mask.Blue;
+                                if (blueMaskIsAo)
+                                    diffuseMask = mask.Blue;
                                 specMask = mask.Red;
                                 roughness = mask.Green;
                             }
 
                             if (!settings.GeneratePbrMaps)
                             {
-                                diffuse *= diffuseMask;
+                                 diffuse *= diffuseMask;
                             }
                             else
                             {
@@ -741,8 +746,6 @@ namespace xivModdingFramework.Models.ModelTextures
                     var emissive = new Color4(0, 0, 0, 1.0f);
                     if (useColorset)
                     {
-                        var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
-
                         var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
                         var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
                         var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
