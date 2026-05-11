@@ -718,7 +718,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                             if (!settings.GeneratePbrMaps)
                             {
-                                 diffuse *= diffuseMask;
+                                diffuse *= diffuseMask;
                             }
                             else
                             {
