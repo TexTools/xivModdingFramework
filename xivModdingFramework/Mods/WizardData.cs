@@ -31,7 +31,8 @@ namespace xivModdingFramework.Mods
     public enum EGroupType
     {
         Standard,
-        Imc
+        Imc,
+        Combining
     };
 
     internal static class WizardHelpers
@@ -614,6 +615,10 @@ namespace xivModdingFramework.Mods
                 {
                     return EGroupType.Imc;
                 }
+                if (ModOption is PMPCombiningGroupJson)
+                {
+                    return EGroupType.Combining;
+                }
                 return EGroupType.Standard;
             }
         }
@@ -888,6 +893,11 @@ namespace xivModdingFramework.Mods
 
         public async Task<PMPGroupJson> ToPmpGroup(string tempFolder, Dictionary<string, List<FileIdentifier>> identifiers, int page, bool oneOption = false)
         {
+            if (GroupType == EGroupType.Combining)
+            {
+                throw new InvalidDataException("Editing or exporting PMP Combining groups is not supported.");
+            }
+
             PMPGroupJson pg;
             // We want to insert a type-erased PMPOptionJson, as returned by ToPmpOption(), in to a type-erased PMPGroupJson
             // This is the alternative to creating a single-purpose virtual function on PMPGroupJson
@@ -1086,6 +1096,14 @@ namespace xivModdingFramework.Mods
             get
             {
                 return DataPages.Any(x => x.HasData);
+            }
+        }
+
+        public bool HasCombiningGroups
+        {
+            get
+            {
+                return DataPages.Any(x => x.Groups.Any(y => y.GroupType == EGroupType.Combining));
             }
         }
 
