@@ -5334,6 +5334,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
+            {XivStrings.Facewear, "met"},
             {XivStrings.Earring, "ear"},
             {XivStrings.Ear, "zer"},
             {XivStrings.Neck, "nek"},

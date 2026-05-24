@@ -64,7 +64,9 @@ namespace xivModdingFramework.Items
             }
             else if (item.PrimaryCategory == XivStrings.Accessories)
             {
-                itemType = XivItemType.accessory;
+                itemType = item.SecondaryCategory == XivStrings.Facewear
+                    ? XivItemType.equipment
+                    : XivItemType.accessory;
             }
             else if (item.SecondaryCategory.Equals(XivStrings.Mounts) || item.SecondaryCategory.Equals(XivStrings.Minions) || item.SecondaryCategory.Equals(XivStrings.Pets)
                      || item.SecondaryCategory.Equals(XivStrings.Monster) || item.SecondaryCategory.Equals(XivStrings.Ornaments))

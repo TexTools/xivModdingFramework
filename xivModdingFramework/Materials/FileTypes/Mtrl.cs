@@ -1365,6 +1365,12 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             if (item == null) return -1;
 
+            var itemModel = item as IItemModel;
+            if (itemModel?.SecondaryCategory == XivStrings.Facewear)
+            {
+                return Math.Max(1, itemModel.ModelInfo?.ImcSubsetID ?? 1);
+            }
+
             var root = item.GetRootInfo();
             if (root == null) return -1;
 
