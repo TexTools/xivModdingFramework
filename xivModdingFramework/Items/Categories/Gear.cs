@@ -59,41 +59,117 @@ namespace xivModdingFramework.Items.Categories
             return await XivCache.GetCachedGearList(substring);
         }
 
-        public async Task GetGlasses(ModTransaction tx = null)
+        public static async Task<XivGear> ResolveFacewear(int facewearId, ModTransaction tx = null)
         {
+            var facewear = await GetFacewearList(tx);
+            return facewear.FirstOrDefault(x => x.ExdID == facewearId);
+        }
 
+        public static async Task<List<XivGear>> GetFacewearList(ModTransaction tx = null)
+        {
             var ex = new Ex();
-            var glasses = await ex.ReadExData(XivEx.glasses, tx);
-            var ex2 = new Ex();
-            var gstyles = await ex2.ReadExData(XivEx.glassesstyle, tx);
-            var ex3 = new Ex();
-            var itemDictionary = await ex3.ReadExData(XivEx.item, tx);
+            var facewear = await ex.ReadExData(XivEx.glasses, tx);
+            var styles = await new Ex().ReadExData(XivEx.glassesstyle, tx);
+            var items = new List<XivGear>();
 
-            await Task.Run(() => Parallel.ForEach(glasses, (item) =>
+            foreach (var item in facewear)
             {
-                var cols = new List<object>();
-
-                for(int i = 0; i < item.Value.Columns.Count; i++)
+                var row = item.Value;
+                var modelInfo = DecodeFacewearModelInfo(GetUIntColumn(row, 0));
+                if (modelInfo.PrimaryID <= 0)
                 {
-                    cols.Add(item.Value.GetColumn(i));
+                    continue;
                 }
 
-
-                Trace.WriteLine(cols);
-
-            }));
-            await Task.Run(() => Parallel.ForEach(gstyles, (item) =>
-            {
-                var cols = new List<object>();
-
-                for (int i = 0; i < item.Value.Columns.Count; i++)
+                var styleId = GetIntColumn(row, 1);
+                if (modelInfo.ImcSubsetID <= 0 && styleId > 0 && styles.TryGetValue(styleId, out var variantStyleRow))
                 {
-                    cols.Add(item.Value.GetColumn(i));
+                    modelInfo.ImcSubsetID = GetFacewearStyleVariant(variantStyleRow, item.Key);
                 }
 
-                Trace.WriteLine(cols);
+                var name = GetStringColumn(row, 13);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    if (styleId > 0 && styles.TryGetValue(styleId, out var styleRow))
+                    {
+                        name = GetStringColumn(styleRow, 23);
+                    }
+                }
 
-            }));
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = $"Facewear {item.Key}";
+                }
+
+                var icon = GetIntColumn(row, 2);
+                items.Add(new XivGear
+                {
+                    Name = name,
+                    ExdID = item.Key,
+                    PrimaryCategory = XivStrings.Accessories,
+                    SecondaryCategory = XivStrings.Facewear,
+                    IconId = icon > 0 ? (uint)icon : 0,
+                    ModelInfo = modelInfo
+                });
+            }
+
+            items.Sort();
+            return items;
+        }
+
+        private static string GetStringColumn(Ex.ExdRow row, int column)
+        {
+            return row.Columns != null && row.Columns.Count > column
+                ? row.GetColumn(column) as string
+                : null;
+        }
+
+        private static int GetIntColumn(Ex.ExdRow row, int column)
+        {
+            if (row.Columns == null || row.Columns.Count <= column)
+            {
+                return 0;
+            }
+
+            var value = row.GetColumn(column);
+            return value == null ? 0 : Convert.ToInt32(value);
+        }
+
+        private static uint GetUIntColumn(Ex.ExdRow row, int column)
+        {
+            if (row.Columns == null || row.Columns.Count <= column)
+            {
+                return 0;
+            }
+
+            var value = row.GetColumn(column);
+            return value == null ? 0 : Convert.ToUInt32(value);
+        }
+
+        private static XivModelInfo DecodeFacewearModelInfo(uint packedModel)
+        {
+            return new XivModelInfo
+            {
+                PrimaryID = (int)(packedModel & 0xFFFF),
+                SecondaryID = 0,
+                ImcSubsetID = Math.Max(1, (int)(packedModel >> 16))
+            };
+        }
+
+        private static int GetFacewearStyleVariant(Ex.ExdRow styleRow, int facewearId)
+        {
+            const int firstFacewearColumn = 3;
+            const int facewearCount = 12;
+
+            for (var i = 0; i < facewearCount; i++)
+            {
+                if (GetIntColumn(styleRow, firstFacewearColumn + i) == facewearId)
+                {
+                    return i + 1;
+                }
+            }
+
+            return 1;
         }
 
         /// <summary>
@@ -110,6 +186,7 @@ namespace xivModdingFramework.Items.Categories
             var xivGearList = new List<XivGear>();
 
             xivGearList.AddRange(GetMissingGear());
+            xivGearList.AddRange(await GetFacewearList(tx));
 
             if (itemDictionary.Count == 0)
                 return xivGearList;

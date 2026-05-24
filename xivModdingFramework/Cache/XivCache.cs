@@ -1391,9 +1391,18 @@ namespace xivModdingFramework.Cache
             else if (item.SecondaryCategory == XivStrings.Earring
                             || item.SecondaryCategory == XivStrings.Neck
                             || item.SecondaryCategory == XivStrings.Wrists
-                            || item.SecondaryCategory == XivStrings.Rings)
+                            || item.SecondaryCategory == XivStrings.Rings
+                            || item.SecondaryCategory == XivStrings.Facewear)
             {
                 item.PrimaryCategory = XivStrings.Accessories;
+            }
+
+            if (item.SecondaryCategory == XivStrings.Facewear && primaryMi.PrimaryID > 0xFFFF)
+            {
+                var packedModel = (uint)primaryMi.PrimaryID;
+                primaryMi.PrimaryID = (int)(packedModel & 0xFFFF);
+                primaryMi.SecondaryID = 0;
+                primaryMi.ImcSubsetID = Math.Max(1, (int)(packedModel >> 16));
             }
 
             return item;

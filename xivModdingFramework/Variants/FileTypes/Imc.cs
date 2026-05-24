@@ -29,6 +29,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
@@ -61,6 +62,11 @@ namespace xivModdingFramework.Variants.FileTypes
         private const string ImcExtension = ".imc";
         public static bool UsesImc(IItemModel item)
         {
+            if (item?.SecondaryCategory == XivStrings.Facewear)
+            {
+                return false;
+            }
+
             var root = item.GetRoot();
             if (root == null) return false;
             return UsesImc(root);
@@ -94,6 +100,11 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <returns></returns>
         public static async Task<int> GetMaterialSetId(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
+            if (item?.SecondaryCategory == XivStrings.Facewear)
+            {
+                return Math.Max(1, item.ModelInfo?.ImcSubsetID ?? 1);
+            }
+
             var root = item.GetRoot();
             if (root == null) return -1;
 
