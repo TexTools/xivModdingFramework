@@ -10,6 +10,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
@@ -108,8 +109,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false)
         {
-            var gameDir = XivCache.GameInfo.GameDirectory;
-
             var originalPath = path;
 
             var alreadyUnzipped = !path.ToLower().EndsWith(".pmp");
@@ -169,6 +168,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             foreach (var g in groups)
             {
+                var combiningGroup = g as PMPCombiningGroupJson;
+                if (combiningGroup != null)
+                {
+                    foreach (var container in combiningGroup.Containers)
+                    {
+                        ValidateOption(container);
+                        foreach (var kv in container.Files)
+                        {
+                            var zipPath = kv.Value;
+                            allPmpFiles.Add(zipPath.ToLower());
+                        }
+                    }
+
+                    continue;
+                }
+
                 foreach(var o in g.Options)
                 {
                     var op = o as PmpStandardOptionJson;
@@ -342,7 +357,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var groupIdx = 0;
                 foreach (var group in orderedGroups)
                 {
-                    if (group.Options == null || group.Options.Count == 0)
+                    if ((group.Options == null || group.Options.Count == 0) && group.Type != "Combining")
                     {
                         // No valid options.
                         groupIdx++;
@@ -391,6 +406,17 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                             }
                         }
 
+                    } else if(group.Type == "Combining")
+                    {
+                        var combiningGroup = group as PMPCombiningGroupJson;
+                        var container = combiningGroup?.GetSelectedContainer(selected);
+                        if (container != null && !container.IsEmptyOption)
+                        {
+                            ValidateOption(container);
+                            var groupRes = await ImportOption(container, unzippedPath, tx, progress, groupIdx, (int)Math.Min(selected, (ulong)int.MaxValue));
+                            UnionDict(imported, groupRes.Imported);
+                            notImported.UnionWith(groupRes.NotImported);
+                        }
                     } else if(group.Type == "Imc")
                     {
                         // Could do with popping this out to its own function.
@@ -948,6 +974,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     option = defMod;
                 }
 
+                if (pmp.Groups.Any(x => x.Type == "Combining"))
+                {
+                    return null;
+                }
+
                 if (pmp.Groups.Count == 1)
                 {
                     var group = pmp.Groups[0];
@@ -1357,6 +1388,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     [JsonSubtypes.KnownSubType(typeof(PMPSingleGroupJson), "Single")]
     [JsonSubtypes.KnownSubType(typeof(PMPMultiGroupJson), "Multi")]
     [JsonSubtypes.KnownSubType(typeof(PMPImcGroupJson), "Imc")]
+    [JsonSubtypes.KnownSubType(typeof(PMPCombiningGroupJson), "Combining")]
     public class PMPGroupJson
     {
         public int Version = 0;
@@ -1411,6 +1443,56 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         {
             var root = PMPExtensions.GetRootFromPenumbraValues(Identifier.ObjectType, Identifier.PrimaryId, Identifier.BodySlot, Identifier.SecondaryId, Identifier.EquipSlot);
             return new XivDependencyRoot(root);
+        }
+    }
+
+    public class PMPCombiningGroupJson : PMPGroupJson
+    {
+        private const int MaxCombiningOptions = 8;
+
+        [JsonProperty(PropertyName = "Options", Order = 98)]
+        public List<PmpCombiningOptionJson> OptionData = new();
+
+        [JsonProperty(PropertyName = "Containers", Order = 99)]
+        public List<PmpCombiningContainerJson> Containers = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
+
+        [OnDeserialized]
+        internal void OnDeserialized(StreamingContext context)
+        {
+            OptionData ??= new List<PmpCombiningOptionJson>();
+            Containers ??= new List<PmpCombiningContainerJson>();
+
+            if (OptionData.Count > MaxCombiningOptions)
+            {
+                Trace.WriteLine($"Combining group {Name} has more than {MaxCombiningOptions} options; ignoring excessive options.");
+                OptionData = OptionData.Take(MaxCombiningOptions).ToList();
+            }
+
+            var requiredContainers = 1 << OptionData.Count;
+            if (Containers.Count > requiredContainers)
+            {
+                Trace.WriteLine($"Combining group {Name} has more data containers than it can support with {OptionData.Count} options; ignoring excessive containers.");
+                Containers = Containers.Take(requiredContainers).ToList();
+            }
+
+            while (Containers.Count < requiredContainers)
+            {
+                Trace.WriteLine($"Combining group {Name} has not enough data containers for its {OptionData.Count} options; filling with an empty container.");
+                Containers.Add(new PmpCombiningContainerJson());
+            }
+        }
+
+        public PmpCombiningContainerJson GetSelectedContainer(ulong selected)
+        {
+            if (Containers.Count == 0)
+            {
+                return null;
+            }
+
+            var idx = (int)Math.Min(selected, (ulong)(Containers.Count - 1));
+            return Containers[idx];
         }
     }
 
@@ -1511,6 +1593,14 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     {
         [JsonProperty(Order = 2)]
         public int Priority = 0;
+    }
+
+    public class PmpCombiningOptionJson : PMPOptionJson
+    {
+    }
+
+    public class PmpCombiningContainerJson : PmpStandardOptionJson
+    {
     }
 
     public class PmpImcOptionJson : PMPOptionJson
