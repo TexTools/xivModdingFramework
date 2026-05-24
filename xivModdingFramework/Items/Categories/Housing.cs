@@ -114,12 +114,13 @@ namespace xivModdingFramework.Items.Categories
                         ModelInfo = new XivModelInfo()
                     };
 
-                    var itemIndex = (uint)housingRow.GetColumnByName("ItemId");
-                    item.ModelInfo.PrimaryID = (ushort) housingRow.GetColumnByName("PrimaryId");
-                    var housingCategory = (byte) housingRow.GetColumnByName("Category");
+                    var itemIndex = housingRow.GetColumnByName<int>("ItemId");
+                    item.ModelInfo.PrimaryID = housingRow.GetColumnByName<int>("PrimaryId");
+                    // Category isn't used; left commented out so a future column-shape change doesn't break for no reason.
+                    //var housingCategory = housingRow.GetColumnByName<byte>("Category");
 
                     // Get the associated item row.
-                    var itemRow = itemDictionary[(int)itemIndex];
+                    var itemRow = itemDictionary[itemIndex];
                     AttachItemInfo(item, itemRow);
 
                     if (!item.Name.Equals(string.Empty))
@@ -142,7 +143,7 @@ namespace xivModdingFramework.Items.Categories
 
         private void AttachItemInfo(XivFurniture furnishing, Ex.ExdRow itemRow)
         {
-            furnishing.IconId = (ushort)itemRow.GetColumnByName("Icon");
+            furnishing.IconId = itemRow.GetColumnByName<uint>("Icon");
             furnishing.Name = (string)itemRow.GetColumnByName("Name");
         }
 
@@ -289,8 +290,8 @@ namespace xivModdingFramework.Items.Categories
                     ModelInfo = new XivModelInfo()
                 };
 
-                var itemIndex = (int) ((uint) row.GetColumnByName("ItemId"));
-                item.ModelInfo.PrimaryID = (ushort) row.GetColumnByName("PrimaryId");
+                var itemIndex = row.GetColumnByName<int>("ItemId");
+                item.ModelInfo.PrimaryID = row.GetColumnByName<int>("PrimaryId");
 
 
                 // Benchmark

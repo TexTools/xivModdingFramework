@@ -77,7 +77,7 @@ namespace xivModdingFramework.Items.Categories
             {
 
                 var name = (string) row.GetColumnByName("Name");
-                var index = (ushort)row.GetColumnByName("ModelCharaId");
+                var index = row.GetColumnByName<int>("ModelCharaId");
 
                 if (string.IsNullOrEmpty(name))
                 {
@@ -86,7 +86,7 @@ namespace xivModdingFramework.Items.Categories
 
                 if (index == 0) return;
 
-                var icon = (ushort)row.GetColumnByName("Icon");
+                var icon = row.GetColumnByName<uint>("Icon");
 
                 var xivMinion = new XivMinion
                 {
@@ -135,12 +135,12 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(mountEx.Values, (row) =>
             {
                 var name = (string)row.GetColumnByName("Name");
-                var index = (int)row.GetColumnByName("ModelCharaId");
+                var index = row.GetColumnByName<int>("ModelCharaId");
 
                 if (index == 0) return;
 
                 var modelInfo = XivModelChara.GetModelInfo(modelCharaEx[index]);
-                var icon = (ushort)row.GetColumnByName("Icon");
+                var icon = row.GetColumnByName<uint>("Icon");
 
                 if (string.IsNullOrEmpty(name))
                 {
@@ -191,7 +191,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(ornamentEx.Values, (ornament) =>
             {
                 var name = (string) ornament.GetColumnByName("Name");
-                var model = (ushort) ornament.GetColumnByName("ModelCharaId");
+                var model = ornament.GetColumnByName<int>("ModelCharaId");
 
                 if (model == 0) return;
 

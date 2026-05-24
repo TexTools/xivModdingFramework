@@ -436,6 +436,41 @@ namespace xivModdingFramework.Exd.FileTypes
             }
 
             /// <summary>
+            /// Reads a column and converts to T. Allows integer widening.
+            /// </summary>
+            public T GetColumn<T>(int column)
+            {
+                object value = GetColumn(column);
+
+                Type targetType = typeof(T);
+                Type valueType = value.GetType();
+
+                if (targetType == valueType)
+                    return (T)value;
+
+                if (IsIntegerType(valueType) && IsIntegerType(targetType))
+                    return (T)Convert.ChangeType(value, targetType);
+
+                throw new InvalidCastException(
+                    ExFile + " column " + column + " (" + Columns[column].Type + ")"
+                    + " cannot be read as " + targetType.Name + "."
+                );
+            }
+
+            /// <summary>
+            /// Reads a column by name and converts to T. See GetColumn&lt;T&gt;.
+            /// </summary>
+            public T GetColumnByName<T>(string name)
+            {
+                if (!ColumnsByName.ContainsKey(name))
+                {
+                    throw new ArgumentException(ExFile.ToString() + " : Invalid Column Name: " + name);
+                }
+                var column = ColumnsByName[name].ColumnIndex;
+                return GetColumn<T>(column);
+            }
+
+            /// <summary>
             /// Checks that the given column has the expected data type.
             /// </summary>
             /// <param name="column"></param>
@@ -443,15 +478,88 @@ namespace xivModdingFramework.Exd.FileTypes
             /// <exception cref="InvalidDataException"></exception>
             public void CheckColumn(int column, ExcelColumnDataType expectedType, string name = "Unknown")
             {
-                if(column >= Columns.Count)
+                if (column >= Columns.Count)
                 {
                     throw new InvalidDataException("EX Table did not match expectations: " + ExFile.ToString() + " Column " + column + " (" + name + ") is larger than the available column count.");
                 }
 
-                if (Columns[column].Type != expectedType)
+                ExcelColumnDataType actualType = Columns[column].Type;
+
+                if (!IsCompatibleType(actualType, expectedType))
                 {
-                    throw new InvalidDataException("EX Table did not match expectations: " + ExFile.ToString() + " Column " + column + " (" + name + ") had unexpected data type: " + Columns[column].Type.ToString() + ".  Expected: " + expectedType.ToString());
+                    throw new InvalidDataException("EX Table did not match expectations: " + ExFile.ToString() + " Column " + column + " (" + name + ") had unexpected data type: " + actualType.ToString() + ". Expected: " + expectedType.ToString() + ".");
                 }
+            }
+
+            private static readonly Dictionary<ExcelColumnDataType, Type> TypeMap = new Dictionary<ExcelColumnDataType, Type>
+            {
+                { ExcelColumnDataType.Int8,    typeof(sbyte) },
+                { ExcelColumnDataType.UInt8,   typeof(byte) },
+                { ExcelColumnDataType.Int16,   typeof(short) },
+                { ExcelColumnDataType.UInt16,  typeof(ushort) },
+                { ExcelColumnDataType.Int32,   typeof(int) },
+                { ExcelColumnDataType.UInt32,  typeof(uint) },
+                { ExcelColumnDataType.Int64,   typeof(long) },
+                { ExcelColumnDataType.UInt64,  typeof(ulong) },
+                { ExcelColumnDataType.String,  typeof(string) },
+                { ExcelColumnDataType.Bool,    typeof(bool) },
+                { ExcelColumnDataType.Float32, typeof(float) },
+            };
+
+            private static bool IsIntegerType(Type type)
+            {
+                return type == typeof(sbyte) ||
+                       type == typeof(byte) ||
+                       type == typeof(short) ||
+                       type == typeof(ushort) ||
+                       type == typeof(int) ||
+                       type == typeof(uint) ||
+                       type == typeof(long) ||
+                       type == typeof(ulong);
+            }
+
+            private static bool IsSignedInteger(Type type)
+            {
+                return type == typeof(sbyte) ||
+                       type == typeof(short) ||
+                       type == typeof(int) ||
+                       type == typeof(long);
+            }
+
+            private static int IntegerTypeSize(Type type)
+            {
+                if (type == typeof(sbyte) || type == typeof(byte))  return 1;
+                if (type == typeof(short) || type == typeof(ushort)) return 2;
+                if (type == typeof(int)   || type == typeof(uint))   return 4;
+                if (type == typeof(long)  || type == typeof(ulong))  return 8;
+                throw new ArgumentException("Not an integer type: " + type);
+            }
+
+            private static bool IsCompatibleType(ExcelColumnDataType actual, ExcelColumnDataType expected)
+            {
+                if (actual == expected)
+                    return true;
+
+                if (!TypeMap.TryGetValue(actual, out var actualClr) ||
+                    !TypeMap.TryGetValue(expected, out var expectedClr))
+                {
+                    return false;
+                }
+
+                if (!IsIntegerType(actualClr) || !IsIntegerType(expectedClr))
+                    return false;
+
+                int actualSize = IntegerTypeSize(actualClr);
+                int expectedSize = IntegerTypeSize(expectedClr);
+                bool actualSigned = IsSignedInteger(actualClr);
+                bool expectedSigned = IsSignedInteger(expectedClr);
+
+                if (expectedSize > actualSize)
+                    return true;
+                if (expectedSize == actualSize && expectedSigned && !actualSigned)
+                    return true;
+
+                return false;
             }
 
             /// <summary>

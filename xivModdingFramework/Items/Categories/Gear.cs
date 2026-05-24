@@ -122,15 +122,15 @@ namespace xivModdingFramework.Items.Categories
                 var row = item.Value;
                 try
                 {
-                    var primaryInfo = (ulong)row.GetColumnByName("PrimaryInfo");
-                    var secondaryInfo = (ulong) row.GetColumnByName("SecondaryInfo");
+                    var primaryInfo = row.GetColumnByName<ulong>("PrimaryInfo");
+                    var secondaryInfo = row.GetColumnByName<ulong>("SecondaryInfo");
 
                     // Check if item can be equipped.
                     if (primaryInfo == 0 && secondaryInfo == 0)
                         return;
 
                     // Belts. No longer exist in game + have no model despite having a setId.
-                    var slotNum = (byte)row.GetColumnByName("SlotNum");
+                    var slotNum = row.GetColumnByName<int>("SlotNum");
                     if (slotNum == 6) return;
 
                     // Has to have a valid name.
@@ -138,7 +138,7 @@ namespace xivModdingFramework.Items.Categories
                     if (String.IsNullOrEmpty(name))
                         return;
 
-                    var icon = (ushort)row.GetColumnByName("Icon");
+                    var icon = row.GetColumnByName<uint>("Icon");
 
                     var primaryMi = new XivModelInfo();
                     var secondaryMi = new XivModelInfo();
