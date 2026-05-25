@@ -826,6 +826,15 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     p2Start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
+                    // Fix Pre-Dawntrail files.
+                    // (Runs before auto-assign so pre-DT modpacks have their MDLs upgraded to v6 first;
+                    //  otherwise the skin-material heuristic would see un-upgraded geometry and miss matches.)
+                    if (settings.UpdateEndwalkerFiles)
+                    {
+                        var modPack = filteredModsJson[0].ModPackEntry;
+                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, progress, tx);
+                    }
+
                     // Auto assign body materials
                     if (settings.AutoAssignSkinMaterials)
                     {
@@ -850,13 +859,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                 var changed = await Mdl.CheckSkinAssignment(mdlEntry.FullPath, tx);
                             }
                         }
-                    }
-
-                    // Fix Pre-Dawntrail files.
-                    if (settings.UpdateEndwalkerFiles)
-                    {
-                        var modPack = filteredModsJson[0].ModPackEntry;
-                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, progress, tx);
                     }
 
                     count = 0;
@@ -1131,6 +1133,11 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
 
+                if (settings.UpdateEndwalkerFiles)
+                {
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
+                }
+
                 if (settings.AutoAssignSkinMaterials)
                 {
                     // Find all relevant models..
@@ -1151,11 +1158,6 @@ namespace xivModdingFramework.Mods.FileTypes
                             var changed = await Mdl.CheckSkinAssignment(mdlEntry, tx);
                         }
                     }
-                }
-
-                if (settings.UpdateEndwalkerFiles)
-                {
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(paths);

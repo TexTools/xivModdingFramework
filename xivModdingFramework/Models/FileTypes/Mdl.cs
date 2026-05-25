@@ -4371,7 +4371,11 @@ namespace xivModdingFramework.Models.FileTypes
             tx = boiler.Transaction;
             try {  
                 var modList = await tx.GetModList();
-                var mods = modList.GetMods();
+                // Snapshot the modlist before iterating. CheckSkinAssignment writes the
+                // updated model back via Dat.WriteModFile, which mutates the live modlist
+                // (data offsets/sizes update on each write). Iterating the live collection
+                // throws "Collection was modified; enumeration operation may not execute".
+                var mods = modList.GetMods().ToList();
 
                 int count = 0;
                 foreach (var mod in mods)
