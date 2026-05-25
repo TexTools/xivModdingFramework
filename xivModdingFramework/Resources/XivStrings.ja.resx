@@ -825,4 +825,7 @@
   <data name="Wrists" xml:space="preserve">
     <value>腕</value>
   </data>
+  <data name="Facewear" xml:space="preserve">
+    <value>フェイスアクセサリー</value>
+  </data>
 </root>

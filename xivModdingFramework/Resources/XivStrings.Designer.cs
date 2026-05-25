@@ -1123,6 +1123,15 @@ namespace xivModdingFramework.Resources {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Facewear.
+        /// </summary>
+        internal static string Facewear {
+            get {
+                return ResourceManager.GetString("Facewear", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Feet.
         /// </summary>
         internal static string Feet {
@@ -1272,15 +1281,6 @@ namespace xivModdingFramework.Resources {
         internal static string Gear {
             get {
                 return ResourceManager.GetString("Gear", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string similar to Facewear.
-        /// </summary>
-        internal static string Facewear {
-            get {
-                return ResourceManager.GetString("Facewear", resourceCulture);
             }
         }
         

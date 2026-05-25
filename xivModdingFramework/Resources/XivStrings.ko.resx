@@ -825,4 +825,7 @@
   <data name="Wrists" xml:space="preserve">
     <value>팔</value>
   </data>
+  <data name="Facewear" xml:space="preserve">
+    <value>페이스 액세서리</value>
+  </data>
 </root>
