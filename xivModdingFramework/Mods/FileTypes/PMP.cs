@@ -141,12 +141,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             string image = null;
 
 
-
-            var defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+            PmpDefaultMod defaultOption = null;
+            if (File.Exists(defModPath))
             {
-                NullValueHandling = NullValueHandling.Ignore
-            });
-            defaultOption.Name = "Default";
+                defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore
+                });
+                defaultOption.Name = "Default";
+            }
 
             var groups = new List<PMPGroupJson>();
 
@@ -173,6 +176,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 DefaultMod = defaultOption,
                 Groups = groups
             };
+
+            if(meta.Groups.Count > 0 || meta.DefaultData != null)
+            {
+                // Pull v4 style Penumbra data back to v3 style for use internally.
+                pmp.Groups = meta.Groups;
+                pmp.DefaultMod = meta.DefaultData;
+
+                meta.Groups = new List<PMPGroupJson>();
+                meta.DefaultData = null;
+            }
 
             var img = pmp.GetHeaderImage();
             if (img != null) {
@@ -1409,6 +1422,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         // These exist.
         public List<string> ModTags;
+
+        // Added in Penumbra JSON 4.0 scheme
+        // -- Penumbra moved (back) to storing groups in the main meta file.
+        public List<PMPGroupJson> Groups;
+
+        // Added in Penumbra JSON 4.0 scheme
+        public PmpDefaultMod DefaultData;
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
