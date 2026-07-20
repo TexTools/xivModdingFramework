@@ -1378,12 +1378,12 @@ namespace xivModdingFramework.Models.Helpers
 
 
                                 position += MatrixTransform(v.Position, matrix) * boneWeight;
-                                normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
-                                binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
-                                tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                normal += MatrixTransformDirection(v.Normal, normalMatrix) * boneWeight;
+                                binormal += MatrixTransformDirection(v.Binormal, matrix) * boneWeight;
+                                tangent += MatrixTransformDirection(v.Tangent, matrix) * boneWeight;
                                 if (v.FlowDirection != Vector3.Zero)
                                 {
-                                    flow += MatrixTransform(v.FlowDirection, matrix) * boneWeight;
+                                    flow += MatrixTransformDirection(v.FlowDirection, matrix) * boneWeight;
                                 }
                             }
 
@@ -1425,12 +1425,12 @@ namespace xivModdingFramework.Models.Helpers
 
 
                                     position += MatrixTransform(v.Position, matrix) * boneWeight;
-                                    normal += MatrixTransform(v.Normal, normalMatrix) * boneWeight;
-                                    binormal += MatrixTransform(v.Binormal, matrix) * boneWeight;
-                                    tangent += MatrixTransform(v.Tangent, matrix) * boneWeight;
+                                    normal += MatrixTransformDirection(v.Normal, normalMatrix) * boneWeight;
+                                    binormal += MatrixTransformDirection(v.Binormal, matrix) * boneWeight;
+                                    tangent += MatrixTransformDirection(v.Tangent, matrix) * boneWeight;
                                     if (v.FlowDirection != Vector3.Zero)
                                     {
-                                        flow += MatrixTransform(v.FlowDirection, matrix) * boneWeight;
+                                        flow += MatrixTransformDirection(v.FlowDirection, matrix) * boneWeight;
                                     }
                                 }
 
@@ -1498,6 +1498,26 @@ namespace xivModdingFramework.Models.Helpers
                 (vector.X * transform[0]) + (vector.Y * transform[1]) + (vector.Z * transform[2]) + (1.0f * transform[3]),
                 (vector.X * transform[4]) + (vector.Y * transform[5]) + (vector.Z * transform[6]) + (1.0f * transform[7]),
                 (vector.X * transform[8]) + (vector.Y * transform[9]) + (vector.Z * transform[10]) + (1.0f * transform[11]));
+
+            return result;
+        }
+
+        /// <summary>
+        /// Applies only the linear (3x3) part of an affine transform to a vector, omitting translation.
+        /// Used for direction vectors (normals, tangents, binormals, flow), which are positionless and
+        /// must not receive the transform's translation component.  Passing directions through
+        /// MatrixTransform() instead would add the bone's translation offset to the unit vector,
+        /// skewing it before normalization.
+        /// Same column-vector convention as MatrixTransform().
+        /// </summary>
+        /// <param name="vector"></param>
+        /// <param name="transform"></param>
+        private static Vector3 MatrixTransformDirection(Vector3 vector, Matrix transform)
+        {
+            var result = new Vector3(
+                (vector.X * transform[0]) + (vector.Y * transform[1]) + (vector.Z * transform[2]),
+                (vector.X * transform[4]) + (vector.Y * transform[5]) + (vector.Z * transform[6]),
+                (vector.X * transform[8]) + (vector.Y * transform[9]) + (vector.Z * transform[10]));
 
             return result;
         }
