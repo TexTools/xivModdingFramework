@@ -1617,7 +1617,6 @@ namespace xivModdingFramework.Mods
                         page++;
                 }
 
-
                 // This performs the final json serialization/writing and zipping.
                 if (zip)
                 {

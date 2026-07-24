@@ -579,7 +579,8 @@ namespace xivModdingFramework.Helpers
 
             if(opt == null)
             {
-                throw new NotImplementedException();
+                // No options/data
+                return;
             }
 
             foreach (var swap in opt.Files)
