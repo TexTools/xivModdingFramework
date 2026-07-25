@@ -43,7 +43,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     /// </summary>
     public static class PMP
     {
-        public const int _WriteFileVersion = 3;
+        public const int _WriteFileVersion = 4;
 
         private const char _PMPSafeNameReplacement = '_';
 
@@ -141,12 +141,15 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             string image = null;
 
 
-
-            var defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+            PmpDefaultMod defaultOption = null;
+            if (File.Exists(defModPath))
             {
-                NullValueHandling = NullValueHandling.Ignore
-            });
-            defaultOption.Name = "Default";
+                defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore
+                });
+                defaultOption.Name = "Default";
+            }
 
             var groups = new List<PMPGroupJson>();
 
@@ -173,6 +176,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 DefaultMod = defaultOption,
                 Groups = groups
             };
+
+            if((meta.Groups != null && meta.Groups.Count > 0) || meta.DefaultData != null)
+            {
+                // Pull v4 style Penumbra data back to v3 style for use internally.
+                pmp.Groups = meta.Groups;
+                pmp.DefaultMod = meta.DefaultData;
+
+                meta.Groups = new List<PMPGroupJson>();
+                meta.DefaultData = null;
+            }
 
             var img = pmp.GetHeaderImage();
             if (img != null) {
@@ -819,20 +832,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var pmp = new PMPJson()
                 {
                     Meta = new PMPMetaJson(),
-                    Groups = new List<PMPGroupJson>(),
-                    DefaultMod = new PmpDefaultMod(),
+                    //Groups = new List<PMPGroupJson>(),
+                    //DefaultMod = new PmpDefaultMod(),
                 };
 
 
                 var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos);
 
-                pmp.DefaultMod = new PmpDefaultMod();
-                await PopulatePmpStandardOption(pmp.DefaultMod, workingPath, files, otherManipulations);
+                pmp.Meta.DefaultData = new PmpDefaultMod();
+                pmp.Meta.Groups = new List<PMPGroupJson>();
+                
+                await PopulatePmpStandardOption(pmp.Meta.DefaultData, workingPath, files, otherManipulations);
 
                 pmp.Meta.Author = modpackMeta.Author;
                 pmp.Meta.Name = modpackMeta.Name;
                 pmp.Meta.Description = modpackMeta.Description;
-                pmp.Meta.FileVersion = 3;
+                pmp.Meta.FileVersion = PMP._WriteFileVersion;
                 pmp.Meta.Version = modpackMeta.Version.ToString();
                 pmp.Meta.Website = modpackMeta.Url;
                 pmp.Meta.ModTags = pmp.Meta.ModTags ?? new List<string>();
@@ -873,19 +888,32 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 pmp.Meta.ModTags = new List<string>();
             }
 
+            // V4 style.
+            if(pmp.Groups != null)
+            {
+                pmp.Meta.Groups = pmp.Groups;
+                pmp.Groups = null;
+            }
+
+            if(pmp.DefaultMod != null)
+            {
+                pmp.Meta.DefaultData = pmp.DefaultMod;
+                pmp.DefaultMod = null;
+            }
+
             var metaString = JsonConvert.SerializeObject(pmp.Meta, Formatting.Indented);
             File.WriteAllText(metapath, metaString);
 
-            var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
-            File.WriteAllText(defaultModPath, defaultModString);
-
+            //var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
+            //File.WriteAllText(defaultModPath, defaultModString);
+            /*
             for(int i = 0; i < pmp.Groups.Count; i++)
             {
                 var gName = PMP.MakePMPPathSafe(pmp.Groups[i].Name);
                 var groupPath = Path.Combine(workingDirectory, "group_" + (i+1).ToString("D3") + "_" + gName + ".json");
                 var groupString = JsonConvert.SerializeObject(pmp.Groups[i], Formatting.Indented);
                 File.WriteAllText(groupPath, groupString);
-            }
+            }*/
 
             if(zipPath != null)
             {
@@ -1409,6 +1437,13 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
         // These exist.
         public List<string> ModTags;
+
+        // Added in Penumbra JSON 4.0 scheme
+        // -- Penumbra moved (back) to storing groups in the main meta file.
+        public List<PMPGroupJson> Groups;
+
+        // Added in Penumbra JSON 4.0 scheme
+        public PmpDefaultMod DefaultData;
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
