@@ -30,6 +30,7 @@ namespace xivModdingFramework.Mods
         public XivTexFormat TextureFormat = XivTexFormat.INVALID;
         public int MaxImageSize = 0;
         public ModelImportOptions ModelOptions = null;
+        public bool CompressFiles = false;
 
         public object Clone()
         {
@@ -138,7 +139,6 @@ namespace xivModdingFramework.Mods
 
             await Task.Run(async () =>
             {
-                var data = await CreateCompressedFile(externalPath, internalPath, tx, options);
 
                 // Establish an item to associate the mod import with, if one exists.
                 var root = await XivCache.GetFirstRoot(internalPath);
@@ -147,7 +147,16 @@ namespace xivModdingFramework.Mods
                     item = root.GetFirstItem();
                 }
 
-                await Dat.WriteModFile(data, internalPath, sourceApplication, item, tx);
+                if (options != null && !options.CompressFiles)
+                {
+                    var data = await CreateCompressedFile(externalPath, internalPath, tx, options);
+                    await Dat.WriteModFile(data, internalPath, sourceApplication, item, tx, true);
+                }
+                else
+                {
+                    var data = await CreateUncompressedFile(externalPath, internalPath, tx, options);
+                    await Dat.WriteModFile(data, internalPath, sourceApplication, item, tx, false);
+                }
                 XivCache.QueueDependencyUpdate(internalPath);
             });
         }
@@ -357,13 +366,14 @@ namespace xivModdingFramework.Mods
             var possiblyFormat = BitConverter.ToInt32(data, 4);
             var possiblyWidth = BitConverter.ToUInt16(data, 8);
             var possiblyHeight = BitConverter.ToUInt16(data, 10);
+            var possiblyMipCount = data[12] & 0xF;
 
             const ushort _SaneMaxImageSize = 16384;
 
             if (Enum.IsDefined(typeof(XivTexFormat), possiblyFormat)) {
-                if(IOUtil.IsPowerOfTwo(possiblyWidth) && possiblyWidth <= _SaneMaxImageSize)
+                if((IOUtil.IsPowerOfTwo(possiblyWidth) || possiblyMipCount == 1) && possiblyWidth <= _SaneMaxImageSize)
                 {
-                    if (IOUtil.IsPowerOfTwo(possiblyHeight) && possiblyHeight <= _SaneMaxImageSize)
+                    if ((IOUtil.IsPowerOfTwo(possiblyHeight) || possiblyMipCount == 1) && possiblyHeight <= _SaneMaxImageSize)
                     {
                         // There's an extremely high chance this is an uncompressed tex file.
                         return await Tex.CompressTexFile(data);

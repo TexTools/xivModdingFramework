@@ -7,6 +7,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using xivModdingFramework.Cache;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.Mods.FileTypes.PMP;
@@ -100,7 +101,7 @@ namespace xivModdingFramework.Helpers
 
             if (files == null)
             {
-                throw new Exception("Folder was not a valid Penumbra Mod folder, or the mod had multiple options.");
+                throw new Exception("Folder was not a valid Penumbra Mod folder, or the mod had multiple options.\n\nTarget must be a Penumbra Mod with only one valid option.");
             }
             ModFolder = penumbraModFolder;
 
@@ -361,7 +362,10 @@ namespace xivModdingFramework.Helpers
                     {
                         await PenumbraAPI.ReloadMod(folder);
                     }
-                    await PenumbraAPI.Redraw();
+                    if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawAll)
+                        await PenumbraAPI.Redraw();
+                    else if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawSelf)
+                        await PenumbraAPI.RedrawSelf();
                 }
             }
             catch
@@ -575,7 +579,8 @@ namespace xivModdingFramework.Helpers
 
             if(opt == null)
             {
-                throw new NotImplementedException();
+                // No options/data
+                return;
             }
 
             foreach (var swap in opt.Files)

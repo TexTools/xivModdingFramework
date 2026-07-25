@@ -142,7 +142,13 @@ namespace xivModdingFramework.Mods.FileTypes
             // Swap EST pointers.
             foreach (var entry in EstEntries)
             {
-                entry.Value.SetId = (ushort)newRoot.Info.PrimaryId;
+                if (newRoot.Info.SecondaryId == null)
+                {
+                    entry.Value.SetId = (ushort)newRoot.Info.PrimaryId;
+                } else
+                {
+                    entry.Value.SetId = (ushort)newRoot.Info.SecondaryId;
+                }
             }
         }
 
@@ -218,7 +224,7 @@ namespace xivModdingFramework.Mods.FileTypes
             }
 
 
-            var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+            var _eqp = new Eqp();
 
             // These functions generate the path::offset to each of our
             // contiguous metadata entries.
@@ -273,12 +279,12 @@ namespace xivModdingFramework.Mods.FileTypes
                 {
                     await meta.FillMissingFiles(source, tx);
                 }
-
                 await boiler.Commit();
             }
-            catch
+            catch(Exception ex)
             {
                 await boiler.Catch();
+                throw;
             }
         }
 
@@ -356,7 +362,7 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         internal static async Task ApplyMetadata(ItemMetadata meta, ModTransaction tx)
         {
-            var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+            var _eqp = new Eqp();
             var df = IOUtil.GetDataFileFromPath(meta.Root.Info.GetRootFile());
 
             var dummyItem = new XivGenericItemModel();
@@ -845,7 +851,7 @@ namespace xivModdingFramework.Mods.FileTypes
             if(dataVersion == 1)
             {
                 // Version 1 didn't have GMP data, so include the default GMP data.
-                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                var _eqp = new Eqp();
                 return await _eqp.GetGimmickParameter(root, true);
             }
             // 5 Bytes to parse, ezpz lemon sqzy

@@ -30,7 +30,7 @@ namespace xivModdingFramework.Models.DataContainers
         {
             get
             {
-                return MeshTypes.Sum(x => x.Value.Count);
+                return MeshTypes.Sum(x => x.Key == EMeshType.TerrainShadow ? 0 :  x.Value.Count);
             }
         }
 
@@ -97,6 +97,7 @@ namespace xivModdingFramework.Models.DataContainers
 
         /// <summary>
         /// Unknown Usage
+        /// This appears to be multiple individual byte values, with the first 2 being related to neck morph data
         /// </summary>
         public int Unknown7 { get; set; }
 

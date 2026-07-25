@@ -16,13 +16,13 @@
 
 namespace xivModdingFramework.Models.DataContainers
 {
-    public class UnknownData1
+    public class UnknownDataPatch72
     {
         /// <summary>
         /// This data block is currently unknown
         /// </summary>
         /// <remarks>
-        /// The size of this unknown data block is [ MdlModelData.Unknown3 * 20 ]
+        /// The size of this unknown data block is [ MdlModelData.Patch72TableSize * 16 ]
         /// </remarks>
         public byte[] Unknown { get; set; }
     }

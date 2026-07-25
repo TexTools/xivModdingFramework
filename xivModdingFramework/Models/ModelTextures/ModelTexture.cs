@@ -206,8 +206,35 @@ namespace xivModdingFramework.Models.ModelTextures
         /// <returns>The texture maps in byte arrays inside a ModelTextureData class</returns>
         public static async Task<ModelTextureData> GetModelMaps(XivMtrl mtrl, bool pbrMaps = false, CustomModelColors colors = null, int highlightedRow = -1, ModTransaction tx = null)
         {
+            return await GetModelMapsInternal(mtrl, pbrMaps, colors, highlightedRow, tx, applyUserColors: true);
+        }
+
+        /// <summary>
+        /// Like <see cref="GetModelMaps"/>, but does not apply the user's customization palette
+        /// (skin/hair/eye/lip/tattoo/furniture colors). Intended for previewing non-character
+        /// models such as monsters and demihumans, whose materials happen to use the same
+        /// shader packs as player customization (Skin/Hair/Iris/etc.) but whose intended
+        /// rendering does not depend on the player's chosen palette.
+        ///
+        /// When the affected shader paths execute, they leave the texture's diffuse pixels
+        /// unaltered by user color overrides instead of replacing them with palette-derived
+        /// values.
+        /// </summary>
+        public static async Task<ModelTextureData> GetModelMapsWithoutUserColors(XivMtrl mtrl, bool pbrMaps = false, int highlightedRow = -1, ModTransaction tx = null)
+        {
+            return await GetModelMapsInternal(mtrl, pbrMaps, null, highlightedRow, tx, applyUserColors: false);
+        }
+
+        private static async Task<ModelTextureData> GetModelMapsInternal(XivMtrl mtrl, bool pbrMaps, CustomModelColors colors, int highlightedRow, ModTransaction tx, bool applyUserColors)
+        {
             if (colors == null)
-                colors = GetCustomColors();
+            {
+                // When not applying user colors, use clean framework defaults rather than the user's
+                // static palette - the shader code paths will skip the user-color fields when
+                // applyUserColors is false, but we still need a CustomModelColors instance for
+                // non-color settings like InvertNormalGreen.
+                colors = applyUserColors ? GetCustomColors() : new CustomModelColors();
+            }
 
             var limitTextureSize = !pbrMaps;
             var texMapData = await GetTexMapData(mtrl, tx);
@@ -284,7 +311,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
             var dataLength = normalPixels != null ? normalPixels.Length : diffusePixels.Length;
-            var shaderFn = GetShaderMapper(GetCustomColors(), mtrl, settings);
+            var shaderFn = GetShaderMapper(colors, mtrl, settings, applyUserColors);
             bool invertNormalGreen = colors.InvertNormalGreen;
 
             await Task.Run(() =>
@@ -582,7 +609,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
         private static bool thrownException1 = false;
 
-        private static ShaderMapperDelegate GetShaderMapper(CustomModelColors colors, XivMtrl mtrl, ShaderMapperSettings settings)
+        private static ShaderMapperDelegate GetShaderMapper(CustomModelColors colors, XivMtrl mtrl, ShaderMapperSettings settings, bool applyUserColors = true)
         {
             // Based on https://docs.google.com/spreadsheets/d/1iY4C6zSJ0K2vpBXNh5BLsTj6_7Ah-fHsznsC5xqMmaw
 
@@ -665,7 +692,7 @@ namespace xivModdingFramework.Models.ModelTextures
             }
 
             if (shaderPack == EShaderPack.Character || shaderPack == EShaderPack.CharacterLegacy || shaderPack == EShaderPack.CharacterGlass
-             || shaderPack == EShaderPack.CharacterScroll || shaderPack == EShaderPack.CharacterInc)
+             || shaderPack == EShaderPack.CharacterScroll || shaderPack == EShaderPack.CharacterInc || shaderPack == EShaderPack.CharacterTransparency)
             {
                 // This is the most common family of shaders that appears on gear, monsters, etc.
                 // Many of its features should be controlled by shader parameters that aren't implemented
@@ -673,11 +700,15 @@ namespace xivModdingFramework.Models.ModelTextures
                 // Default 1.0 emissive color for these, since it gets nuked by colorset typically.
                 emissiveColorMul = GetConstColor(mtrl, 0x38A64362, new Color4(1, 1, 1, 1.0f));
 
-                return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
+                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     Color4 specular = new Color4(1.0f);
                     var roughness = 0.0f;
                     var metalness = 0.0f;
                     var occlusion = 1.0f;
+
+                    var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
+                    uint effectId = (uint)row[24];
+                    bool blueMaskIsAo = effectId == 0 || effectId == 7 || effectId == 10 || effectId == 12 || effectId >= 17;
 
                     if (useTextures)
                     {
@@ -686,24 +717,30 @@ namespace xivModdingFramework.Models.ModelTextures
                             diffuse = new Color4(1.0f);
                         }
 
-
                         if (hasMulti)
                         {
-                            float diffuseMask, specMask;
+                            float diffuseMask = 1.0f, specMask;
                             // Construct specular from mask
                             if (shaderPack == EShaderPack.CharacterLegacy)
                             {
                                 // Specular/Gloss flow
 
-                                diffuseMask = multi.Red;
-                                specMask = multi.Green;
-                                roughness = 1 - multi.Blue;
+                                if (blueMaskIsAo)
+                                    diffuseMask = mask.Blue;
+                                specMask = mask.Red;
+                                roughness = 1 - mask.Green;
+
+                                // Kind of jank, but works.
+                                metalness = 1 - diffuseMask;
+                                //metalness = 1 - multi.Blue;
+
                             }
                             else
                             {
-                                diffuseMask = multi.Blue;
-                                specMask = multi.Red;
-                                roughness = multi.Green;
+                                if (blueMaskIsAo)
+                                    diffuseMask = mask.Blue;
+                                specMask = mask.Red;
+                                roughness = mask.Green;
                             }
 
                             if (!settings.GeneratePbrMaps)
@@ -719,7 +756,7 @@ namespace xivModdingFramework.Models.ModelTextures
 
                         } else if(hasSpecular)
                         {
-                            specular = multi;
+                            specular = mask;
                         } else
                         {
                             // ???
@@ -731,12 +768,11 @@ namespace xivModdingFramework.Models.ModelTextures
                         specular = new Color4(1.0f);
                         diffuse = new Color4(1.0f);
                     }
-                        
+
+                    var alpha = normal.Blue;
                     var emissive = new Color4(0, 0, 0, 1.0f);
                     if (useColorset)
                     {
-                        var row = GetColorsetRow(colorset, index[0], index[1], visualizeColorset, highlightRow);
-
                         var diffusePixel = new Color4(row[0], row[1], row[2], 1.0f);
                         var specPixel = new Color4(row[4], row[5], row[6], 1.0f);
                         var emissPixel = new Color4(row[8], row[9], row[10], 1.0f);
@@ -755,27 +791,39 @@ namespace xivModdingFramework.Models.ModelTextures
 
                             metalness = row[18];
                             //var metalPixel = new Color4(row[18], row[18], row[18], 1.0f);
+                        }
+                        else
+                        {
+                            // Arbitrary estimation for SE-gloss to inverse roughness.
+                            var roughPixel = (1 - row[3] / 16);
+                            roughness = 1 - ((1 - roughness) * (1 - roughPixel));
+                        }
 
+                        if (!settings.GeneratePbrMaps)
+                        {
+                            // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
+                            specular *= _MetalFloor + (metalness * _MetalMultiplier);
 
-
-                            if (!settings.GeneratePbrMaps)
+                            if (mtrl.ShaderPack != EShaderPack.CharacterLegacy)
                             {
-                                // Some semi-arbitrary math to loosely simulate metalness in our bad spec-diffuse system.
-                                specular *= _MetalFloor + (metalness * _MetalMultiplier);
-
                                 // As metalness rises, the diffuse/specular colors merge.
                                 diffusePixel = Color4.Lerp(diffusePixel, diffusePixel * specPixel, metalness);
                                 specPixel = Color4.Lerp(specPixel, diffusePixel * specPixel, metalness);
                             }
                         }
-                        else
+                        else if(mtrl.ShaderPack == EShaderPack.CharacterLegacy)
                         {
-                            // Arbitrary estimation for SE-gloss to inverse roughness.
-                            roughness *= (1 - row[3] / 16);
+                            metalness = 0;
                         }
 
                         diffuse *= diffusePixel;
                         specular *= specPixel;
+
+                        if (mtrl.ShaderPack == EShaderPack.CharacterLegacy && !settings.GeneratePbrMaps)
+                        {
+                            // As metalness rises, the diffuse becomes specular.
+                            diffuse = Color4.Lerp(diffuse, specular, metalness);
+                        }
                     }
 
                     if (!settings.GeneratePbrMaps)
@@ -784,8 +832,13 @@ namespace xivModdingFramework.Models.ModelTextures
                         specular *= invRough;
                     }
 
-                    var alpha = normal.Blue * alphaMultiplier;
+                    alpha *= alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
+
+                    if(highlightRow >= 0)
+                    {
+                        alpha = 1.0f;
+                    }
 
                     return new ShaderMapperResult()
                     {
@@ -802,32 +855,30 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Skin)
             {
-                var skinColor = colors.SkinColor;
-                var bonusColor = GetSkinBonusColor(mtrl, colors);
-                var highlightColor = GetSkinBonusColor2(mtrl, colors);
+                var skinColor = applyUserColors ? colors.SkinColor : default;
+                var bonusColor = applyUserColors ? GetSkinBonusColor(mtrl, colors) : (Color: (Color4?)null, Blend: false);
+                var highlightColor = applyUserColors ? GetSkinBonusColor2(mtrl, colors) : (Color: (Color4?)null, Blend: false);
                 var metalnessConst = 1 - GetFloatConst(mtrl, 0x59BDA0B1, 1.0f);
+                var isHroth = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0 && x.Value == 0x57FF3B64) != null;
 
-                return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
+                 return (Color4 diffuse, Color4 normal, Color4 mask, Color4 index) => {
                     var roughness = 0.0f;
                     var metalness = metalnessConst;
                     var occlusion = 1.0f;
 
-                    // HACKHACK - This is wrong, both according to Shader Decomp and logic/sanity.
-                    // The incoming diffuse *SHOULD* be coming in as sRGB encoded, and get Linear-converted previously.
-                    // But instead, the diffuse appears to be coming in already linear encoded, and gets double converted.
-                    // This effectively undoes one of those conversions.
-                    diffuse = LinearToSrgb(diffuse);
-
-                    float skinInfluence = (float)normal.Blue;// * normal.Blue;
-                    var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
-                    diffuse *= sColor;
+                    if (applyUserColors)
+                    {
+                        float skinInfluence = (float)normal.Blue;// * normal.Blue;
+                        var sColor = Color4.Lerp(new Color4(1.0f), skinColor, skinInfluence);
+                        diffuse *= sColor;
+                    }
 
                     var specMask = mask.Red;
                     var specular = new Color4(specMask, specMask, specMask, 1.0f);
 
                     roughness = mask.Green;
                     float bonusInfluence = normal.Alpha;
-                    if (bonusColor.Color != null)
+                    if (applyUserColors && bonusColor.Color != null)
                     {
                         if (bonusColor.Blend)
                         {
@@ -845,7 +896,9 @@ namespace xivModdingFramework.Models.ModelTextures
                             hairColor *= _BodyFurMultiplier;
 
                             // Blend in hair color/hroth fur
-                            diffuse = Color4.Lerp(diffuse, hairColor, bonusInfluence);
+                            float skinInfluenceLocal = (float)normal.Blue;
+                            var delta = Math.Min(Math.Max(bonusInfluence - skinInfluenceLocal, 0), 1.0f);
+                            diffuse = Color4.Lerp(diffuse, hairColor, delta);
 
                             // Arbitrary darkening to attempt to match hair better.
                         }
@@ -853,8 +906,6 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                     //diffuse *= diffuseColorMul;
-                    // This is a bit of a hack here and probably not correct.
-                    diffuse *= LinearToSrgb(diffuseColorMul);
 
                     if (!settings.GeneratePbrMaps)
                     {
@@ -877,6 +928,11 @@ namespace xivModdingFramework.Models.ModelTextures
                     var alpha = diffuse.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
 
+                    if (isHroth)
+                    {
+                        alpha = 1.0f;
+                    }
+
                     var emissive = emissiveColorMul;
                     var sss = mask.Blue;
 
@@ -896,8 +952,10 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Hair)
             {
-                var hairColor = (Color4)colors.HairColor;
-                var bonusColor = GetHairBonusColor(mtrl, colors, colors.HairHighlightColor != null ? colors.HairHighlightColor.Value : colors.HairColor);
+                var hairColor = applyUserColors ? (Color4)colors.HairColor : default;
+                var bonusColor = applyUserColors
+                    ? GetHairBonusColor(mtrl, colors, colors.HairHighlightColor != null ? colors.HairHighlightColor.Value : colors.HairColor)
+                    : default;
 
                 //bonusColor = SrgbToLinear(bonusColor);
 
@@ -912,7 +970,12 @@ namespace xivModdingFramework.Models.ModelTextures
                     roughness = mask.Green;
                     var specular = new Color4(mask.Red, mask.Red, mask.Red, 1.0f);
 
-                    diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    if (applyUserColors)
+                    {
+                        diffuse = Color4.Lerp(hairColor, bonusColor, bonusInfluence);
+                    }
+                    // else: leave diffuse as the texture's own value (used for demihuman/monster
+                    // gear that uses the Hair shader but isn't customised by player palette).
                     diffuse *= diffuseColorMul;
 
                     occlusion = (mask.Alpha * mask.Alpha);
@@ -944,10 +1007,10 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.CharacterTattoo)
             {
-                var bonusColor = GetHairBonusColor(mtrl, colors, colors.TattooColor);
+                var bonusColor = applyUserColors ? GetHairBonusColor(mtrl, colors, colors.TattooColor) : default;
 
 
-                var tattooColor = colors.TattooColor;
+                var tattooColor = applyUserColors ? colors.TattooColor : default;
                 // Very similar to hair.shpk but without an extra texture
                 return (Color4 diffuse, Color4 normal, Color4 multi, Color4 index) => {
                     var roughness = 0.0f;
@@ -955,7 +1018,11 @@ namespace xivModdingFramework.Models.ModelTextures
                     var occlusion = 1.0f;
                     float tattooInfluence = normal.Blue;
 
-                    diffuse = Color4.Lerp(_MoleColor, tattooColor, tattooInfluence);
+                    if (applyUserColors)
+                    {
+                        diffuse = Color4.Lerp(_MoleColor, tattooColor, tattooInfluence);
+                    }
+                    // else: leave diffuse as the texture's own value.
 
                     var alpha = normal.Alpha * alphaMultiplier;
                     alpha = allowTranslucency ? alpha : (alpha < 1 ? 0 : 1);
@@ -996,10 +1063,13 @@ namespace xivModdingFramework.Models.ModelTextures
             }
             else if (shaderPack == EShaderPack.Iris)
             {
-                var irisColor = colors.EyeColor;
+                var irisColor = applyUserColors ? colors.EyeColor : default(Color4);
                 var scleraColor = GetConstColor(mtrl, 0x11C90091, new Color4(1.0f));
 
-                irisColor *= irisColor;
+                if (applyUserColors)
+                {
+                    irisColor *= irisColor;
+                }
                 scleraColor *= scleraColor;
 
                 //g_SpecularColorMask
@@ -1013,7 +1083,15 @@ namespace xivModdingFramework.Models.ModelTextures
 
 
                     float colorInfluence = multi.Blue;
-                    diffuse = Color4.Lerp(diffuse * scleraColor, diffuse * irisColor, colorInfluence);
+                    if (applyUserColors)
+                    {
+                        diffuse = Color4.Lerp(diffuse * scleraColor, diffuse * irisColor, colorInfluence);
+                    }
+                    else
+                    {
+                        // Use sclera-only path - texture diffuse modulated by sclera, no iris-color tint.
+                        diffuse = diffuse * scleraColor;
+                    }
 
                     var emissive = new Color4(multi.Red, multi.Red, multi.Red, 1.0f);
                     emissive *= emissiveColorMul;
@@ -1111,9 +1189,16 @@ namespace xivModdingFramework.Models.ModelTextures
                     // It usually seems to roughly reflect the default dye color, but not always.
                     // Probably a vestigial dev value.
                     var baseDiffuse = diffuse * multi.Red;// * diffuseColorMul;
-                    var dyeDiffuse = diffuse * colors.FurnitureColor;
-
-                    diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
+                    if (applyUserColors)
+                    {
+                        var dyeDiffuse = diffuse * colors.FurnitureColor;
+                        diffuse = Color4.Lerp(baseDiffuse, dyeDiffuse, colorInfluence);
+                    }
+                    else
+                    {
+                        // Skip furniture-color dye blend; use only the base diffuse path.
+                        diffuse = baseDiffuse;
+                    }
 
                     var specular = new Color4(1.0f);
                     if (!hasMulti)
@@ -1242,6 +1327,12 @@ namespace xivModdingFramework.Models.ModelTextures
         private static (Color4? Color, bool Blend) GetSkinBonusColor(XivMtrl mtrl, CustomModelColors colors)
         {
             Color4? bonusColor = null;
+            var compatMode = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF) != null;
+            if (compatMode)
+            {
+                return (null, false);
+            }
+
 
             var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
 
@@ -1277,6 +1368,11 @@ namespace xivModdingFramework.Models.ModelTextures
         private static (Color4? Color, bool Blend) GetSkinBonusColor2(XivMtrl mtrl, CustomModelColors colors)
         {
             Color4? bonusColor = null;
+            var compatMode = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0xB616DC5A && x.Value == 0x600EF9DF) != null;
+            if (compatMode)
+            {
+                return (null, false);
+            }
 
             var bonusColorKey = mtrl.ShaderKeys.FirstOrDefault(x => x.KeyId == 0x380CAED0);
 
@@ -1406,7 +1502,7 @@ namespace xivModdingFramework.Models.ModelTextures
         public static (int RowId, float Blend) ReadColorIndex(float indexRed, float indexGreen)
         {
             int byteRed = (int) Math.Round(indexRed * 255.0f);
-            int rowNumber = (int) (byteRed / (_ColorsetMul));
+            int rowNumber = (int) Math.Round(byteRed / (_ColorsetMul));
 
             float blendAmount = 1.0f - indexGreen;
 

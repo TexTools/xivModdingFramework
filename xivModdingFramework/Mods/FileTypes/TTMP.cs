@@ -42,6 +42,7 @@ using xivModdingFramework.Mods.Interfaces;
 using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using xivModdingFramework.Textures.DataContainers;
 using xivModdingFramework.Textures.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
 
@@ -95,6 +96,13 @@ namespace xivModdingFramework.Mods.FileTypes
             Pmp
         };
 
+        public enum UpgradesNeeded
+        {
+            None = 0x00,
+            NeedsTexFix = 0x01,
+            NeedsMdlFix = 0x02
+        };
+
         // These file types are forbidden from being included in Modpacks or being imported via modpacks.
         // This is because these file types are re-built from constituent smaller files, and thus importing
         // a complete file would bash the user's current file state in unpredictable ways.
@@ -103,7 +111,7 @@ namespace xivModdingFramework.Mods.FileTypes
             ".cmp", ".imc", ".eqdp", ".eqp", ".gmp", ".est"
         };
 
-        internal const string _currentTTMPVersion = "2.0";
+        internal const string _currentTTMPVersion = "2.1";
 
         internal const char _typeCodeSimple = 's';
         internal const char _typeCodeWizard = 'w';
@@ -113,7 +121,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
         public static EModpackType GetModpackType(string path)
         {
-            if (path.EndsWith(".pmp") || path.EndsWith(".json"))
+            if (path.EndsWith(".pmp") || path.EndsWith(".json") || Directory.Exists(path))
             {
                 return EModpackType.Pmp;
             }
@@ -492,10 +500,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 if (mpdName == null)
                 {
-                    using (var zf = ZipFile.Read(path))
-                    {
-                        zf.ExtractAll(targetPath);
-                    }
+                    await IOUtil.UnzipFiles(path, targetPath);
                 }
                 else
                 {
@@ -534,7 +539,14 @@ namespace xivModdingFramework.Mods.FileTypes
                     var images = zf.Entries.Where(x => x.FileName.EndsWith(".png") || x.FileName.EndsWith(".jpg") || x.FileName.EndsWith(".bmp") || x.FileName.EndsWith(".jpeg") || x.FileName.EndsWith(".gif") || x.FileName.StartsWith("images/"));
                     foreach(var image in images)
                     {
-                        image.Extract(tempFolder);
+                        try
+                        {
+                            image.Extract(tempFolder);
+                        }
+                        catch
+                        {
+                            // No-Op.
+                        }
                     }
                 }
 
@@ -678,7 +690,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     Dictionary<XivDataFile, List<string>> FilesPerDf = new Dictionary<XivDataFile, List<string>>();
 
 
-                    var needsTexFix = DoesModpackNeedTexFix(modpackMpl);
+                    var upgradesNeeded = DoesModpackNeedFix(modpackMpl);
+                    bool needsTexFix = (upgradesNeeded & UpgradesNeeded.NeedsTexFix) == UpgradesNeeded.NeedsTexFix;
+                    bool needsMdlFix = (upgradesNeeded & UpgradesNeeded.NeedsMdlFix) == UpgradesNeeded.NeedsMdlFix;
                     var count = 0;
                     var modList = await tx.GetModList();
 
@@ -724,7 +738,7 @@ namespace xivModdingFramework.Mods.FileTypes
                                 Trace.WriteLine(ex);
                                 continue;
                             }
-                        } else if(needsTexFix && modJson.FullPath.EndsWith(".mdl"))
+                        } else if(needsMdlFix && modJson.FullPath.EndsWith(".mdl"))
                         {
                             try
                             {
@@ -762,6 +776,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         mod.ModPack = modJson.ModPackEntry == null ? "" : modJson.ModPackEntry.Value.Name;
                         mod.SourceApplication = settings.SourceApplication;
 
+                        Dat.AssertOriginalOffsetIsSafe(mod.DataFile, mod.OriginalOffset8x);
                         modList.AddOrUpdateMod(mod);
 
                         // Add the modpack if we haven't already.
@@ -811,6 +826,15 @@ namespace xivModdingFramework.Mods.FileTypes
 
                     p2Start = DateTimeOffset.Now.ToUnixTimeMilliseconds();
 
+                    // Fix Pre-Dawntrail files.
+                    // (Runs before auto-assign so pre-DT modpacks have their MDLs upgraded to v6 first;
+                    //  otherwise the skin-material heuristic would see un-upgraded geometry and miss matches.)
+                    if (settings.UpdateEndwalkerFiles)
+                    {
+                        var modPack = filteredModsJson[0].ModPackEntry;
+                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, progress, tx);
+                    }
+
                     // Auto assign body materials
                     if (settings.AutoAssignSkinMaterials)
                     {
@@ -835,13 +859,6 @@ namespace xivModdingFramework.Mods.FileTypes
                                 var changed = await Mdl.CheckSkinAssignment(mdlEntry.FullPath, tx);
                             }
                         }
-                    }
-
-                    // Fix Pre-Dawntrail files.
-                    if (settings.UpdateEndwalkerFiles)
-                    {
-                        var modPack = filteredModsJson[0].ModPackEntry;
-                        await EndwalkerUpgrade.UpdateEndwalkerFiles(filePaths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, progress, tx);
                     }
 
                     count = 0;
@@ -888,23 +905,30 @@ namespace xivModdingFramework.Mods.FileTypes
         /// </summary>
         /// <param name="modpackPath">The path to the modpack.</param>
         /// <returns>True if we must modify tex header uncompressed sizes, false otherwise.</returns>
-        public static bool DoesModpackNeedTexFix(DirectoryInfo modpackPath) {
+        public static UpgradesNeeded DoesModpackNeedFix(DirectoryInfo modpackPath) {
 
 	        var ver = GetVersion(modpackPath);
 
-            return DoesModpackNeedTexFix(ver);
+            return DoesModpackNeedFix(ver);
         }
-        public static bool DoesModpackNeedTexFix(ModPackJson mpl)
+        public static UpgradesNeeded DoesModpackNeedFix(ModPackJson mpl)
         {
-            return DoesModpackNeedTexFix(mpl.Version);
+            return DoesModpackNeedFix(mpl.TTMPVersion);
         }
-        public static bool DoesModpackNeedTexFix(string version)
+        public static UpgradesNeeded DoesModpackNeedFix(string version)
         {
             if (string.IsNullOrEmpty(version))
-                return true;
-
-            Int32.TryParse(version.Substring(0, 1), out var v);
-            return v < 2;
+                version = "0.0";
+            int major = 0, minor = 0;
+            string[] parts = version.Split('.');
+            int.TryParse(parts[0], out major);
+            if (parts.Length > 1)
+                int.TryParse(new(parts[1].TakeWhile(char.IsDigit).ToArray()), out minor);
+            if (major < 2)
+                return UpgradesNeeded.NeedsTexFix | UpgradesNeeded.NeedsMdlFix;
+            if (major == 2 && minor == 0)
+                return UpgradesNeeded.NeedsTexFix;
+            return UpgradesNeeded.None;
         }
 
 
@@ -1109,6 +1133,11 @@ namespace xivModdingFramework.Mods.FileTypes
                 }
 
 
+                if (settings.UpdateEndwalkerFiles)
+                {
+                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
+                }
+
                 if (settings.AutoAssignSkinMaterials)
                 {
                     // Find all relevant models..
@@ -1129,11 +1158,6 @@ namespace xivModdingFramework.Mods.FileTypes
                             var changed = await Mdl.CheckSkinAssignment(mdlEntry, tx);
                         }
                     }
-                }
-
-                if (settings.UpdateEndwalkerFiles)
-                {
-                    await EndwalkerUpgrade.UpdateEndwalkerFiles(paths, settings.SourceApplication, settings.UpdatePartialEndwalkerFiles, settings.ProgressReporter, tx);
                 }
 
                 XivCache.QueueDependencyUpdate(paths);
@@ -1249,9 +1273,9 @@ namespace xivModdingFramework.Mods.FileTypes
                     mpl = await GetModpackList(modpackPath);
                 }
 
-                var needsTexFix = DoesModpackNeedTexFix(mpl);
+                UpgradesNeeded upgradesNeeded = DoesModpackNeedFix(mpl);
 
-                return await MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, needsTexFix, includeData);
+                return await MakeFileStorageInformationDictionary(_tempMPD, mpl.SimpleModsList, upgradesNeeded, includeData);
             });
         }
         private static async Task<Dictionary<string, FileStorageInformation>> UnpackWizardModlist(string modpackPath, bool includeData = true, ModTransaction tx = null)
@@ -1305,19 +1329,20 @@ namespace xivModdingFramework.Mods.FileTypes
 
                 var option = mpl.ModPackPages[0].ModGroups[0].OptionList[0];
 
-                var needsTexFix = DoesModpackNeedTexFix(mpl);
-                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, needsTexFix, includeData);
+                var upgradesNeeded = DoesModpackNeedFix(mpl);
+                return await MakeFileStorageInformationDictionary(_tempMPD, option.ModsJsons, upgradesNeeded, includeData);
 
             });
         }
 
-        private static async Task<Dictionary<string, FileStorageInformation>> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, bool needsTexFix, bool includeData = true)
+        private static async Task<Dictionary<string, FileStorageInformation>> MakeFileStorageInformationDictionary(string mpdPath, List<ModsJson> mods, UpgradesNeeded upgradesNeeded, bool includeData = true)
         {
             var ret = new Dictionary<string, FileStorageInformation>();
+            bool needsTexFix = (upgradesNeeded & UpgradesNeeded.NeedsTexFix) == UpgradesNeeded.NeedsTexFix;
+            bool needsMdlFix = (upgradesNeeded & UpgradesNeeded.NeedsMdlFix) == UpgradesNeeded.NeedsMdlFix;
+
             foreach (var file in mods)
             {
-
-
                 if (!includeData)
                 {
                     if (ret.ContainsKey(file.FullPath))
@@ -1341,7 +1366,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
 
                 // Ancient bug issues....
-                if (needsTexFix && file.FullPath.EndsWith(".tex") && includeData)
+                if (needsTexFix && file.FullPath.EndsWith(".tex") && includeData && !file.FullPath.StartsWith("ui/"))
                 {
                     try
                     {
@@ -1354,7 +1379,7 @@ namespace xivModdingFramework.Mods.FileTypes
                         // Skip the file?
                         continue;
                     }
-                } else if(needsTexFix && file.FullPath.EndsWith(".mdl") && includeData)
+                } else if(needsMdlFix && file.FullPath.EndsWith(".mdl") && includeData)
                 {
                     try
                     {
@@ -1402,16 +1427,13 @@ namespace xivModdingFramework.Mods.FileTypes
 
             var data = await TransactionDataHandler.GetUncompressedFile(info);
 
-            using(var ms = new MemoryStream(data)) {
-                using (var br = new BinaryReader(ms))
-                {
-                    var header = Tex.TexHeader.ReadTexHeader(br);
-                    if (!IOUtil.IsPowerOfTwo(header.Width) || !IOUtil.IsPowerOfTwo(header.Height))
-                    {
-                        throw new InvalidDataException("Texture dimensions must be a power of two. (Ex. 256, 512, 1024, ...)");
-                    }
-                }
+            var resized = await EndwalkerUpgrade.ValidateTexFileData(data);
+            if(resized != null)
+            {
+                data = resized;
             }
+
+
 
             var recomp = await Tex.CompressTexFile(data);
 

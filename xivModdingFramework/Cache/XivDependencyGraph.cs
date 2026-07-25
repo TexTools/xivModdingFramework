@@ -98,6 +98,11 @@ namespace xivModdingFramework.Cache
                 var sameMaterialItems = new List<IItemModel>();
 
                 var originalInfo = await Imc.GetImcInfo(item, false, tx);
+                if(originalInfo == null)
+                {
+                    return sameModelItems;
+                }
+
                 foreach (var i in sameModelItems)
                 {
                     var info = await Imc.GetImcInfo(i, false, tx);
@@ -106,7 +111,6 @@ namespace xivModdingFramework.Cache
                         sameMaterialItems.Add(i);
                     }
                 }
-
                 sameMaterialItems = sameMaterialItems.OrderBy(x => x.Name, new ItemNameComparer()).ToList();
                 return sameMaterialItems;
             } catch
@@ -676,7 +680,12 @@ namespace xivModdingFramework.Cache
                 match = _slotRegex.Match(internalFilePath);
                 if (match.Success)
                 {
-                    info.Slot = match.Groups[1].Value;
+                    // Validate the slot name to avoid matching on arbitrary three letter strings that may be present
+                    if (XivItemTypes.GetAvailableSlots(info.PrimaryType).Contains(match.Groups[1].Value)
+                        || (info.SecondaryType.HasValue && XivItemTypes.GetAvailableSlots(info.SecondaryType.Value).Contains(match.Groups[1].Value)))
+                    {
+                        info.Slot = match.Groups[1].Value;
+                    }
                 }
             }
             else
@@ -927,7 +936,7 @@ namespace xivModdingFramework.Cache
                     var root = new XivDependencyRootInfo();
                     root.PrimaryType = primary;
                     root.SecondaryType = (secondary == XivItemType.none ? null : (XivItemType?) secondary);
-                    var eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                    var eqp = new Eqp();
                     var races = (XivRace[])Enum.GetValues(typeof(XivRace));
                     var slots = XivItemTypes.GetAvailableSlots(primary);
                     if(secondary != XivItemType.none)
@@ -1103,6 +1112,7 @@ namespace xivModdingFramework.Cache
                 Console.WriteLine("Saving all valid roots...");
                 using (var db = new SQLiteConnection(RootsCacheConnectionString))
                 {
+                    db.BusyTimeout = 3000;
                     db.Open();
 
                     using (var transaction = db.BeginTransaction())
@@ -1112,7 +1122,7 @@ namespace xivModdingFramework.Cache
                         {
                             foreach (var root in allRoots)
                             {
-                                XivCache.CacheRoot(root, db, cmd);
+                                XivCache.CacheRoot(root, cmd);
                             }
                         }
                         transaction.Commit();

@@ -555,6 +555,11 @@ namespace xivModdingFramework.Materials.FileTypes
         /// <returns>The new mtrl file byte data</returns>
         public static byte[] XivMtrlToUncompressedMtrl(XivMtrl xivMtrl)
         {
+            foreach(var tex in xivMtrl.Textures)
+            {
+                tex.TexturePath = tex.TexturePath.ToLower();
+            }
+
             var mtrlBytes = new List<byte>();
 
             mtrlBytes.AddRange(BitConverter.GetBytes(xivMtrl.Signature));
@@ -654,13 +659,13 @@ namespace xivModdingFramework.Materials.FileTypes
             }
             if (xivMtrl.ColorSetData != null && xivMtrl.ColorSetData.Count > 0)
             {
-                xivMtrl.AdditionalData[0] |= 0x04;
+                //xivMtrl.AdditionalData[0] |= 0x04;
             }
             else
             {
                 unchecked
                 {
-                    xivMtrl.AdditionalData[0] &= (byte)(~0x04);
+                    //xivMtrl.AdditionalData[0] &= (byte)(~0x04);
                 }
             }
 
@@ -1360,6 +1365,12 @@ namespace xivModdingFramework.Materials.FileTypes
         {
             if (item == null) return -1;
 
+            var itemModel = item as IItemModel;
+            if (itemModel?.SecondaryCategory == XivStrings.Facewear)
+            {
+                return Math.Max(1, itemModel.ModelInfo?.ImcSubsetID ?? 1);
+            }
+
             var root = item.GetRootInfo();
             if (root == null) return -1;
 
@@ -1428,14 +1439,20 @@ namespace xivModdingFramework.Materials.FileTypes
                 throw new InvalidDataException("Cannot get hair material info for non-hair root.");
             }
 
+            if(root.PrimaryId == 1601 || root.PrimaryId == 1501)
+            {
+                // Hrothgar never share hair materials.
+                return root;
+            }
+
             if(root.SecondaryId < 101)
             {
                 // Racial uniques.
                 return root;
             } else if (root.SecondaryId < 116)
             {
-                // 101-115 have Midlander M/F, and Miqo M/F
-                if (root.PrimaryId == 701 || root.PrimaryId == 801)
+                // 101-115 have Midlander M/F, and Miqo M/F/Hroth M/F
+                if (root.PrimaryId == 701 || root.PrimaryId == 801 || root.PrimaryId == 1501 || root.PrimaryId == 1601)
                 {
                     return root;
                 }
@@ -1596,6 +1613,7 @@ namespace xivModdingFramework.Materials.FileTypes
 
                         transaction.Commit();
                     }
+
                 }
             }
             catch
@@ -1604,14 +1622,33 @@ namespace xivModdingFramework.Materials.FileTypes
             }
         }
 
-        /// <summary>
-        /// Retrieves simplified material info for ALL Materials in the entire game.
-        /// Used to collect data to store into SQLite DB or JSON.
-        /// 
-        /// Not Transaction Safe
-        /// </summary>
-        /// <returns></returns>
-        public static async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
+
+        public static async Task ShrinkShaderDB()
+        {
+            const string _ShaderDbFilePath = "./Resources/DB/shader_info.db";
+            const string _ShrinkDbScript = "ShrinkShaderCache.sql";
+            var connectionString = "Data Source=" + _ShaderDbFilePath + ";Pooling=False;";
+            using (var db = new SQLiteConnection(connectionString))
+            {
+                db.Open();
+                var lines = File.ReadAllLines("Resources\\SQL\\" + _ShrinkDbScript);
+                var sqlCmd = String.Join("\n", lines);
+
+                using (var cmd = new SQLiteCommand(sqlCmd, db))
+                {
+                    cmd.ExecuteScalar();
+                }
+            }
+        }
+
+            /// <summary>
+            /// Retrieves simplified material info for ALL Materials in the entire game.
+            /// Used to collect data to store into SQLite DB or JSON.
+            /// 
+            /// Not Transaction Safe
+            /// </summary>
+            /// <returns></returns>
+            public static async Task<List<SimplifiedMtrlInfo>> GetAllMtrlInfo(bool useIndex2 = false)
         {
             if(ModTransaction.ActiveTransaction != null)
             {

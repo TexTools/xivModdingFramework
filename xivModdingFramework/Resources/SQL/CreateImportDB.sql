@@ -38,6 +38,16 @@ CREATE TABLE "vertices" (
 	"normal_x"	REAL NOT NULL,
 	"normal_y"  REAL NOT NULL,
 	"normal_z"	REAL NOT NULL,
+
+	-- Binormal
+	"binormal_x"	REAL,
+	"binormal_y"	REAL,
+	"binormal_z"	REAL,
+	
+	-- Tangent
+	"tangent_x"	REAL,
+	"tangent_y"	REAL,
+	"tangent_z"	REAL,
 	
 	-- Vertex Color
 	"color_r"	REAL NOT NULL,
@@ -56,6 +66,8 @@ CREATE TABLE "vertices" (
 	"uv_1_v"	REAL NOT NULL,
 	"uv_2_u"	REAL NOT NULL,
 	"uv_2_v"	REAL NOT NULL,
+	"uv_3_u"	REAL NOT NULL,
+	"uv_3_v"	REAL NOT NULL,
 
 	-- Bone Weights
 	"bone_1_id"			INTEGER,
@@ -74,6 +86,10 @@ CREATE TABLE "vertices" (
 	"bone_7_weight"		REAL,
 	"bone_8_id"			INTEGER,
 	"bone_8_weight"		REAL,
+	
+	-- Flow Info
+	"flow_u"	REAL NOT NULL,
+	"flow_v"	REAL NOT NULL,
 
 	PRIMARY KEY("mesh","part","vertex_id")
 );

@@ -62,6 +62,7 @@ using SixLabors.ImageSharp.Formats.Tga;
 using SixLabors.ImageSharp.Formats;
 using Image = SixLabors.ImageSharp.Image;
 using System.Diagnostics.CodeAnalysis;
+using HelixToolkit.SharpDX.Core.Animations;
 
 namespace xivModdingFramework.Models.FileTypes
 {
@@ -299,7 +300,7 @@ namespace xivModdingFramework.Models.FileTypes
         {
             var mdlPath = await GetMdlPath(item, race, submeshId, tx);
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
-            var ttModel = TTModel.FromRaw(mdl);
+            var ttModel = await TTModel.FromRaw(mdl);
             return ttModel;
         }
 
@@ -313,14 +314,14 @@ namespace xivModdingFramework.Models.FileTypes
         public static async Task<TTModel> GetTTModel(string mdlPath, bool getOriginal = false, ModTransaction tx = null)
         {
             var mdl = await GetXivMdl(mdlPath, getOriginal, tx);
-            var ttModel = TTModel.FromRaw(mdl);
+            var ttModel = await TTModel.FromRaw(mdl);
             return ttModel;
         }
 
-        public static TTModel GetTTModel(byte[] mdlData, string mdlPath = "")
+        public static async Task<TTModel> GetTTModel(byte[] mdlData, string mdlPath = "")
         {
             var mdl = GetXivMdl(mdlData, mdlPath);
-            var ttModel = TTModel.FromRaw(mdl);
+            var ttModel = await TTModel.FromRaw(mdl);
             return ttModel;
         }
 
@@ -347,7 +348,6 @@ namespace xivModdingFramework.Models.FileTypes
 
         public static XivMdl GetXivMdl(byte[] mdlData, string mdlPath = "")
         {
-
             var xivMdl = new XivMdl { MdlPath = mdlPath };
             int totalNonNullMaterials = 0;
             var getShapeData = true;
@@ -413,7 +413,7 @@ namespace xivModdingFramework.Models.FileTypes
                     for (var i = 0; i < mdlModelData.MaterialCount; i++)
                     {
                         var mat = IOUtil.ReadNullTerminatedString(br1, false);
-                        if (mat.StartsWith("shp_"))
+                        if (mat.StartsWith("shp"))
                         {
                             // Catch case for situation where there's null values at the end of the materials list.
                             mdlPathData.ShapeList.Add(mat);
@@ -542,6 +542,11 @@ namespace xivModdingFramework.Models.FileTypes
                 for (var i = 0; i < xivMdl.LoDList.Count; i++)
                 {
                     var totalMeshCount = xivMdl.LoDList[i].TotalMeshCount;
+
+                    if(meshCount < totalMeshCount)
+                    {
+                        totalMeshCount = meshCount;
+                    }
 
 
                     for (var j = 0; j < totalMeshCount; j++)
@@ -674,11 +679,11 @@ namespace xivModdingFramework.Models.FileTypes
                 xivMdl.AttrDataBlock = attributeDataBlock;
 
                 // Terrain Shadow Meshes
-                var unkData1 = new UnknownData1
+                var shadowMeshData = new TerrainShadowMeshData
                 {
-                    //Unknown = br.ReadBytes(TerrainShadowMeshCount * 20)
+                    TerrainShadowMeshHeader = br.ReadBytes(xivMdl.LoDList[0].MeshTypes[EMeshType.TerrainShadow].Count * 20)
                 };
-                xivMdl.UnkData1 = unkData1;
+                xivMdl.UnkData1 = shadowMeshData;
                 #endregion
 
                 #region Mesh Part Headers
@@ -888,7 +893,7 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
-                #region Part Bone Sets & Padding
+                #region Part Bone Sets
                 // Bone index for Parts
                 var partBoneSet = new BoneSet
                 {
@@ -902,7 +907,52 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
                 xivMdl.PartBoneSets = partBoneSet;
+                #endregion
 
+                #region Neck Morph Data
+                // Neck morph data (appears on face models new in Patch 7.1)
+                xivMdl.NeckMorphTable = new List<NeckMorphEntry>();
+                for (var i = 0; i < xivMdl.ModelData.NeckMorphTableSize; ++i)
+                {
+                    var neckMorphDataEntry = new NeckMorphEntry
+                    {
+                        PositionAdjust = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()),
+                        Unknown = br.ReadUInt32(),
+                        NormalAdjust = new Vector3(br.ReadSingle(), br.ReadSingle(), br.ReadSingle()),
+                        Bones = new List<short>()
+                    };
+                    byte[] neckBoneTable = br.ReadBytes(4);
+                    // Weird code alert:
+                    // - Most vanilla heads legitimately have a zero value in the second slot of the table.
+                    // - Female Hrothgar heads legitimately have a zero value in the first slot of the table.
+                    // - Values in the third and fourth slot seem to be unused, and also seem to use 0 as a padding or null value.
+                    // - However, at least one vanilla model seems to have a non-zero value in the third slot of the table.
+                    // Therefore, only in the third and fourth slot is a zero value treated as an early list terminator.
+                    // This means the table should always contain at least two bones.
+                    for (int j = 0; j < neckBoneTable.Length; ++j)
+                    {
+                        int boneset0_index = neckBoneTable[j];
+                        if (j >= 2 && boneset0_index == 0) break; // Treat this case as an early list terminator.
+                        // Resolve the bone to an index in the bone path table here, to make the in-memory representation a little more normal
+                        if (xivMdl.MeshBoneSets.Count > 0 && xivMdl.MeshBoneSets[0].BoneIndices.Count() > boneset0_index)
+                        {
+                            neckMorphDataEntry.Bones.Add(xivMdl.MeshBoneSets[0].BoneIndices[boneset0_index]);
+                        }
+                    }
+                    xivMdl.NeckMorphTable.Add(neckMorphDataEntry);
+                }
+                #endregion
+
+                #region Patch 7.2 Unknown Data
+                // Something to do with shadows (appears on face models new in Patch 7.2)
+                var unkDataPatch72 = new UnknownDataPatch72
+                {
+                    Unknown = br.ReadBytes(xivMdl.ModelData.Patch72TableSize * 16)
+                };
+                xivMdl.UnkDataPatch72 = unkDataPatch72;
+                #endregion
+
+                #region Padding
                 // Padding
                 xivMdl.PaddingSize = br.ReadByte();
                 xivMdl.PaddedBytes = br.ReadBytes(xivMdl.PaddingSize);
@@ -934,6 +984,7 @@ namespace xivModdingFramework.Models.FileTypes
                     xivMdl.BoneBoundingBoxes.Add(new List<Vector4>() { minPoint, maxPoint });
                 }
 
+                var preBound = br.BaseStream.Position;
                 xivMdl.BonelessPartBoundingBoxes = new List<List<Vector4>>();
                 for (var i = 0; i < xivMdl.ModelData.FurniturePartBoundingBoxCount; i++)
                 {
@@ -949,19 +1000,35 @@ namespace xivModdingFramework.Models.FileTypes
                 // Attempts to catch weird broken mod mdls.
                 // This has been known to occur with both certain penumbra MDLs, and very old
                 // TexTools MDLs.
-                if (xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
-                    || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                if (xivMdl.BonelessPartBoundingBoxes.Count != 0)
                 {
+                    if(xivMdl.LoDList[0].VertexDataOffset == preBound)
+                    {
+                        foreach(var bl in xivMdl.BonelessPartBoundingBoxes)
+                        {
+                            bl[0] = new Vector4(0, 0, 0, 1);
+                            bl[1] = new Vector4(0, 0, 0, 1);
+                        }
+                        br.BaseStream.Seek(preBound, SeekOrigin.Begin);
+                    }
+                }
+                else { 
+                    if ((xivMdl.LoDList[0].VertexDataOffset < br.BaseStream.Position
+                        || (xivMdl.LoDList[0].VertexDataOffset % 8 != br.BaseStream.Position % 8))
+                        && xivMdl.LoDList[1].VertexDataSize == 0 // Avoid applying this fix to vanilla models
+                        && xivMdl.ModelData.NeckMorphTableSize != 0x0A) // Avoid applying to face models, which were written incorrectly after patch 7.1
+                    {
 
-                    var delta = (int) (xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
-                    xivMdl.LoDList[0].VertexDataOffset -= delta;
-                    xivMdl.LoDList[0].IndexDataOffset -= delta;
-                    //var rem = br.ReadBytes(delta);
-                    var z = "z";
+                        var delta = (int)(xivMdl.LoDList[0].VertexDataOffset - br.BaseStream.Position);
+                        xivMdl.LoDList[0].VertexDataOffset -= delta;
+                        xivMdl.LoDList[0].IndexDataOffset -= delta;
+                        //var rem = br.ReadBytes(delta);
+                        var z = "z";
+                    }
                 }
 
 
-                    var lodNum = 0;
+                var lodNum = 0;
                 var totalMeshNum = 0;
                 foreach (var lod in xivMdl.LoDList)
                 {
@@ -973,16 +1040,12 @@ namespace xivModdingFramework.Models.FileTypes
                     {
                         throw new Exception("Failed to parse some meshes in previous LoD level.");
                     }
-
-                    // Seek to the start of the LoD.
-                    br.BaseStream.Seek(lod.VertexDataOffset, SeekOrigin.Begin);
-                    var LoDStart = br.BaseStream.Position;
                     
                     var mIdx = 0;
 
                     foreach (var meshData in meshDataList)
                     {
-                        MdlVertexReader.ReadVertexData(br, meshData, lod.VertexDataOffset, lod.IndexDataOffset);
+                        MdlVertexReader.ReadVertexData(mdlData, meshData, lod.VertexDataOffset, lod.IndexDataOffset);
 
                         mIdx++;
                         totalMeshNum++;
@@ -1008,6 +1071,9 @@ namespace xivModdingFramework.Models.FileTypes
                             if (!indexMeshNum.ContainsKey(indexDataOffset))
                             {
                                 indexMeshNum.Add(indexDataOffset, i);
+                            } else
+                            {
+                                indexMeshNum[indexDataOffset] = i;
                             }
                         }
 
@@ -1121,6 +1187,40 @@ namespace xivModdingFramework.Models.FileTypes
         }
 
 
+        internal static List<Vector4> ReadBoundingBox(BinaryReader br)
+        {
+            var ret = new List<Vector4>();
+
+            ret.Add(new Vector4(
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle()
+            ));
+
+            ret.Add(new Vector4(
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle(),
+                br.ReadSingle()
+            ));
+
+            return ret;
+        }
+        internal static void WriteBoundingBox(BinaryWriter bw, List<Vector4> bb)
+        {
+            bw.Write(BitConverter.GetBytes(bb[0][0]));
+            bw.Write(BitConverter.GetBytes(bb[0][1]));
+            bw.Write(BitConverter.GetBytes(bb[0][2]));
+            bw.Write(BitConverter.GetBytes(bb[0][3]));
+
+            bw.Write(BitConverter.GetBytes(bb[1][0]));
+            bw.Write(BitConverter.GetBytes(bb[1][1]));
+            bw.Write(BitConverter.GetBytes(bb[1][2]));
+            bw.Write(BitConverter.GetBytes(bb[1][3]));
+        }
+
+
         /// <summary>
         /// Extracts and calculates the full MTRL paths from a given MDL file.
         /// A material variant of -1 gets the materials for ALL variants,
@@ -1150,6 +1250,8 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 return materials;
             }
+
+            ModelModifiers.FixUpSkinReferences(mdlPath, materialNames);
 
             var root = await XivCache.GetFirstRoot(mdlPath);
 
@@ -1361,9 +1463,9 @@ namespace xivModdingFramework.Models.FileTypes
             }
 
             var exporters = GetAvailableExporters();
-            var fileFormat = Path.GetExtension(outputFilePath).Substring(1);
+            var fileFormat = Path.GetExtension(outputFilePath).Substring(1).ToLower();
             fileFormat = fileFormat.ToLower();
-            if (!exporters.Contains(fileFormat))
+            if (!exporters.Contains(fileFormat) && fileFormat != "mdl")
             {
                 throw new NotSupportedException(fileFormat.ToUpper() + " File type not supported.");
             }
@@ -1393,42 +1495,35 @@ namespace xivModdingFramework.Models.FileTypes
                 return;
             }
 
-            if (!model.IsInternal)
-            {
-                // This isn't *really* true, but there's no case where we are re-exporting TTModel objects
-                // right now without them at least having an internal XIV path associated, so I don't see a need to fuss over this,
-                // since it would be complicated.
-                throw new NotSupportedException("Cannot export non-internal model - Skel data unidentifiable.");
-            }
-
             // The export process could really be sped up by forking threads to do
             // both the bone and material exports at the same time.
 
             // Pop the textures out so the exporters can reference them.
-            if (settings.IncludeTextures)
+            if (settings.IncludeTextures && model.HasPath)
             {
                 // Fix up our skin references in the model before exporting, to ensure
                 // we supply the right material names to the exporters down-chain.
-                if (model.IsInternal)
+                if (model.HasPath)
                 {
                     ModelModifiers.FixUpSkinReferences(model, model.Source, null);
                 }
                 await ExportMaterialsForModel(model, outputFilePath, settings.PbrTextures, mtrlVariant, XivRace.All_Races, tx);
             }
 
-
-            if (settings.ShiftUVs)
+            if(fileFormat == "mdl")
             {
-                // This is not a typo.  Because we haven't flipped the UV yet, we need to -1, not +1.
-                ModelModifiers.ShiftImportUV(model);
+                var data = MakeUncompressedMdlFile(model, await Mdl.GetXivMdl(model.Source));
+                File.WriteAllBytes(outputFilePath, data);
+                return;
             }
+
 
             // Save the DB file.
             var cwd = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location);
             var converterFolder = cwd + "\\converters\\" + fileFormat;
             Directory.CreateDirectory(converterFolder);
             var dbPath = converterFolder + "\\input.db";
-            model.SaveToFile(dbPath, outputFilePath);
+            model.SaveToFile(dbPath, settings.ShiftUVs, outputFilePath, null, tx);
 
 
             if (fileFormat == "db")
@@ -1796,7 +1891,7 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 // Kind of clunky to have to convert this back off bytes, but w/e.
                 // This codepath is basically unused at this point anyways.
-                var ttm = Mdl.GetTTModel(bytes, internalFile);
+                var ttm = await Mdl.GetTTModel(bytes, internalFile);
                 await FillMissingMaterials(ttm, options.ReferenceItem, options.SourceApplication, tx);
             }
 
@@ -1826,7 +1921,6 @@ namespace xivModdingFramework.Models.FileTypes
         /// <exception cref="InvalidDataException"></exception>
         public static async Task<byte[]> FileToUncompressedMdl(string externalPath, string internalPath, ModelImportOptions options = null, ModTransaction tx = null)
         {
-
             if (options == null)
             {
                 options = new ModelImportOptions();
@@ -1928,15 +2022,17 @@ namespace xivModdingFramework.Models.FileTypes
                 }
 
 
+                ttModel.Source = internalPath;
 
                 // At this point we now have a fully populated TTModel entry.
                 // Time to pull in the Model Modifier for any extra steps before we pass
                 // it to the raw MDL creation function.
-                loggingFunction(false, "Merging in existing Attribute & Material Data...");
+                loggingFunction(false, "Merging in existing Model Settings...");
 
                 // Apply our Model Modifier options to the model.
                 await options.Apply(ttModel, currentMdl, originalMdl, tx);
 
+                ModelModifiers.MergeFlags(ttModel, currentMdl);
 
                 // Call the user function, if one was provided.
                 if (options.IntermediaryFunction != null)
@@ -1944,7 +2040,7 @@ namespace xivModdingFramework.Models.FileTypes
                     loggingFunction(false, "Waiting on user...");
 
                     // Bool says whether or not we should continue.
-                    var oldModel = TTModel.FromRaw(originalMdl);
+                    var oldModel = await TTModel.FromRaw(originalMdl);
                     bool cont = await options.IntermediaryFunction(ttModel, oldModel);
                     if (!cont)
                     {
@@ -1997,14 +2093,14 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 // Raw already converted DB file, just load it.
                 loggingFunction(false, "Loading intermediate file...");
-                ttModel = TTModel.LoadFromFile(externalPath, loggingFunction);
+                ttModel = await TTModel.LoadFromFile(externalPath, loggingFunction, options);
             }
             else
             {
                 // External Importer converts the file to .db format.
                 var dbFile = await RunExternalImporter(suffix, externalPath, loggingFunction);
                 loggingFunction(false, "Loading intermediate file...");
-                ttModel = TTModel.LoadFromFile(dbFile, loggingFunction, options);
+                ttModel = await TTModel.LoadFromFile(dbFile, loggingFunction, options);
             }
 
             if(ttModel == null)
@@ -2033,9 +2129,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <param name="ogMdl"></param>
         /// <param name="loggingFunction"></param>
         /// <returns></returns>
-        public static async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public static async Task<byte[]> MakeCompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null, bool upgradePrecision = true)
         {
-            var mdl = MakeUncompressedMdlFile(ttModel, ogMdl, loggingFunction);
+            var mdl = MakeUncompressedMdlFile(ttModel, ogMdl, loggingFunction, upgradePrecision);
             var compressed = await CompressMdlFile(mdl);
             return compressed;
         }
@@ -2362,6 +2458,22 @@ namespace xivModdingFramework.Models.FileTypes
             return MakeUncompressedMdlFile(model, xivMdl, loggingFunction);
 
         }
+
+        // I do not know where in FFXIV's model pipeline this limit comes from,
+        // but vertex buffers larger than 2^23 will overflow and wrap around in game.
+        public const int _MaxVertexBufferSize = 8388608;
+
+        private static void AddVertexHeader(List<VertexDataStruct> source, VertexDataStruct newData)
+        {
+            var elem = source.FirstOrDefault(x => x.DataUsage == newData.DataUsage && x.Count == newData.Count);
+            if (elem != null)
+            {
+                elem.DataType = newData.DataType;
+            }
+
+            source.Add(newData);
+        }
+
         /// <summary>
         /// Creates a new Uncompressed MDL file from the given information.
         /// OGMdl is used to fill in gaps in data types we do not know about.
@@ -2369,24 +2481,13 @@ namespace xivModdingFramework.Models.FileTypes
         /// </summary>
         /// <param name="ttModel">The ttModel to import</param>
         /// <param name="ogMdl">The currently modified Mdl file.</param>
-        public static byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null)
+        public static byte[] MakeUncompressedMdlFile(TTModel ttModel, XivMdl ogMdl, Action<bool, string> loggingFunction = null, bool upgradePrecision = true)
         {
             var mdlVersion = ttModel.MdlVersion > 0 ? ttModel.MdlVersion : ogMdl.MdlVersion;
-
-            // Debug Code
-            /*
-            var root = XivCache.GetFilePathRoot(ogMdl.MdlPath);
-            var race = IOUtil.GetRaceFromPath(ogMdl.MdlPath);
-            var skel = Sklb.GetBones(root.Info, race).Result;
-            */
 
             ttModel.MdlVersion = mdlVersion;
 
             byte _LoDCount = 1;
-
-            // Pipe some user var down here and we could ship this toggle.
-            // Not really much reason to ever use lower precision other than file size/perf though.
-            bool _UpgradePrecision = true;
 
             // Distance used for model LoD settings. 0 is infinite.
             float _ModelLoDDistance = 0.0f;
@@ -2400,8 +2501,46 @@ namespace xivModdingFramework.Models.FileTypes
                 loggingFunction = NoOp;
             }
 
+            var useFlowData = ttModel.AnisotropicLightingEnabled;
             try
             {
+                var usageInfo = ttModel.GetUsageInfo();
+
+                var vertexSize = 48;
+                if (usageInfo.NeedsEightWeights)
+                {
+                    vertexSize += 8;
+                }
+                if (usageInfo.MaxUv > 1)
+                {
+                    if (usageInfo.MaxUv == 2)
+                    {
+                        vertexSize += 8;
+                    } else if(usageInfo.MaxUv >= 3)
+                    {
+                        vertexSize += 16;
+                    }
+                }
+                if (usageInfo.UsesVColor2)
+                {
+                    vertexSize += 4;
+                }
+                if (useFlowData)
+                {
+                    vertexSize += 4;
+                }
+                var shapeVertCount = ttModel.MeshGroups.Sum(m => m.Parts.Sum(p => p.ShapeParts.Sum(s => s.Key == "original" ? 0 : s.Value.Vertices.Count)));
+                var totalVertexCount = shapeVertCount + ttModel.VertexCount;
+                var estimatedVertexBufferSize = (vertexSize * totalVertexCount);
+
+                if(estimatedVertexBufferSize >= _MaxVertexBufferSize)
+                {
+                    upgradePrecision = false;
+                }
+
+                
+
+
                 ttModel.OrderMeshGroupsForImport();
                 var rawShapeData = ttModel.GetRawShapeParts();
 
@@ -2467,55 +2606,108 @@ namespace xivModdingFramework.Models.FileTypes
                     var ttMeshGroup = ttModel.MeshGroups.Count > meshNum ? ttModel.MeshGroups[meshNum] : null;
 
 
-                    List<VertexDataStruct> source;
-                    if (ogGroup == null)
-                    {
-                        // New Group, copy data over.
-                        source = lod.MeshDataList[0].VertexDataStructList;
-                    }
-                    else
-                    {
-                        source = ogGroup.VertexDataStructList;
-                    }
-
                     // Vertex Header Writing
-                    var runningOffsets = new List<int>() { 0, 0, 0 };
-                    source.OrderBy(x => (x.DataBlock * -1000) + x.DataOffset);
-                    vertexStreamCounts.Add(source.Max(x => x.DataBlock) + 1);
+                    List<VertexDataStruct> source = new List<VertexDataStruct>();
 
-                    // If we're upgrading precision on a v6 mdl, might as well add all the bells and whistles.
-                    if(mdlVersion >= 6 && _UpgradePrecision)
+                    // Standard elements
+                    AddVertexHeader(source, new VertexDataStruct()
                     {
-                        // Add precomputed tangent data.
-                        var tangentCount = source.Count(x => x.DataUsage == VertexUsageType.Tangent);
-                        var binormalIdx = source.FindIndex(x => x.DataUsage == VertexUsageType.Binormal);
-                        if(binormalIdx >= 0 && tangentCount <= 0 && false)
-                        {
-                            // Goes in after Binormal
-                            source.Insert(binormalIdx + 1, new VertexDataStruct()
-                            {
-                                DataBlock = 1,
-                                DataOffset = 0, // Offset doesn't matter since we recalculate it anyways.
-                                DataType = VertexDataType.Ubyte4n,
-                                DataUsage = VertexUsageType.Tangent
-                            });
+                        DataBlock = 0,
+                        DataType = upgradePrecision ? VertexDataType.Float3 : VertexDataType.Half4,
+                        DataUsage = VertexUsageType.Position,
+                    });
 
-                        }
-                        
-                        // Add 2nd color channel for faux-wind simulation.
-                        var colorCounts = source.Count(x => x.DataUsage == VertexUsageType.Color);
-                        var colorIdx = source.FindIndex(x => x.DataUsage == VertexUsageType.Color);
-                        if (colorCounts == 1)
+                    if (ttModel.HasWeights)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
                         {
-                            source.Insert(colorIdx + 1, new VertexDataStruct()
-                            {
-                                DataBlock = 1,
-                                DataOffset = 0, // Offset doesn't matter since we recalculate it anyways.
-                                DataType = VertexDataType.Ubyte4n,
-                                DataUsage = VertexUsageType.Color
-                            });
-                        }
+                            DataBlock = 0,
+                            DataType = usageInfo.NeedsEightWeights ? VertexDataType.UByte8 : VertexDataType.Ubyte4n,
+                            DataUsage = VertexUsageType.BoneWeight
+                        });
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 0,
+                            DataType = usageInfo.NeedsEightWeights ? VertexDataType.UByte8 : VertexDataType.Ubyte4,
+                            DataUsage = VertexUsageType.BoneIndex
+                        });
                     }
+
+                    AddVertexHeader(source, new VertexDataStruct()
+                    {
+                        DataBlock = 1,
+                        DataType = upgradePrecision ? VertexDataType.Float3 : VertexDataType.Half4,
+                        DataUsage = VertexUsageType.Normal
+                    });
+
+                    AddVertexHeader(source, new VertexDataStruct()
+                    {
+                        DataBlock = 1,
+                        DataType = VertexDataType.Ubyte4n,
+                        DataUsage = VertexUsageType.Binormal
+                    });
+
+                    // Optional/Situational Elements
+                    if (upgradePrecision && useFlowData)
+                    {
+                        
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = VertexDataType.Ubyte4n,
+                            DataUsage = VertexUsageType.Flow
+                        });
+                    }
+
+                    AddVertexHeader(source, new VertexDataStruct()
+                    {
+                        DataBlock = 1,
+                        DataType = VertexDataType.Ubyte4n,
+                        DataUsage = VertexUsageType.Color
+                    });
+
+                    if (usageInfo.UsesVColor2)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = VertexDataType.Ubyte4n,
+                            DataUsage = VertexUsageType.Color,
+                            Count = 1
+                        });
+                    }
+
+                    if (usageInfo.MaxUv == 1)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = upgradePrecision ? VertexDataType.Float2 : VertexDataType.Half2,
+                            DataUsage = VertexUsageType.TextureCoordinate,
+                        });
+                    } else
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = upgradePrecision ? VertexDataType.Float4 : VertexDataType.Half4,
+                            DataUsage = VertexUsageType.TextureCoordinate,
+                        });
+                    }
+
+                    if (usageInfo.MaxUv > 2)
+                    {
+                        AddVertexHeader(source, new VertexDataStruct()
+                        {
+                            DataBlock = 1,
+                            DataType = upgradePrecision ? VertexDataType.Float2 : VertexDataType.Half2,
+                            DataUsage = VertexUsageType.TextureCoordinate,
+                            Count = 1
+                        });
+                    }
+
+                    var runningOffsets = new List<int>() { 0, 0, 0 };
+                    vertexStreamCounts.Add(source.Max(x => x.DataBlock) + 1);
 
                     foreach (var vds in source)
                     {
@@ -2523,87 +2715,7 @@ namespace xivModdingFramework.Models.FileTypes
                         var dataOffset = vds.DataOffset;
                         var dataType = vds.DataType;
                         var dataUsage = vds.DataUsage;
-
-                        // Model version 5 doesn't allow double color channel information.
-                        if (vdsDictionary.ContainsKey(dataUsage) && mdlVersion == 5)
-                        {
-                            continue;
-                        }
-
-                        // Perform precision updates if requested, and adjustments for MDL version.
-                        if (dataUsage == VertexUsageType.Position)
-                        {
-                            if (_UpgradePrecision)
-                            {
-                                dataType = VertexDataType.Float3;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Half4;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.BoneWeight)
-                        {
-                            if (mdlVersion >= 6 && _UpgradePrecision)
-                            {
-                                dataType = VertexDataType.UByte8;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Ubyte4n;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.BoneIndex)
-                        {
-                            if (mdlVersion >= 6 && _UpgradePrecision)
-                            {
-                                dataType = VertexDataType.UByte8;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Ubyte4;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.Normal)
-                        {
-                            if (_UpgradePrecision)
-                            {
-                                dataType = VertexDataType.Float3;
-                            }
-                            else
-                            {
-                                dataType = VertexDataType.Half4;
-                            }
-                        }
-
-                        if (dataUsage == VertexUsageType.TextureCoordinate)
-                        {
-                            if (_UpgradePrecision)
-                            {
-                                if (dataType == VertexDataType.Half2)
-                                {
-                                    dataType = VertexDataType.Float2;
-                                }
-                                else if (dataType == VertexDataType.Half4)
-                                {
-                                    dataType = VertexDataType.Float4;
-                                }
-                            }
-                            else
-                            {
-                                if (dataType == VertexDataType.Float2)
-                                {
-                                    dataType = VertexDataType.Half2;
-                                }
-                                else if (dataType == VertexDataType.Float4)
-                                {
-                                    dataType = VertexDataType.Half4;
-                                }
-                            }
-                        }
+                        var ct = vds.Count;
 
                         var count = 0;
                         if (!vdsDictionary.ContainsKey(dataUsage))
@@ -2702,6 +2814,12 @@ namespace xivModdingFramework.Models.FileTypes
 
                     Dat.Pad(indexDataBlock, 16);
                 }
+
+                if (vertexDataBlock.Count > _MaxVertexBufferSize)
+                {
+                    throw new InvalidDataException($"Total Vertex buffer data size is too large, even after compression attempts:\nTotal Size: {vertexDataBlock.Count}\nMax Size: {_MaxVertexBufferSize}\n\nPlease reduce the total number of Vertices in the model:\nVertices (After Unwelding): {totalVertexCount}");
+                }
+
                 #endregion
 
                 // Path Data
@@ -2909,8 +3027,10 @@ namespace xivModdingFramework.Models.FileTypes
                 basicModelBlock.Add(bgChangeIdx);
                 basicModelBlock.Add(crestChangeIdx);
 
-                // More Unknowns
-                basicModelBlock.Add(ogModelData.Unknown12);
+                // Using neck morph data from original modal
+                // The field currently named LevelOfDetail.Unknown7 also contains this number, and also gets copied from the original model
+                var neckMorphTableSizePointer = basicModelBlock.Count; // we want to reset this to 0 later if the neck data cannot be preserved
+                basicModelBlock.Add(ogModelData.NeckMorphTableSize);
 
                 // We fix this pointer later after bone table is done.
                 var boneSetSizePointer = basicModelBlock.Count;
@@ -2918,7 +3038,11 @@ namespace xivModdingFramework.Models.FileTypes
 
                 // Unknowns that are probably partly padding.
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown13));
-                basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown14));
+                // XXX: Not preserving new Patch 7.2 face data
+                // It seems to have a dependency on the number of vertices, and thus crashes with custom models with fewer of them
+                // It also has a dependency on the order of vertices, and thus has poor results when Blender decides to shuffle them around...
+                //basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Patch72TableSize));
+                basicModelBlock.AddRange(new byte[] { 0, 0 });
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown15));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown16));
                 basicModelBlock.AddRange(BitConverter.GetBytes(ogModelData.Unknown17));
@@ -3008,7 +3132,7 @@ namespace xivModdingFramework.Models.FileTypes
                             {
                                 foreach (var shapePart in part.ShapeParts)
                                 {
-                                    if (shapePart.Key.StartsWith("shp_"))
+                                    if (shapePart.Key.StartsWith("shp"))
                                     {
                                         vertexCount += shapePart.Value.Vertices.Count;
                                     }
@@ -3085,7 +3209,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // Unknown Data 1
                 #region Unknown Data Block 1
 
-                var unknownDataBlock1 = ogMdl.UnkData1.Unknown;
+                var unknownDataBlock1 = ogMdl.UnkData1.TerrainShadowMeshHeader;
 
                 #endregion
 
@@ -3408,14 +3532,16 @@ namespace xivModdingFramework.Models.FileTypes
 
                     foreach (var p in rawShapeData.ShapeList)
                     {
+                        var seen = new HashSet<ushort>();
                         foreach (var r in p.IndexReplacements)
                         {
-                            if (r.Value > ushort.MaxValue)
+                            if (r.Value > ushort.MaxValue || r.Key > ushort.MaxValue)
                             {
                                 throw new InvalidDataException("Mesh Group " + p.MeshId + " has too many total vertices/triangle indices.\nRemove some vertices/faces/shapes or split them across multiple mesh groups.");
                             }
                             meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Key));
                             meshShapeDataBlock.AddRange(BitConverter.GetBytes((ushort)r.Value));
+                            seen.Add((ushort)r.Key);
                         }
                     }
 
@@ -3457,6 +3583,76 @@ namespace xivModdingFramework.Models.FileTypes
 
                 #endregion
 
+                // Neck Morph Data
+                #region Neck Morph Data
+                var neckMorphDataBlock = new List<byte>();
+                // Preserve the original model's neck morph data if present -- but update the bone references inside of it
+                // Bone references are made via BoneSet[0]
+                for (int i = 0; i < ogMdl.NeckMorphTable.Count; ++i)
+                {
+                    // Extract the original data (except the bone list)
+                    var positionAdjust = ogMdl.NeckMorphTable[i].PositionAdjust;
+                    var unknown = ogMdl.NeckMorphTable[i].Unknown;
+                    var normalAdjust = ogMdl.NeckMorphTable[i].NormalAdjust;
+                    var bones = new List<byte>();
+
+                    // Look up the originally referenced bone by name, and map it to the same bone in the imported model
+                    for (int j = 0; j < ogMdl.NeckMorphTable[i].Bones.Count; ++j)
+                    {
+                        string ogBoneName = ogMdl.PathData.BoneList[ogMdl.NeckMorphTable[i].Bones[j]];
+                        int boneset0Index = -1;
+
+                        if (ttModel.MeshGroups.Count > 0)
+                        {
+                            boneset0Index = ttModel.MeshGroups[0].Bones.FindIndex(x => x == ogBoneName);
+                        }
+
+                        // If a bone can't be located in the new model, just discard all of the neck morph data
+                        if (boneset0Index == -1 || boneset0Index > 255)
+                        {
+                            loggingFunction(true, "Could not match bones in neck morph data, so the data was discarded!");
+                            // Reset the table size to 0 in the model header and drop the data
+                            // (Two bytes are also cleared later on when writing the LODs)
+                            basicModelBlock[neckMorphTableSizePointer] = 0;
+                            neckMorphDataBlock = new List<byte>();
+                            break;
+                        }
+
+                        bones.Add((byte)boneset0Index);
+                    }
+
+                    // Fully abort building neck data if we gave up inside the previous loop
+                    if (basicModelBlock[neckMorphTableSizePointer] == 0)
+                        break;
+
+                    // Serialize
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.X));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.Y));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(positionAdjust.Z));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(unknown));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(normalAdjust.X));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(normalAdjust.Y));
+                    neckMorphDataBlock.AddRange(BitConverter.GetBytes(normalAdjust.Z));
+
+                    // Bone list is always 4 bytes -- pad with zeroes
+                    for (int j = 0; j < 4; ++j)
+                    {
+                        if (j < bones.Count)
+                            neckMorphDataBlock.Add(bones[j]);
+                        else
+                            neckMorphDataBlock.Add(0);
+                    }
+                }
+                #endregion
+
+                // Patch 7.2 Unknown Data
+                #region Patch 7.2 Unknown Data
+                // XXX: Not preserving Patch 7.2 face data
+                //var unknownPatch72DataBlock = ogMdl.UnkDataPatch72.Unknown;
+                var unknownPatch72DataBlock = Array.Empty<byte>();
+
+                #endregion
+
                 // Padding 
                 #region Padding Data Block
 
@@ -3483,6 +3679,7 @@ namespace xivModdingFramework.Models.FileTypes
                     if (i < 2)
                     {
                         // First bounding box is bounds from the origin.
+
                         boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.X > 0 ? 0.0f : minVect.X));
                         boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.Y > 0 ? 0.0f : minVect.Y));
                         boundingBoxDataBlock.AddRange(BitConverter.GetBytes(i == 0 && minVect.Z > 0 ? 0.0f : minVect.Z));
@@ -3500,21 +3697,47 @@ namespace xivModdingFramework.Models.FileTypes
                     }
                 }
 
-                // Afterwards there are is a bounding box for every bone.
-                // Again, we'll be lazy and just use the full model bounding box for each.
-                // Unsure what these are actually used for since there seems no difference
-                // in model function whether these have real data or no data.
+                var ogBbDict = new Dictionary<string, List<Vector4>>();
+
+                var boneId = 0;
+                foreach(var bbList in ogMdl.BoneBoundingBoxes)
+                {
+                    if (boneId >= ogMdl.PathData.BoneList.Count) continue;
+                    var bone = ogMdl.PathData.BoneList[boneId];
+
+                    var list = bbList;
+                    // Ignore old bad data.
+                    if (new Vector3(bbList[0][0], bbList[0][1], bbList[0][2]) == minVect
+                        && new Vector3(bbList[1][0], bbList[1][1], bbList[1][2]) == maxVect)
+                    {
+                        list = new List<Vector4>()
+                        {
+                            new Vector4(0,0,0,0),
+                            new Vector4(0,0,0,0),
+                        };
+                    }
+
+                    ogBbDict.Add(bone, list);
+                    boneId++;
+                }
+
+
+                // Bone bounding boxes.  We use a 1/10th model size cube for every bone.
+                // This gives us something functional, without having to do a bunch of wild and crazy
+                // parsing/math or demanding the user import models with a functional skeleton.
+                const float _Divisor = 20.0f;
                 var boneBoundingBoxDataBlock = new List<byte>();
                 for (var i = 0; i < ttModel.Bones.Count; i++)
                 {
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(minVect.Z));
+                    var bone = ttModel.Bones[i];
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(-1 * modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(-1 * modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(-1 * modelRadius / _Divisor));
                     boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
 
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.X));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.Y));
-                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(maxVect.Z));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(modelRadius / _Divisor));
+                    boundingBoxDataBlock.AddRange(BitConverter.GetBytes(modelRadius / _Divisor));
                     boundingBoxDataBlock.AddRange(BitConverter.GetBytes(1.0f));
                 }
 
@@ -3585,7 +3808,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // This is the offset to the beginning of the vertex data
                 var combinedDataBlockSize = _MdlHeaderSize + vertexInfoBlock.Count + pathInfoBlock.Count + basicModelBlock.Count + unknownDataBlock0.Length + (60 * ogMdl.LoDList.Count) + extraMeshesBlock.Count + meshDataBlock.Count +
                     attributePathDataBlock.Count + (unknownDataBlock1?.Length ?? 0) + meshPartDataBlock.Count + unknownDataBlock2.Length + matPathOffsetDataBlock.Count + bonePathOffsetDataBlock.Count +
-                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
+                    boneSetsBlock.Count + FullShapeDataBlock.Count + partBoneSetsBlock.Count + neckMorphDataBlock.Count + unknownPatch72DataBlock.Length + paddingDataBlock.Count + boundingBoxDataBlock.Count + boneBoundingBoxDataBlock.Count;
 
                 var lodDataBlock = new List<byte>();
                 List<int> indexStartInjectPointers = new List<int>();
@@ -3628,6 +3851,14 @@ namespace xivModdingFramework.Models.FileTypes
                 lodDataBlock.AddRange(BitConverter.GetBytes(ogMdl.LoDList[0].Unknown6));
                 lodDataBlock.AddRange(BitConverter.GetBytes(ogMdl.LoDList[0].Unknown7));
 
+                // If the neck morph data was discarded -- clear the morph counts here too
+                // (The first 2 bytes of what is currently named "Unknown7" seem to refer to the size of this table)
+                if (ogMdl.NeckMorphTable.Count > 0 && neckMorphDataBlock.Count == 0)
+                {
+                    lodDataBlock[lodDataBlock.Count - 4] = 0;
+                    lodDataBlock[lodDataBlock.Count - 3] = 0;
+                }
+
                 // Vertex & Index Sizes
                 lodDataBlock.AddRange(BitConverter.GetBytes(vertexDataSize));
                 lodDataBlock.AddRange(BitConverter.GetBytes(indexDataSize));
@@ -3664,6 +3895,8 @@ namespace xivModdingFramework.Models.FileTypes
                 modelDataBlock.AddRange(boneSetsBlock);
                 modelDataBlock.AddRange(FullShapeDataBlock);
                 modelDataBlock.AddRange(partBoneSetsBlock);
+                modelDataBlock.AddRange(neckMorphDataBlock);
+                modelDataBlock.AddRange(unknownPatch72DataBlock);
                 modelDataBlock.AddRange(paddingDataBlock);
                 modelDataBlock.AddRange(boundingBoxDataBlock);
                 modelDataBlock.AddRange(boneBoundingBoxDataBlock);
@@ -3807,7 +4040,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             var bytes = new List<byte>(4);
             var vec = normal;
-            vec.Normalize();
+            //vec.Normalize();
 
 
             // The possible range of -1 to 1 Vector X/Y/Z Values are compressed
@@ -3869,9 +4102,10 @@ namespace xivModdingFramework.Models.FileTypes
                     value = v.Binormal;
                     handedness = v.Handedness;
                     break;
-                case VertexUsageType.Tangent:
-                    value = v.Tangent;
-                    handedness = !v.Handedness;
+                case VertexUsageType.Flow:
+                    value = v.FlowDirection;
+                    // Unused
+                    handedness = true;
                     break;
                 default:
                     return false;
@@ -3936,7 +4170,6 @@ namespace xivModdingFramework.Models.FileTypes
             {
                 if (vertexInfoList[VertexUsageType.BoneIndex][0] == VertexDataType.UByte8)
                 {
-                    ModelModifiers.CleanWeight(v, 8, loggingFunction);
 
                     // 8 Byte stye...
                     importData.VertexData0.Add(v.Weights[0]);
@@ -3958,7 +4191,6 @@ namespace xivModdingFramework.Models.FileTypes
                     importData.VertexData0.Add(v.BoneIds[7]);
                 } else
                 {
-                    ModelModifiers.CleanWeight(v, 4, loggingFunction);
                     // 4 byte style ...
                     importData.VertexData0.Add(v.Weights[0]);
                     importData.VertexData0.Add(v.Weights[1]);
@@ -3975,7 +4207,7 @@ namespace xivModdingFramework.Models.FileTypes
 
             WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Normal, v);
             WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Binormal, v);
-            WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Tangent, v);
+            WriteVectorData(importData.VertexData1, vertexInfoList, VertexUsageType.Flow, v);
 
 
             if (vertexInfoList.ContainsKey(VertexUsageType.Color))
@@ -4019,6 +4251,21 @@ namespace xivModdingFramework.Models.FileTypes
                         importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV2[0]).RawValue));
                         importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV2[1]).RawValue));
                     }
+                }
+            }
+            if(vertexInfoList.ContainsKey(VertexUsageType.TextureCoordinate) && vertexInfoList[VertexUsageType.TextureCoordinate].Count > 1)
+            {
+                var texCoordDataType = vertexInfoList[VertexUsageType.TextureCoordinate][1];
+                if (texCoordDataType == VertexDataType.Float2)
+                {
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV3[0]));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(v.UV3[1]));
+
+                }
+                else if (texCoordDataType == VertexDataType.Half2)
+                {
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV3[0]).RawValue));
+                    importData.VertexData1.AddRange(BitConverter.GetBytes(((Half)v.UV3[1]).RawValue));
                 }
             }
 
@@ -4078,7 +4325,7 @@ namespace xivModdingFramework.Models.FileTypes
             var modlist = await tx.GetModList();
 
             var ogMdl = await GetXivMdl(mdlPath, false, tx);
-            var ttMdl = TTModel.FromRaw(ogMdl);
+            var ttMdl = await TTModel.FromRaw(ogMdl);
 
             bool anyChanges = false;
             anyChanges = SkinCheckBibo(ttMdl, index);
@@ -4120,7 +4367,11 @@ namespace xivModdingFramework.Models.FileTypes
             tx = boiler.Transaction;
             try {  
                 var modList = await tx.GetModList();
-                var mods = modList.GetMods();
+                // Snapshot the modlist before iterating. CheckSkinAssignment writes the
+                // updated model back via Dat.WriteModFile, which mutates the live modlist
+                // (data offsets/sizes update on each write). Iterating the live collection
+                // throws "Collection was modified; enumeration operation may not execute".
+                var mods = modList.GetMods().ToList();
 
                 int count = 0;
                 foreach (var mod in mods)
@@ -4539,7 +4790,7 @@ namespace xivModdingFramework.Models.FileTypes
                 // File already exists, no adjustments needed.
                 if ((await tx.FileExists(path))) return;
 
-                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                var _eqp = new Eqp();
                 var availableModels = await _eqp.GetAvailableRacialModels(setId, slot);
                 var baseModelOrder = newRace.GetModelPriorityList();
 
@@ -4661,7 +4912,7 @@ namespace xivModdingFramework.Models.FileTypes
                 var modlist = await tx.GetModList();
 
                 var xMdl = await GetXivMdl(originalPath, false, tx);
-                var model = TTModel.FromRaw(xMdl);
+                var model = await TTModel.FromRaw(xMdl);
 
 
                 if (model == null)
@@ -4852,10 +5103,10 @@ namespace xivModdingFramework.Models.FileTypes
                 var modlist = await tx.GetModList();
 
                 var xMdl = await GetXivMdl(mergeIn, false, tx);
-                var mergeInModel = TTModel.FromRaw(xMdl);
+                var mergeInModel = await TTModel.FromRaw(xMdl);
 
                 var xMdl2 = await GetXivMdl(primaryModel, false, tx);
-                var mainModel = TTModel.FromRaw(xMdl2);
+                var mainModel = await TTModel.FromRaw(xMdl2);
 
 
                 if (mergeInModel == null)
@@ -5083,6 +5334,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Legs, "dwn"},
             {XivStrings.Feet, "sho"},
             {XivStrings.Body, "top"},
+            {XivStrings.Facewear, "met"},
             {XivStrings.Earring, "ear"},
             {XivStrings.Ear, "zer"},
             {XivStrings.Neck, "nek"},
@@ -5092,6 +5344,7 @@ namespace xivModdingFramework.Models.FileTypes
             {XivStrings.Head_Body, "top"},
             {XivStrings.Body_Hands, "top"},
             {XivStrings.Body_Hands_Legs, "top"},
+            {XivStrings.Body_Legs, "top"},			
             {XivStrings.Body_Legs_Feet, "top"},
             {XivStrings.Body_Hands_Legs_Feet, "top"},
             {XivStrings.Legs_Feet, "dwn"},
@@ -5133,7 +5386,7 @@ namespace xivModdingFramework.Models.FileTypes
                 {0x2, VertexUsageType.BoneIndex },
                 {0x3, VertexUsageType.Normal },
                 {0x4, VertexUsageType.TextureCoordinate },
-                {0x5, VertexUsageType.Tangent },
+                {0x5, VertexUsageType.Flow },
                 {0x6, VertexUsageType.Binormal },
                 {0x7, VertexUsageType.Color }
             };

@@ -82,7 +82,7 @@ namespace xivModdingFramework.Models.DataContainers
                             if(indexOffsets[lodNum][meshNum] == part.MeshIndexOffset)
                             {
                                 part.MeshNumber = meshNum;
-                                break;
+                                // No break; here since we need the LAST matching mesh.
                             }
                         }
                     }

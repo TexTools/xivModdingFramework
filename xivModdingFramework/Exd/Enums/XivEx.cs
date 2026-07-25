@@ -544,6 +544,7 @@ namespace xivModdingFramework.Exd.Enums
         recipe,
         recipeelement,
         recipeleveltable,
+        recipelookup,
         recipenotebooklist,
         recommendcontents,
         relic,
@@ -671,6 +672,9 @@ namespace xivModdingFramework.Exd.Enums
         xpvpgroupactivity,
         ykw,
         zonesharedgroup,
-        zonetimeline
+        zonetimeline,
+        glasses,
+        glassesstyle,
+
     }
 }

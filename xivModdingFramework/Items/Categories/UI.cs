@@ -187,8 +187,8 @@ namespace xivModdingFramework.Items.Categories
             {
 
                 var name = (string) action.GetColumnByName("Name");
-                var iconId = (ushort)action.GetColumnByName("Icon");
-                var actionCatId = (byte)action.GetColumnByName("ActionCategoryId");
+                var iconId = action.GetColumnByName<int>("Icon");
+                var actionCatId = action.GetColumnByName<int>("ActionCategoryId");
                 var actionCat = GetActionCategory(actionCategoryExData, actionCatId);
 
                 var xivUi = new XivUi()
@@ -224,7 +224,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(generalActionExData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (int)action.GetColumnByName("Icon");
+                var iconId = action.GetColumnByName<int>("Icon");
 
                 var xivUi = new XivUi()
                 {
@@ -250,8 +250,8 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(buddyActionExData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (int)action.GetColumnByName("Icon");
-                var iconStatus = (int)action.GetColumnByName("IconStatus");
+                var iconId = action.GetColumnByName<int>("Icon");
+                var iconStatus = action.GetColumnByName<int>("IconStatus");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
@@ -285,7 +285,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(companyActionExData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (int)action.GetColumnByName("Icon");
+                var iconId = action.GetColumnByName<int>("Icon");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
@@ -308,7 +308,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(craftActionData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (ushort)action.GetColumnByName("Icon");
+                var iconId = action.GetColumnByName<int>("Icon");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
@@ -331,7 +331,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(eventActionData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (ushort)action.GetColumnByName("Icon");
+                var iconId = action.GetColumnByName<int>("Icon");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
@@ -355,7 +355,8 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(emoteData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (ushort)action.GetColumnByName("Icon");
+                // Cast to int for storage; SE is unlikely to ever use past 2^31 icons.
+                int iconId = action.GetColumnByName<int>("Icon");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
@@ -379,7 +380,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(markerData.Values, (action) =>
             {
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (int)action.GetColumnByName("Icon");
+                var iconId = action.GetColumnByName<int>("Icon");
 
                 if (string.IsNullOrWhiteSpace(name)) return;
 
@@ -402,10 +403,10 @@ namespace xivModdingFramework.Items.Categories
             var vfxData = await _ex.ReadExData(XivEx.vfx, tx);
             await Task.Run(() => Parallel.ForEach(fieldMarkerData.Values, (action) =>
             {
-                var vfxId = (int)action.GetColumnByName("VfxId");
+                var vfxId = action.GetColumnByName<int>("VfxId");
                 var name = (string)action.GetColumnByName("Name");
-                var iconId = (ushort)action.GetColumnByName("Icon");
-                var minimapIcon = (ushort)action.GetColumnByName("MiniMapIcon");
+                var iconId = action.GetColumnByName<int>("Icon");
+                var minimapIcon = action.GetColumnByName<int>("MiniMapIcon");
 
                 var vfx = (string)vfxData[vfxId].GetColumnByName("Path");
 
@@ -462,12 +463,12 @@ namespace xivModdingFramework.Items.Categories
                     PrimaryCategory = "UI",
                     SecondaryCategory = XivStrings.Status,
                     Name = (string) status.GetColumnByName("Name"),
-                    IconNumber = (int)((uint) status.GetColumnByName("Icon"))
+                    IconNumber = status.GetColumnByName<int>("Icon")
                 };
                 if (string.IsNullOrWhiteSpace(xivUi.Name)) return;
 
                 //Status effects have a byte that determines whether the effect is detrimental or beneficial
-                var type = (byte)status.GetColumnByName("Type");
+                var type = status.GetColumnByName<int>("Type");
                 if (type == 1)
                 {
                     xivUi.TertiaryCategory = XivStrings.Beneficial;
@@ -518,8 +519,8 @@ namespace xivModdingFramework.Items.Categories
                 {
                     PrimaryCategory = "UI",
                     SecondaryCategory = XivStrings.MapSymbol,
-                    IconNumber = (int)mapSymbol.GetColumnByName("Icon"),
-                    Name = GetPlaceName(placeNameData, (int)mapSymbol.GetColumnByName("PlaceNameId")),
+                    IconNumber = mapSymbol.GetColumnByName<int>("Icon"),
+                    Name = GetPlaceName(placeNameData, mapSymbol.GetColumnByName<int>("PlaceNameId")),
                 };
 
                 if (string.IsNullOrWhiteSpace(xivUi.Name))
@@ -557,7 +558,7 @@ namespace xivModdingFramework.Items.Categories
                 {
                     PrimaryCategory = "UI",
                     SecondaryCategory = XivStrings.OnlineStatus,
-                    IconNumber = (int)(uint)onlineStatus.GetColumnByName("Icon"),
+                    IconNumber = onlineStatus.GetColumnByName<int>("Icon"),
                     Name = (string)onlineStatus.GetColumnByName("Name"),
                 };
 
@@ -597,7 +598,7 @@ namespace xivModdingFramework.Items.Categories
                 {
                     PrimaryCategory = "UI",
                     SecondaryCategory = XivStrings.Weather,
-                    IconNumber = (int)weather.GetColumnByName("Icon"),
+                    IconNumber = weather.GetColumnByName<int>("Icon"),
                     Name = (string)weather.GetColumnByName("Name"),
                 };
 
@@ -664,7 +665,7 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(itemDictionary.Values, (itemRow) =>
             {
 
-                var pictureId = (uint)itemRow.GetColumnByName("PictureId");
+                var pictureId = itemRow.GetColumnByName<int>("PictureId");
                 if (pictureId == 0 || pictureId > pictureDictionary.Count)
                     return;
 
@@ -674,15 +675,15 @@ namespace xivModdingFramework.Items.Categories
                     return;
                 }
 
-                var filterGroup = (byte)itemRow.GetColumnByName("FilterGroup");
+                var filterGroup = itemRow.GetColumnByName<int>("FilterGroup");
                 if (filterGroup != 34)
                 {
                     return;
                 }
 
-                var pictureRow = pictureDictionary[(int)pictureId];
+                var pictureRow = pictureDictionary[pictureId];
 
-                var id = (int)pictureRow.GetColumnByName("PrimaryId");
+                var id = pictureRow.GetColumnByName<int>("PrimaryId");
                 var painting = new XivUi
                 {
                     PrimaryCategory = XivStrings.UI,
@@ -690,8 +691,8 @@ namespace xivModdingFramework.Items.Categories
                     UiPath = "ui/icon/" + (id).ToString("D6"),
                     IconNumber = id,
                 };
-                //painting.IconId = (ushort)itemRow.GetColumnByName("Icon");
-                painting.Name = (string)itemRow.GetColumnByName("Name") + " Icon";
+                //painting.IconId = itemRow.GetColumnByName<ushort>("Icon");
+                painting.Name = $"{(string)itemRow.GetColumnByName("Name")} {XivStrings.Icon}";
 
 
                 lock (paintingsLock)

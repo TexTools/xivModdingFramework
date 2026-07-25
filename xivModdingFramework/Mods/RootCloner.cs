@@ -1,6 +1,7 @@
 ﻿using SharpDX.Win32;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -269,7 +270,7 @@ namespace xivModdingFramework.Mods
                     var src = kv.Key;
                     var dst = kv.Value;
                     var xmdl = await Mdl.GetXivMdl(src, false, tx);
-                    var tmdl = TTModel.FromRaw(xmdl);
+                    var tmdl = await TTModel.FromRaw(xmdl);
 
                     if (xmdl == null || tmdl == null)
                         continue;
@@ -446,7 +447,7 @@ namespace xivModdingFramework.Mods
 
                 if (ProgressReporter != null)
                 {
-                    ProgressReporter.Report("Filling in missing material sets...");
+                    ProgressReporter.Report("Filling in missing material versions...");
                 }
 
                 // Validate all variants/material sets for valid materials, and copy materials as needed to fix.
@@ -722,7 +723,13 @@ namespace xivModdingFramework.Mods
                         dstSlot = srcSlot + dstSlot;
                     }
 
-                    file = file.Replace(srcSlot, dstSlot);
+                    if (!string.IsNullOrWhiteSpace(srcSlot))
+                    {
+                        file = file.Replace(srcSlot, dstSlot);
+                    } else if(!string.IsNullOrWhiteSpace(dstSlot))
+                    {
+                        file = file.Replace(match.Groups[0].Value, match.Groups[0].Value + "_" + dstSlot);
+                    }
                 }
 
 
@@ -843,10 +850,11 @@ namespace xivModdingFramework.Mods
                     {
                         // If we got here, we have mods that weren't in the original modpack import, that got included in the root clone.
                         // This should never happen if the modpack includes the entire subset of files necessary to properly fill out its item root.
-                        
+
                         // If it /does/ happen, it means we just copied some unknown (possibly orphaned) files into the destination item directory.
                         // Which isn't necessarily dangerous, but isn't correct, either.
-                        throw new Exception("Root CloneAndReset wanted to copy more files than were provided by the modpack import.");
+                        //throw new Exception("Root CloneAndReset wanted to copy more files than were provided by the modpack import.");
+                        Trace.WriteLine("Root CloneAndReset wanted to copy more files than were provided by the modpack import: " + file);
                     }
                 }
                 clearedFiles.UnionWith(filesToReset);

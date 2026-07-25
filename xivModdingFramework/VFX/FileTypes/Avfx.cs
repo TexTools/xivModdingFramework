@@ -52,10 +52,9 @@ namespace xivModdingFramework.VFX.FileTypes
                         {
                             data = br.ReadInt32();
                         }
-                        catch (EndOfStreamException e)
+                        catch (EndOfStreamException)
                         {
-                            throw new System.Exception("VFX textures were detected but no texture paths could be found.\n" +
-                                "VFX textures will not be accessible.");
+                            return;
                         }                        
                     }
 

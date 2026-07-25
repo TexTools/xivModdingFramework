@@ -54,6 +54,8 @@ using xivModdingFramework.Exd.Enums;
 using SharpDX.Toolkit.Graphics;
 using xivModdingFramework.Models.DataContainers;
 using SixLabors.ImageSharp.PixelFormats;
+using Image = SixLabors.ImageSharp.Image;
+using SixLabors.ImageSharp.Formats.Tga;
 
 namespace xivModdingFramework.Textures.FileTypes
 {
@@ -80,14 +82,14 @@ namespace xivModdingFramework.Textures.FileTypes
             public ushort Depth;
 
             public byte MipCount;
-            public bool MipFlag;
+            public byte MipFlag;
 
             public byte ArraySize;
 
             // 3 Ints, representing which MipMaps to use at each LoD level.
-            uint[] LoDMips;
+            public uint[] LoDMips;
 
-            uint[] MipMapOffsets;
+            public uint[] MipMapOffsets;
 
             /// <summary>
             /// Reads a .tex file header (80 bytes) from the given stream.
@@ -109,7 +111,7 @@ namespace xivModdingFramework.Textures.FileTypes
 
                 header.Depth = br.ReadUInt16();
                 header.MipCount = br.ReadByte();
-                header.MipFlag = (header.MipCount & 8) > 0;
+                header.MipFlag = (byte)(header.MipCount >> 4);
                 header.MipCount = (byte)(header.MipCount & 0xF);
                 header.ArraySize = br.ReadByte();
 
@@ -126,8 +128,111 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
                 return header;
             }
-        }
 
+            /// <summary>
+            /// Writes a .tex file header from this.
+            /// </summary>
+            /// <returns>Byte array containing the header data.</returns>
+            internal byte[] ToBytes()
+            {
+                var res = new byte[_TexHeaderSize];
+                var bw = new BinaryWriter(new MemoryStream(res, true));
+                bw.Write(this.Attributes);
+                bw.Write(this.TextureFormat);
+                bw.Write(this.Width);
+                bw.Write(this.Height);
+                bw.Write(this.Depth);
+                bw.Write((byte)((this.MipFlag << 4) | this.MipCount));
+                bw.Write(this.ArraySize);
+                foreach (var x in this.LoDMips)
+                    bw.Write(x);
+                foreach (var x in this.MipMapOffsets)
+                    bw.Write(x);
+
+                Debug.Assert(bw.BaseStream.Position == _TexHeaderSize, "Data was not fully written.");
+                return res;
+            }
+
+            // Many tex files were written with broken mipmap offsets, and extra data at the end.
+            // Try to rebuild them here, using the total tex file size as a heuristic
+            // Returns a flag indicating if any data was changed, as well as the size in bytes that the tex file should be
+            internal static (bool HeaderChanged, long CalculatedTexSize) FixUpBrokenMipOffsets(TexHeader header, long texSizeIncludingHeader)
+            {
+                bool modified = false;
+                int originalMipCount = header.MipCount;
+                int mipOffset = (int)Tex._TexHeaderSize;
+
+                // A mip count of more than 13 is impossible
+                if (originalMipCount > 13)
+                    originalMipCount = 13;
+
+                // This will throw for unknown formats
+                var mipSizes = DDS.CalculateMipMapSizes((XivTexFormat)header.TextureFormat, header.Width, header.Height);
+
+                // Ensure MipCount is always something valid. First offset will always be 80 or 0x50
+                header.MipCount = 1;
+                modified |= (header.MipMapOffsets[0] != (uint)mipOffset);
+                header.MipMapOffsets[0] = (uint)mipOffset;
+                mipOffset += mipSizes[0];
+
+                int mipLevel;
+
+                for (mipLevel = 1; mipLevel < originalMipCount; ++mipLevel)
+                {
+                    // There's more mipmaps in the original file than we calculated should be possible -- cut the list short
+                    if (mipLevel >= mipSizes.Count)
+                        break;
+
+                    int mipSize = mipSizes[mipLevel];
+
+                    // We've reached a mipmap we calculate would extend past the end of the file -- cut the list short
+                    if (mipOffset + mipSize > texSizeIncludingHeader)
+                        break;
+
+                    // Write the expected mipmap offset
+                    modified |= (header.MipMapOffsets[mipLevel] != (uint)mipOffset);
+                    header.MipMapOffsets[mipLevel] = (uint)mipOffset;
+
+                    // Next offset
+                    mipOffset += mipSize;
+
+                    // Bump the mip count in the header to match what we have verified so far
+                    header.MipCount = (byte)(mipLevel + 1);
+                }
+
+                uint maxLodMip = 0;
+                // Update LoDMips in case we removed a referenced mipmap
+                // ... or if the values are not correctly in ascending order
+                for (int lodLevel = 0; lodLevel < 3; ++lodLevel)
+                {
+                    if (header.LoDMips[lodLevel] >= header.MipCount)
+                    {
+                        modified = true;
+                        header.LoDMips[lodLevel] = (uint)(header.MipCount - 1);
+                    }
+                    if (header.LoDMips[lodLevel] < maxLodMip)
+                    {
+                        modified = true;
+                        header.LoDMips[lodLevel] = maxLodMip;
+                    }
+                    maxLodMip = header.LoDMips[lodLevel];
+                }
+
+                // Fill out the rest of table with zeroes
+                for (; mipLevel < 13; ++mipLevel)
+                {
+                    if (header.MipMapOffsets[mipLevel] != 0)
+                    {
+                        modified = true;
+                        header.MipMapOffsets[mipLevel] = 0;
+                    }
+                }
+
+                modified |= (header.MipCount != originalMipCount);
+
+                return (modified, mipOffset);
+            }
+        }
 
         /// <summary>
         /// Gets the path to the default blank texture for a given texture format.
@@ -249,15 +354,14 @@ namespace xivModdingFramework.Textures.FileTypes
                 return new List<string>();
             }
 
-            var iconString = iconId.ToString();
+            var baseNum = (iconId / 1000) * 1000;
+            var iconString = baseNum.ToString();
 
             var ttpList = new List<string>();
 
-
-            var iconBaseNum = iconString.Substring(0, 2).PadRight(iconString.Length, '0');
-            var iconFolder = $"ui/icon/{iconBaseNum.PadLeft(6, '0')}";
+            var iconFolder = $"ui/icon/{baseNum.ToString("D6")}";
             var iconHQFolder = $"{iconFolder}/hq";
-            var iconFile = $"{iconString.PadLeft(6, '0')}.tex";
+            var iconFile = $"{iconId.ToString("D6")}.tex";
 
             var path = iconFolder + "/" + iconFile;
             if (await tx.FileExists(path))
@@ -417,8 +521,8 @@ namespace xivModdingFramework.Textures.FileTypes
         /// <returns></returns>
         public static async Task<string> ConvertToDDS(string externalPath, string internalPath, XivTexFormat texFormat = XivTexFormat.INVALID, ModTransaction tx = null)
         {
-            var root = await XivCache.GetFirstRoot(internalPath);
-            bool useMips = root != null;
+            var df= IOUtil.GetDataFileFromPath(internalPath);
+            bool useMips = df != XivDataFile._06_Ui;
 
 
             // First of all, check if the file is a DDS file.
@@ -435,29 +539,67 @@ namespace xivModdingFramework.Textures.FileTypes
                 }
             }
 
+            // If no format was specified...
+            if (texFormat == XivTexFormat.INVALID)
+            {
+                // Use the current internal format.
+                var xivt = await Tex.GetXivTex(internalPath, false, tx);
+                texFormat = xivt.TextureFormat;
+            }
+
+            // Ensure we're converting to a format we can actually process.
+            CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
+
+            if (compressionFormat == CompressionFormat.BC7)
+            {
+                return await DDS.TexConv(externalPath, "BC7_UNORM", useMips);
+            }
+
+            // We have to check the image size here to be sure it won't nuke TexImpNet.
+            // Extremely small (<64x64) image sizes will cause it to memory error and nuke the entire application.
+            using (var img = Image.Load(externalPath))
+            {
+                if(img.Width < 64 || img.Height < 64)
+                {
+                    var w = 0;
+                    var h = 0;
+                    if(img.Width < img.Height)
+                    {
+                        w = 64;
+                        var mul = 64.0f / img.Width;
+                        h = (int) Math.Floor(img.Height * mul);
+                    }
+                    else
+                    {
+                        h = 64;
+                        var mul = 64.0f / img.Height;
+                        w = (int)Math.Floor(img.Width * mul);
+                    }
+                    var rOptions = new ResizeOptions()
+                    {
+                        Size = new Size(w, h),
+                        PremultiplyAlpha = false,
+                        Mode = SixLabors.ImageSharp.Processing.ResizeMode.Stretch,
+                        Sampler = KnownResamplers.NearestNeighbor,
+                    };
+
+                    img.Mutate(x => x.Resize(rOptions));
+
+                    var encoder = new TgaEncoder() { BitsPerPixel = TgaBitsPerPixel.Pixel32, Compression = TgaCompression.None };
+
+                    var path = IOUtil.GetFrameworkTempFile() + ".tga";
+                    img.Save(path, encoder);
+                    externalPath = path;
+                }
+            }
+
             var ddsContainer = new DDSContainer();
             try
             {
-                // If no format was specified...
-                if (texFormat == XivTexFormat.INVALID)
-                {
-                    // Use the current internal format.
-                    var xivt = await Tex.GetXivTex(internalPath, false, tx);
-                    texFormat = xivt.TextureFormat;
-                }
-
-                // Ensure we're converting to a format we can actually process.
-                CompressionFormat compressionFormat = GetCompressionFormat(texFormat);
-
-                if(compressionFormat == CompressionFormat.BC7)
-                {
-                    return await DDS.TexConv(externalPath, "BC7_UNORM", useMips);
-                }
-
                 using (var surface = Surface.LoadFromFile(externalPath))
                 {
                     if (surface == null)
-                        throw new FormatException($"Unsupported texture format");
+                        throw new FormatException($"Unsupported texture format or unable to load file: "  + externalPath);
 
                     surface.FlipVertically();
 
@@ -510,6 +652,12 @@ namespace xivModdingFramework.Textures.FileTypes
             }
             else
             {
+                if(tex.Width < 64 || tex.Height < 64)
+                {
+                    // The TexImpNet compressor will hard crash the entire application with a memory error with small sizes.
+                    throw new InvalidDataException("Image is too small for DDS Compressor. (64x64 Minimum Size)");
+                }
+
                 // TexImpNet Route
                 unsafe
                 {
@@ -686,7 +834,7 @@ namespace xivModdingFramework.Textures.FileTypes
             BitConverter.GetBytes(124).CopyTo(header, 4);
 
             // Flags?
-            BitConverter.GetBytes(0).CopyTo(header, 8);
+            BitConverter.GetBytes(0x21007).CopyTo(header, 8);
 
             // Size
             BitConverter.GetBytes(height).CopyTo(header, 12);
@@ -701,12 +849,15 @@ namespace xivModdingFramework.Textures.FileTypes
             // MipMap Count
             BitConverter.GetBytes(mipCount).CopyTo(header, 28);
 
+            // dwCaps. DDSCAPS_MIPMAP(0x40000) + DDSCAPS_TEXTURE(0x1000)
+            BitConverter.GetBytes(mipCount > 1 ? 0x401000 : 0x1000).CopyTo(header, 104);
+
             var startOfPixStruct = 76;
             // Pixel struct size
             BitConverter.GetBytes(32).CopyTo(header, startOfPixStruct);
 
-            // Pixel Flags.  In this case, uncompressed(64) + contains alpha(1).
-            BitConverter.GetBytes(65).CopyTo(header, startOfPixStruct + 4);
+            // Pixel Flags.  In this case, uncompressed(0x40) + contains alpha(0x01).
+            BitConverter.GetBytes(0x41).CopyTo(header, startOfPixStruct + 4);
 
             // DWFourCC, unused
             BitConverter.GetBytes(0).CopyTo(header, startOfPixStruct + 8);
@@ -870,11 +1021,6 @@ namespace xivModdingFramework.Textures.FileTypes
             ddsStream.ReadBytes(8);
             var newMipCount = ddsStream.ReadInt32();
 
-            if (!IOUtil.IsPowerOfTwo(newHeight) || !IOUtil.IsPowerOfTwo(newHeight))
-            {
-                throw new Exception("Resolution must be a multiple of 2.  (Ex. 256, 512, 1024, ...)");
-            }
-
             ddsStream.BaseStream.Seek(offset + DDS._DDS_PixelFormatOffset, SeekOrigin.Begin);
 
             var pixelFormatSize = ddsStream.ReadInt32();
@@ -970,56 +1116,21 @@ namespace xivModdingFramework.Textures.FileTypes
             headerData.AddRange(BitConverter.GetBytes((short)1));
             headerData.AddRange(BitConverter.GetBytes((short)newMipCount));
 
+            var mipSizes = DDS.CalculateMipMapSizes(format, newWidth, newHeight);
+
+            if (mipSizes.Count < newMipCount)
+                throw new InvalidDataException($"CreateTexFileHeader: newMipCount ({newMipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             headerData.AddRange(BitConverter.GetBytes(0)); // LoD 0 Mip
             headerData.AddRange(BitConverter.GetBytes(newMipCount > 1 ? 1 : 0)); // LoD 1 Mip
-            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : 0)); // LoD 2 Mip
-
-            int mipLength;
-
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    mipLength = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.A8:
-                    mipLength = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    mipLength = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    mipLength = (newWidth * newHeight) * 4;
-                    break;
-            }
+            headerData.AddRange(BitConverter.GetBytes(newMipCount > 2 ? 2 : (newMipCount - 1))); // LoD 2 Mip
 
             var mipMapUncompressedOffset = 80;
 
             for (var i = 0; i < newMipCount; i++)
             {
                 headerData.AddRange(BitConverter.GetBytes(mipMapUncompressedOffset));
-                mipMapUncompressedOffset = mipMapUncompressedOffset + mipLength;
-
-                if (mipLength > 16)
-                {
-                    mipLength = mipLength / 4;
-                }
-                else
-                {
-                    mipLength = 16;
-                }
+                mipMapUncompressedOffset = mipMapUncompressedOffset + mipSizes[i];
             }
 
             var padding = 80 - headerData.Count;
@@ -1060,7 +1171,7 @@ namespace xivModdingFramework.Textures.FileTypes
             br.ReadBytes(8);
             var newMipCount = br.ReadInt32();
 
-            if (!IOUtil.IsPowerOfTwo(newHeight) || !IOUtil.IsPowerOfTwo(newHeight))
+            if ((!IOUtil.IsPowerOfTwo(newHeight) || !IOUtil.IsPowerOfTwo(newWidth)) && newMipCount > 1)
             {
                 throw new Exception("Resolution must be a multiple of 2.  (Ex. 256, 512, 1024, ...)");
             }
@@ -1108,7 +1219,15 @@ namespace xivModdingFramework.Textures.FileTypes
                 Mode = ResizeMode.Stretch,
             };
 
-            if (externalFile.ToLower().EndsWith(".dds"))
+            if (externalFile.ToLower().EndsWith(".tex"))
+            {
+                var data = File.ReadAllBytes(externalFile);
+                var tex = XivTex.FromUncompressedTex(data);
+                var pix = await tex.GetRawPixels();
+
+                return (pix, tex.Width, tex.Height);
+            }
+            else if (externalFile.ToLower().EndsWith(".dds"))
             {
 
                 // We could have functions somewhere to just raw read the DDS tex data, but this is a 
@@ -1196,13 +1315,13 @@ namespace xivModdingFramework.Textures.FileTypes
                 var uncompLength = lengthIncludingHeader - _TexHeaderSize;
 
 
-                br.BaseStream.Seek(offset, SeekOrigin.Begin);
+                br.BaseStream.Seek(offset + _TexHeaderSize, SeekOrigin.Begin);
 
                 // Type 4 Header
                 newTex.AddRange(Dat.MakeType4DatHeader((XivTexFormat)header.TextureFormat, ddsParts, (int)uncompLength, header.Width, header.Height));
 
                 // Texture file header.
-                newTex.AddRange(br.ReadBytes((int)_TexHeaderSize));
+                newTex.AddRange(header.ToBytes());
 
                 // Compressed pixel data.
                 foreach (var mip in ddsParts)
@@ -1359,6 +1478,76 @@ namespace xivModdingFramework.Textures.FileTypes
                 colorSetExtraData = null;
             }
             return colorSetExtraData;
+        }
+
+
+        /// <summary>
+        /// Ensures the given texture meets normal size requirements, with an optional max size.
+        /// Returns true if the texture was altered.
+        /// </summary>
+        /// <param name="tex"></param>
+        /// <param name="maxSize"></param>
+        /// <returns></returns>
+        public static async Task<bool> EnsureValidSize(XivTex tex, int maxSize = -1)
+        {
+            var usesMips = false;
+            if (!string.IsNullOrWhiteSpace(tex.FilePath))
+            {
+                var df = IOUtil.GetDataFileFromPath(tex.FilePath);
+                if(df == XivDataFile._06_Ui)
+                {
+                    usesMips = false;
+                } else
+                {
+                    usesMips = true;
+                }
+            }
+            else
+            {
+                usesMips = tex.MipMapCount > 1;
+            }
+
+            var newWidth = tex.Width;
+            var newHeight = tex.Height;
+            if (usesMips)
+            {
+                if(!IOUtil.IsPowerOfTwo(tex.Width))
+                {
+                    newWidth = IOUtil.RoundToPowerOfTwo(tex.Width);
+                }
+
+                if (!IOUtil.IsPowerOfTwo(tex.Height))
+                {
+                    newHeight = IOUtil.RoundToPowerOfTwo(tex.Height);
+                }
+            }
+
+            if (maxSize > 0)
+            {
+                while (newWidth > maxSize || newHeight > maxSize)
+                {
+                    newWidth /= 2;
+                    newHeight /= 2;
+                }
+            }
+
+            var regenMips = false;
+            if(usesMips && tex.MipMapCount == 1)
+            {
+                regenMips = true;
+                tex.MipMapCount = GetMipCount(tex.Width, tex.Height);
+            } else if(!usesMips && tex.MipMapCount > 1)
+            {
+                regenMips = true;
+                tex.MipMapCount = 1;
+            }
+
+            if(newWidth != tex.Width || newHeight != tex.Height || regenMips)
+            {
+                await ResizeXivTx(tex, newWidth, newHeight, false);
+                return true;
+            }
+            return false;
         }
 #endregion
 

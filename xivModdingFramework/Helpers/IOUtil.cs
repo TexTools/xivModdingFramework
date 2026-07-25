@@ -37,11 +37,17 @@ using xivModdingFramework.SqPack.FileTypes;
 using System.Diagnostics;
 using System.Threading;
 using xivModdingFramework.Cache;
+using System.Management;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Text;
 
 namespace xivModdingFramework.Helpers
 {
     public static class IOUtil
     {
+        private static readonly HashSet<char> _InvalidFileNameChars = new(Path.GetInvalidFileNameChars());
+
         /// <summary>
         /// Compresses raw byte data.
         /// </summary>
@@ -319,7 +325,7 @@ namespace xivModdingFramework.Helpers
                     return file;
                 }
             }
-            throw new Exception("Could not resolve data file - Invalid internal FFXIV path.");
+            throw new Exception("Could not resolve data file - Invalid internal FFXIV path: " + path);
         }
 
         /// <summary>
@@ -399,6 +405,7 @@ namespace xivModdingFramework.Helpers
             {
                 return;
             }
+            var time = DateTime.Now;
             if (dir.StartsWith(Path.GetTempPath()))
             {
                 RecursiveDeleteDirectory(dir);
@@ -406,6 +413,8 @@ namespace xivModdingFramework.Helpers
             {
                 RecursiveDeleteDirectory(dir);
             }
+            var duration = DateTime.Now - time;
+            Trace.WriteLine("Deletion Time: " + duration);
         }
         public static void RecursiveDeleteDirectory(string dir)
         {
@@ -420,7 +429,25 @@ namespace xivModdingFramework.Helpers
             {
                 RecursiveDeleteDirectory(dir);
             }
-            baseDir.Delete(true);
+
+            try
+            {
+                if (!baseDir.Exists)
+                    return;
+                baseDir.Delete(true);
+            }
+            catch
+            {
+                // Try to handle readonly cases.
+                var files = Directory.GetFiles(baseDir.FullName);
+                foreach(var f in files)
+                {
+                    File.SetAttributes(f, FileAttributes.Normal);
+                    File.Delete(f);
+                }
+                baseDir.Attributes &= ~FileAttributes.ReadOnly;
+                baseDir.Delete(true);
+            }
         }
 
 
@@ -519,17 +546,26 @@ namespace xivModdingFramework.Helpers
             return Directory.GetFiles(path, format, SearchOption.AllDirectories);
         }
 
+
+        private static Regex _InvalidRegex = new Regex("[^a-z0-9\\.\\/\\-_{}]");
         public static bool IsFFXIVInternalPath(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
 
-            foreach(XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
+
+            if (_InvalidRegex.IsMatch(path))
+            {
+                return false;
+            }
+
+            foreach (XivDataFile df in Enum.GetValues(typeof(XivDataFile)))
             {
                 if (path.StartsWith(df.GetFolderKey()))
                 {
                     return true;
                 }
             }
+
             return false;
         }
 
@@ -635,7 +671,23 @@ namespace xivModdingFramework.Helpers
                         var toUnzip = zip.Entries.Where(x => ReplaceSlashes(x.FileName).ToLower() == taskFile);
                         foreach (var e in toUnzip)
                         {
-                            e.Extract(destination, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                            var pathSafe = IOUtil.MakePathSafe(Path.GetFileName(e.FileName), false);
+                            var def = Path.GetFileName(e.FileName);
+                            var illegal = def != pathSafe;
+                            if (illegal)
+                            {
+                                try
+                                {
+                                    e.Extract(destination, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                                }
+                                catch(Exception ex)
+                                {
+                                    Trace.WriteLine(ex);
+                                }
+                            } else
+                            {
+                                e.Extract(destination, Ionic.Zip.ExtractExistingFileAction.OverwriteSilently);
+                            }
                         }
                     }
                 }));
@@ -680,31 +732,68 @@ namespace xivModdingFramework.Helpers
 
         public static string MakePathSafe(string fileName, bool makeLowercase = true)
         {
-            foreach (var c in Path.GetInvalidFileNameChars())
-            {
-                fileName = fileName.Replace(c, '-');
-            }
-            if (makeLowercase)
-            {
-                fileName = fileName.ToLower();
-            }
-            return fileName.Trim();
+            return IOUtil.MakePathSafe(fileName, '-', makeLowercase);
         }
+
+        public static string MakePathSafe(string fileName, char rep, bool makeLowercase = true)
+        {
+            // This approach walks the string once, and hash lookups are O(1).
+            StringBuilder ret = new(fileName.Length);
+            foreach (var c in fileName)
+            {
+                if (_InvalidFileNameChars.Contains(c))
+                {
+                    ret.Append(rep);
+                }
+                else if (makeLowercase)
+                {
+                    ret.Append(Char.ToLower(c));
+                }
+                else
+                {
+                    ret.Append(c);
+                }
+            }
+
+            return ret.ToString().Trim();
+        }
+
         public static void CopyFolder(string sourcePath, string targetPath)
         {
+            sourcePath = MakeLongPath(sourcePath);
+            targetPath = MakeLongPath(targetPath);
+
+            // \\?\ prefixed Long File Names will fail if there's double slashes in a path
+            // Guarantee the source and target both have trailing slashes to avoid accidentally creating a double slash
+            if (!sourcePath.EndsWith("\\")) sourcePath += "\\";
+            if (!targetPath.EndsWith("\\")) targetPath += "\\";
+
             Directory.CreateDirectory(targetPath);
 
             //Now Create all of the directories
             foreach (string dirPath in Directory.GetDirectories(sourcePath, "*", SearchOption.AllDirectories))
             {
-                Directory.CreateDirectory(dirPath.Replace(sourcePath, targetPath));
+                var dir = MakeLongPath(dirPath);
+                Directory.CreateDirectory(dir.Replace(sourcePath, targetPath));
             }
 
             //Copy all the files & Replaces any files with the same name
             foreach (string newPath in Directory.GetFiles(sourcePath, "*.*", SearchOption.AllDirectories))
             {
-                File.Copy(newPath, newPath.Replace(sourcePath, targetPath), true);
+                var path = MakeLongPath(newPath);
+                File.Copy(path, newPath.Replace(sourcePath, targetPath), true);
             }
+        }
+
+        public static string MakeLongPath(string path)
+        {
+            if (!path.StartsWith("\\\\?\\"))
+            {
+                while (path.Contains("\\\\"))
+                    path = path.Replace("\\\\", "\\");
+                path = "\\\\?\\" + path;
+            }
+            return path.Replace("/", "\\");
         }
 
         public static byte[] GetImageSharpPixels(Image<Bgra32> img)
@@ -734,19 +823,34 @@ namespace xivModdingFramework.Helpers
             }
         }
 
-        public static string GetUniqueSubfolder(string basePath, string prefix = "")
+        public static string GetUniqueSubfolder(string basePath, string prefix = "", bool omitZero = false)
         {
-            var id = 0;
-            var path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
-            while (Directory.Exists(path))
+            lock (_SubfolderLock)
             {
-                id++;
-                path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+                var id = 0;
+                var path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+                if (omitZero)
+                {
+                    path = Path.GetFullPath(Path.Combine(basePath, prefix));
+                }
+                while (Directory.Exists(path))
+                {
+                    id++;
+                    if (omitZero)
+                    {
+                        path = Path.GetFullPath(Path.Combine(basePath, prefix + " (" +id.ToString() +")"));
+                    }
+                    else
+                    {
+                        path = Path.GetFullPath(Path.Combine(basePath, prefix + id.ToString()));
+                    }
+                }
+                Directory.CreateDirectory(path);
+                return path;
             }
-            Directory.CreateDirectory(path);
-
-            return path;
         }
+
+        public static object _SubfolderLock = new object();
         public static string GetFrameworkTempSubfolder(string prefix = "")
         {
             var basePath = GetFrameworkTempFolder();
@@ -768,6 +872,7 @@ namespace xivModdingFramework.Helpers
         {
             var path = GetFrameworkTempFolder();
             DeleteTempDirectory(path);
+            Directory.CreateDirectory(path);
         }
 
         public static string GetParentIfExists(string path, string target, bool caseSensitive = true)
@@ -797,5 +902,84 @@ namespace xivModdingFramework.Helpers
             return (x != 0) && ((x & (x - 1)) == 0);
         }
 
+        public static int RoundToPowerOfTwo(int x)
+        {
+            var min = FloorPower2(x);
+            var max = CeilPower2(x);
+
+
+            return max - x < x - min ? max : min;
+        }
+
+        public static int CeilPower2(int x)
+        {
+            if (x < 2)
+            {
+                return 1;
+            }
+            return (int)Math.Pow(2, (int)Math.Log(x - 1, 2) + 1);
+        }
+
+        public static int FloorPower2(int x)
+        {
+            if (x < 1)
+            {
+                return 1;
+            }
+            return (int)Math.Pow(2, (int)Math.Log(x, 2));
+        }
+
+        public static async Task CompressWindowsDirectory(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            try
+            {
+                var wrappedDir = Regex.Replace(dir, @"(\\*)" + "\"", @"$1$1\" + "\"");
+                var args = "/c /EXE XPRESS8K /s /f *";
+                var proc = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "compact.exe",
+                        Arguments = args,
+                        WorkingDirectory = dir,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                proc.EnableRaisingEvents = true;
+
+                proc.Start();
+                proc.BeginOutputReadLine();
+                proc.BeginErrorReadLine();
+                int? code = null;
+
+                proc.Exited += (object sender, EventArgs e) =>
+                {
+                    code = proc.ExitCode;
+                };
+
+                await Task.Run(async () =>
+                {
+                    while (code == null)
+                    {
+                        await Task.Delay(10);
+                    }
+
+                    if (code != 0)
+                    {
+                        throw new Exception("Compress.exe threw code: " + code);
+                    }
+                });
+            }
+            catch(Exception ex)
+            {
+                // No-Op, if this fails, it fails.
+                Trace.WriteLine(ex);
+            }
+        }
     }
 }

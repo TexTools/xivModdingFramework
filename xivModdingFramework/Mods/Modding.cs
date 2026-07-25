@@ -77,11 +77,62 @@ namespace xivModdingFramework.Mods
             CreateModlist();
         }
 
+        public static bool ValidateModlist(string ffxivDirectory = null)
+        {
+            if(ffxivDirectory == null && 
+                (XivCache.GameInfo == null 
+                    || XivCache.GameInfo.GameDirectory == null 
+                    || string.IsNullOrWhiteSpace(XivCache.GameInfo.GameDirectory.FullName)))
+            {
+                throw new InvalidDataException("Cannot validate modlist for NULL directory.");
+            }
+
+            var dir = string.IsNullOrEmpty(ffxivDirectory) ? XivCache.GameInfo.GameDirectory.FullName : ffxivDirectory;
+            dir = new DirectoryInfo(dir).Parent.Parent.FullName;
+
+            dir = Path.Combine(dir, XivStrings.ModlistFilePath);
+            if (File.Exists(dir))
+            {
+                // Try to parse it.
+                try
+                {
+                    var modlistText = File.ReadAllText(dir);
+                    var res = JsonConvert.DeserializeObject<ModList>(modlistText);
+                    if (res != null)
+                    {
+                        return true;
+                    } else
+                    {
+                        // Modlist failed to parse.
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Broken.
+                    return false;
+                }
+            }
+            return true;
+        }
+
         /// <summary>
         /// Creates a blank ModList file if one does not already exist.
         /// </summary>
-        internal static void CreateModlist()
+        internal static void CreateModlist(bool reset = false)
         {
+            if (XivCache.GameInfo == null) return;
+
+            if (reset)
+            {
+                var ml = new ModList(true)
+                {
+                    Version = _modlistVersion.ToString(),
+                };
+
+                File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(ml, Formatting.Indented));
+            }
+
             if (File.Exists(ModListDirectory))
             {
                 // Try to parse it.
@@ -106,6 +157,7 @@ namespace xivModdingFramework.Mods
             };
 
             File.WriteAllText(ModListDirectory, JsonConvert.SerializeObject(modList, Formatting.Indented));
+            return;
         }
 
         /// <summary>
@@ -145,7 +197,7 @@ namespace xivModdingFramework.Mods
             }
             catch(Exception ex)
             {
-                throw new FileNotFoundException("Failedto find or parse modlist file.\n\n" + ex.Message);
+                throw new FileNotFoundException("Failed to find or parse modlist file.\n\n" + ex.Message);
             }
             finally
             {
@@ -444,23 +496,37 @@ namespace xivModdingFramework.Mods
             try
             {
                 var ml = await tx.GetModList();
-                var mp = ml.GetModPack(modPackName);
-                if(mp == null)
+                if (string.IsNullOrWhiteSpace(modPackName))
                 {
-                    return;
+                    // Special case, this is altering all mods without a modpack association.
+                    var mods = ml.GetMods(x => string.IsNullOrWhiteSpace(x.ModPack)).ToList();
+
+                    foreach(var mod in mods)
+                    {
+                        await SetModState(state, mod, tx);
+                    }
+
                 }
-
-                var pack = mp.Value;
-                var mods = pack.Mods;
-
-                foreach(var mod in mods)
+                else
                 {
-                    await SetModState(state, mod, tx);
-                }
+                    var mp = ml.GetModPack(modPackName);
+                    if (mp == null)
+                    {
+                        return;
+                    }
 
-                if(state == EModState.UnModded)
-                {
-                    ml.RemoveModpack(pack);
+                    var pack = mp.Value;
+                    var mods = pack.Mods;
+
+                    foreach (var mod in mods)
+                    {
+                        await SetModState(state, mod, tx);
+                    }
+
+                    if (state == EModState.UnModded)
+                    {
+                        ml.RemoveModpack(pack);
+                    }
                 }
 
                 await boiler.Commit();
@@ -504,6 +570,8 @@ namespace xivModdingFramework.Mods
                 throw new Exception("Cannot intentionally set Invalid Mod State.");
             }
 
+            var workerState = XivCache.CacheWorkerEnabled;
+            await XivCache.SetCacheWorkerState(false);
             var boiler = await TxBoiler.BeginWrite(tx);
             tx = boiler.Transaction;
             try
@@ -538,6 +606,10 @@ namespace xivModdingFramework.Mods
             {
                 await boiler.Catch();
                 throw;
+            }
+            finally
+            {
+                await XivCache.SetCacheWorkerState(workerState);
             }
         }
 
@@ -661,7 +733,7 @@ namespace xivModdingFramework.Mods
         /// <returns></returns>
         public static async Task CleanUpModlistItems(IProgress<(int Current, int Total, string Message)> progressReporter = null, ModTransaction tx = null)
         {
-            if (XivCache.GameWriteEnabled)
+            if (!XivCache.GameWriteEnabled)
             {
                 throw new Exception("Cannot alter game files while FFXIV file writing is disabled.");
             }

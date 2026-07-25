@@ -89,6 +89,7 @@ namespace xivModdingFramework.Mods.DataContainers
             {
                 throw new Exception("Cannot add NULL path mod.");
             }
+            Dat.AssertOriginalOffsetIsSafe(mod.DataFile, mod.OriginalOffset8x);
 
             if (_Mods.ContainsKey(mod.FilePath))
             {

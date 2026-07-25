@@ -10,6 +10,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.Cache;
@@ -33,6 +34,7 @@ using System.Security.Cryptography;
 using JsonSubTypes;
 using SharpDX.Win32;
 using static HelixToolkit.SharpDX.Core.Model.Metadata;
+using xivModdingFramework.Textures.FileTypes;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -41,7 +43,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     /// </summary>
     public static class PMP
     {
-        public const int _WriteFileVersion = 3;
+        public const int _WriteFileVersion = 4;
+
+        private const char _PMPSafeNameReplacement = '_';
+
         private static bool _ImportActive = false;
         private static string _Source = null;
 
@@ -70,7 +75,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     {
                         // Unzip everything.
                         await IOUtil.UnzipFiles(path, tempFolder);
-                    } else
+
+                        // Quick check of tex file headers after unpacking from PMP modpacks
+                        // It is safe to rewrite the files here, as they are unzipped to a temporary path
+                        foreach (var filePath in IOUtil.GetFilesInFolder(tempFolder))
+                        {
+                            if (filePath.EndsWith(".tex"))
+                            {
+                                try
+                                {
+                                    _ = EndwalkerUpgrade.FastValidateTexFile(filePath);
+                                }
+                                catch { }
+                            }
+                        }
+                    }
+                    else
                     {
                         // Just JSON files.
                         await IOUtil.UnzipFiles(path, tempFolder, (file) =>
@@ -81,13 +101,29 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 });
                 path = tempFolder;
             }
+
+            var metaPath = Path.GetFullPath(Path.Combine(path, "meta.json"));
+            if (!File.Exists(metaPath))
+            {
+                if (Directory.Exists(path))
+                {
+                    var subs = Directory.EnumerateDirectories(path).ToList();
+                    if(subs.Count == 1)
+                    {
+                        metaPath = Path.GetFullPath(Path.Combine(path, subs[0], "meta.json"));
+                        if (File.Exists(metaPath))
+                        {
+                            path = Path.GetFullPath(Path.Combine(path, subs[0]));
+                        }
+                    }
+                }
+            }
+
             return path;
         }
 
         public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false)
         {
-            var gameDir = XivCache.GameInfo.GameDirectory;
-
             var originalPath = path;
 
             var alreadyUnzipped = !path.ToLower().EndsWith(".pmp");
@@ -97,13 +133,23 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var metaPath = Path.Combine(path, "meta.json");
 
             var text = File.ReadAllText(metaPath);
-            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text);
+            var meta = JsonConvert.DeserializeObject<PMPMetaJson>(text, new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
 
             string image = null;
 
 
-
-            var defaultOption = JsonConvert.DeserializeObject<PMPOptionJson>(File.ReadAllText(defModPath));
+            PmpDefaultMod defaultOption = null;
+            if (File.Exists(defModPath))
+            {
+                defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore
+                });
+                defaultOption.Name = "Default";
+            }
 
             var groups = new List<PMPGroupJson>();
 
@@ -111,9 +157,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
             foreach (var file in files)
             {
-                if (Path.GetFileName(file).StartsWith("group_"))
+                if (Path.GetFileName(file).StartsWith("group_") && Path.GetFileName(file).ToLower().EndsWith(".json"))
                 {
-                    groups.Add(JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file)));
+                    var group = JsonConvert.DeserializeObject<PMPGroupJson>(File.ReadAllText(file), new JsonSerializerSettings
+                    {
+                        NullValueHandling = NullValueHandling.Ignore
+                    });
+                    if (group != null)
+                    {
+                        groups.Add(group);
+                    }
                 }
             }
 
@@ -124,11 +177,70 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 Groups = groups
             };
 
+            if((meta.Groups != null && meta.Groups.Count > 0) || meta.DefaultData != null)
+            {
+                // Pull v4 style Penumbra data back to v3 style for use internally.
+                pmp.Groups = meta.Groups;
+                pmp.DefaultMod = meta.DefaultData;
+
+                meta.Groups = new List<PMPGroupJson>();
+                meta.DefaultData = null;
+            }
+
             var img = pmp.GetHeaderImage();
             if (img != null) {
                 image = Path.GetFullPath(Path.Combine(path, img));
             }
 
+            var allPmpFiles = new HashSet<string>();
+
+            foreach (var g in groups)
+            {
+                var combiningGroup = g as PMPCombiningGroupJson;
+                if (combiningGroup != null)
+                {
+                    foreach (var container in combiningGroup.Containers)
+                    {
+                        ValidateOption(container);
+                        foreach (var kv in container.Files)
+                        {
+                            var zipPath = kv.Value;
+                            allPmpFiles.Add(zipPath.ToLower());
+                        }
+                    }
+
+                    continue;
+                }
+
+                foreach(var o in g.Options)
+                {
+                    var op = o as PmpStandardOptionJson;
+                    if (op != null)
+                    {
+                        ValidateOption(op);
+                        foreach (var kv in op.Files)
+                        {
+                            var zipPath = kv.Value;
+                            allPmpFiles.Add(zipPath.ToLower());
+                        }
+                    }
+                }
+            }
+
+            var defOp = pmp.DefaultMod as PmpStandardOptionJson;
+            if(defOp != null)
+            {
+                ValidateOption(defOp);
+                foreach (var kv in defOp.Files)
+                {
+                    var zipPath = kv.Value;
+                    allPmpFiles.Add(zipPath.ToLower());
+                }
+            }
+
+            // Log the unused files that were contained in the PMP.
+            var unusedFiles = IOUtil.GetFilesInFolder(path).Select(x => x.Substring(path.Length + 1).ToLower()).Where(x => !allPmpFiles.Contains(x) && !IsPmpJsonFile(x)).ToList();
+            pmp.ExtraFiles = new HashSet<string>(unusedFiles);
 
             if (includeImages && !alreadyUnzipped)
             {
@@ -138,9 +250,42 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 });
             }
 
-
-
             return (pmp, path, image);
+        }
+
+        private static bool IsPmpJsonFile(string file)
+        {
+            var name = Path.GetFileName(file).ToLower();
+            if (name.EndsWith(".json"))
+            {
+                if (name == "meta.json"
+                    || name == "default_mod.json"
+                    || name.StartsWith("group_"))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Preforms basic cleanup-validation on options.
+        /// </summary>
+        /// <param name="op"></param>
+        private static void ValidateOption(PmpStandardOptionJson op)
+        {
+            if (op.Files == null)
+            {
+                op.Files = new Dictionary<string, string>();
+            }
+            if(op.Manipulations == null)
+            {
+                op.Manipulations = new List<PMPManipulationWrapperJson>();
+            }
+            if(op.FileSwaps == null)
+            {
+                op.FileSwaps = new Dictionary<string, string>();
+            }
         }
 
         /// <summary>
@@ -225,124 +370,161 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 tx.ModPack = modPack;
 
-                if (pmp.Groups == null || pmp.Groups.Count == 0)
+                var defMod = pmp.DefaultMod as PmpStandardOptionJson;
+
+                // Default option is always selected and always applied first, if it is present
+                if (defMod != null && !defMod.IsEmptyOption)
                 {
-                    // No options, just default.
                     var groupRes = await ImportOption(pmp.DefaultMod, unzippedPath, tx, progress);
                     UnionDict(imported, groupRes.Imported);
                     notImported.UnionWith(groupRes.NotImported);
                 }
-                else
+
+                // Order groups by Priority, Lowest => Highest, tiebreaker default order
+                var orderedGroups = pmp.Groups.OrderBy(x => x.Priority).ToList();
+                var groupIdx = 0;
+                foreach (var group in orderedGroups)
                 {
-                    // Order groups by Priority, Lowest => Highest, tiebreaker default order
-                    var orderedGroups = pmp.Groups.OrderBy(x => x.Priority).ToList();
-                    var groupIdx = 0;
-                    foreach (var group in orderedGroups)
+                    if ((group.Options == null || group.Options.Count == 0) && group.Type != "Combining")
                     {
-                        if (group.Options == null || group.Options.Count == 0)
+                        // No valid options.
+                        groupIdx++;
+                        continue;
+                    }
+                    var optionIdx = 0;
+
+                    // Get Default selection.
+                    var selected = group.DefaultSettings;
+
+                    // If the user selected custom settings, use those.
+                    if (group.SelectedSettings.HasValue)
+                    {
+                        selected = group.SelectedSettings.Value;
+                    }
+
+                    if (group.Type == "Single")
+                    {
+                        var selectedIdx = (int)selected;
+                        if (selected < 0 || selectedIdx >= group.Options.Count)
                         {
-                            // No valid options.
-                            groupIdx++;
-                            continue;
+                            selected = 0;
                         }
-                        var optionIdx = 0;
+                        var groupRes = await ImportOption(group.Options[selectedIdx], unzippedPath, tx, progress, groupIdx, optionIdx);
+                        UnionDict(imported, groupRes.Imported);
+                        notImported.UnionWith(groupRes.NotImported);
+                    }
+                    else if(group.Type == "Multi")
+                    {
+                        var ordered = group.Options.OrderBy(x => ((PmpMultiOptionJson)x).Priority).ToList();
 
-                        // Get Default selection.
-                        var selected = group.DefaultSettings;
-
-                        // If the user selected custom settings, use those.
-                        if (group.SelectedSettings >= 0)
+                        // Bitmask options.  Install in priority order.
+                        foreach(var op in ordered)
                         {
-                            selected = group.SelectedSettings;
-                        }
+                            var multiGroup = group as PMPMultiGroupJson;
+                            var multiOpt = op as PmpMultiOptionJson;
 
-                        if (group.Type == "Single")
-                        {
-                            if (selected < 0 || selected >= group.Options.Count)
+                            var i = multiGroup.OptionData.IndexOf(multiOpt);
+                            var value = 1UL << i;
+                            if ((selected & value) > 0)
                             {
-                                selected = 0;
+                                var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, groupIdx, optionIdx);
+                                UnionDict(imported, groupRes.Imported);
+                                notImported.UnionWith(groupRes.NotImported);
+                                optionIdx++;
                             }
-                            var groupRes = await ImportOption(group.Options[selected], unzippedPath, tx, progress, groupIdx, optionIdx);
+                        }
+
+                    } else if(group.Type == "Combining")
+                    {
+                        var combiningGroup = group as PMPCombiningGroupJson;
+                        var container = combiningGroup?.GetSelectedContainer(selected);
+                        if (container != null && !container.IsEmptyOption)
+                        {
+                            ValidateOption(container);
+                            var groupRes = await ImportOption(container, unzippedPath, tx, progress, groupIdx, (int)Math.Min(selected, (ulong)int.MaxValue));
                             UnionDict(imported, groupRes.Imported);
                             notImported.UnionWith(groupRes.NotImported);
                         }
-                        else if(group.Type == "Multi")
+                    } else if(group.Type == "Imc")
+                    {
+                        // Could do with popping this out to its own function.
+                        var imcGroup = group as PMPImcGroupJson;
+                        var xivImc = imcGroup.DefaultEntry.ToXivImc();
+
+                        bool disabled = false;
+                        // Bitmask options.
+                        for (int i = 0; i < group.Options.Count; i++)
                         {
-                            var ordered = group.Options.OrderBy(x => ((PmpStandardOptionJson)x).Priority).ToList();
-
-                            // Bitmask options.  Install in priority order.
-                            foreach(var op in ordered)
+                            var value = 1UL << i;
+                            if ((selected & value) > 0)
                             {
-                                var i = group.Options.IndexOf(op);
-                                var value = 1 << i;
-                                if ((selected & value) > 0)
+                                var opt = group.Options[i] as PmpImcOptionJson;
+                                if (opt.IsDisableSubMod)
                                 {
-                                    var groupRes = await ImportOption(group.Options[i], unzippedPath, tx, progress, groupIdx, optionIdx);
-                                    UnionDict(imported, groupRes.Imported);
-                                    notImported.UnionWith(groupRes.NotImported);
-                                    optionIdx++;
-                                }
-                            }
-
-                        } else if(group.Type == "Imc")
-                        {
-                            // Could do with popping this out to its own function.
-                            var imcGroup = group as PMPImcGroupJson;
-                            var xivImc = imcGroup.DefaultEntry.ToXivImc();
-
-                            bool disabled = false;
-                            // Bitmask options.
-                            for (int i = 0; i < group.Options.Count; i++)
-                            {
-                                var value = 1 << i;
-                                if ((selected & value) > 0)
-                                {
-                                    var disableOpt = group.Options[i] as PmpDisableImcOptionJson;
-                                    if (disableOpt != null)
-                                    {
-                                        // No options allowed >:|
-                                        disabled = true;
-                                        break;
-                                    }
-
-                                    var opt = group.Options[i] as PmpImcOptionJson;
-                                    optionIdx++;
-
-                                    xivImc.AttributeMask |= opt.AttributeMask;
-                                }
-                            }
-
-                            if (!disabled)
-                            {
-                                var root = imcGroup.GetRoot();
-                                var metaData = await GetImportMetadata(imported, root, tx);
-                                if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
-                                {
-                                    while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
-                                    {
-                                        metaData.ImcEntries.Add((XivImc)xivImc.Clone());
-                                    }
-                                }
-                                else
-                                {
-                                    metaData.ImcEntries[(int)imcGroup.Identifier.Variant] = xivImc;
+                                    // No options allowed >:|
+                                    disabled = true;
+                                    break;
                                 }
 
-                                if (imcGroup.AllVariants)
-                                {
-                                    for (int i = 0; i < metaData.ImcEntries.Count; i++)
-                                    {
-                                        metaData.ImcEntries[i] = (XivImc)xivImc.Clone();
-                                    }
-                                }
+                                optionIdx++;
 
-                                await ItemMetadata.SaveMetadata(metaData, _Source, tx);
-                                await ItemMetadata.ApplyMetadata(metaData, tx);
-
+                                xivImc.AttributeMask ^= opt.AttributeMask;
                             }
                         }
-                        groupIdx++;
+
+                        if (!disabled)
+                        {
+                            var root = imcGroup.GetRoot();
+                            var metaData = await GetImportMetadata(imported, root, tx);
+
+                            // If the OnlyAttribute flag is set on the group, fill in the fields that should be ignored from the current values instead
+                            // ( The source can be null, in the case that we're going to be synthesizing new variants from thin air )
+                            void CopyNonMaskImcValues(XivImc xivImc, XivImc src)
+                            {
+                                xivImc.Animation = src?.Animation ?? 0;
+                                xivImc.SoundId = src?.SoundId ?? 0;
+                                xivImc.MaterialSet = src?.MaterialSet ?? 0;
+                                xivImc.Decal = src?.Decal ?? 0;
+                                xivImc.Vfx = src?.Vfx ?? 0;
+                            };
+
+                            if (imcGroup.OnlyAttributes)
+                            {
+                                XivImc copyFromEntry = null;
+                                if (imcGroup.Identifier.Variant < metaData.ImcEntries.Count)
+                                    copyFromEntry = metaData.ImcEntries[(int)imcGroup.Identifier.Variant];
+                                CopyNonMaskImcValues(xivImc, copyFromEntry);
+                            }
+
+                            if (metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
+                            {
+                                while(metaData.ImcEntries.Count <= imcGroup.Identifier.Variant)
+                                {
+                                    metaData.ImcEntries.Add((XivImc)xivImc.Clone());
+                                }
+                            }
+                            else
+                            {
+                                metaData.ImcEntries[(int)imcGroup.Identifier.Variant] = xivImc;
+                            }
+
+                            if (imcGroup.AllVariants)
+                            {
+                                for (int i = 0; i < metaData.ImcEntries.Count; i++)
+                                {
+                                    var variantXivImc = (XivImc)xivImc.Clone();
+                                    if (imcGroup.OnlyAttributes)
+                                        CopyNonMaskImcValues(variantXivImc, metaData.ImcEntries[i]);
+                                    metaData.ImcEntries[i] = variantXivImc;
+                                }
+                            }
+
+                            await ItemMetadata.SaveMetadata(metaData, _Source, tx);
+                            await ItemMetadata.ApplyMetadata(metaData, tx);
+
+                        }
                     }
+                    groupIdx++;
                 }
 
                 var preRootTime = DateTimeOffset.Now.ToUnixTimeMilliseconds();
@@ -370,7 +552,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 if (boiler.OwnTx)
                 {
-                    progress?.Report((0, 0, "Committing Transaction..."));
+                    progress?.Report((0, 0, "Compressing files and Committing Transaction..."));
                 }
                 await boiler.Commit();
 
@@ -458,7 +640,30 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     }
 
                     // Import the file...
-                    await SmartImport.Import(externalPath, internalPath, _Source, tx);
+
+                    var data = File.ReadAllBytes(externalPath);
+
+                    if (internalPath.EndsWith(".tex"))
+                    {
+                        try
+                        {
+                            var resized = await EndwalkerUpgrade.ValidateTexFileData(data);
+                            if(resized != null)
+                            {
+                                data = resized;
+                            }
+                        }
+                        catch
+                        {
+                            // Something invalid enough to break here shouldn't be imported.
+                            notImported.Add(file.Key);
+                            i++;
+                            continue;
+                        }
+                    }
+
+                    await Dat.WriteModFile(data, internalPath, _Source, null, tx, false);
+                    XivCache.QueueDependencyUpdate(internalPath);
                     i++;
                 }
                 catch (Exception ex)
@@ -627,21 +832,25 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var pmp = new PMPJson()
                 {
                     Meta = new PMPMetaJson(),
-                    Groups = new List<PMPGroupJson>(),
-                    DefaultMod = new PMPOptionJson(),
+                    //Groups = new List<PMPGroupJson>(),
+                    //DefaultMod = new PmpDefaultMod(),
                 };
 
 
                 var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos);
 
-                pmp.DefaultMod = await CreatePmpStandardOption(workingPath, "Default", "The only option.", files, otherManipulations);
+                pmp.Meta.DefaultData = new PmpDefaultMod();
+                pmp.Meta.Groups = new List<PMPGroupJson>();
+                
+                await PopulatePmpStandardOption(pmp.Meta.DefaultData, workingPath, files, otherManipulations);
 
                 pmp.Meta.Author = modpackMeta.Author;
                 pmp.Meta.Name = modpackMeta.Name;
                 pmp.Meta.Description = modpackMeta.Description;
-                pmp.Meta.FileVersion = 3;
+                pmp.Meta.FileVersion = PMP._WriteFileVersion;
                 pmp.Meta.Version = modpackMeta.Version.ToString();
                 pmp.Meta.Website = modpackMeta.Url;
+                pmp.Meta.ModTags = pmp.Meta.ModTags ?? new List<string>();
 
 
                 await WritePmp(pmp, workingPath, zip ? destination : null);
@@ -664,19 +873,47 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             var metapath = Path.Combine(workingDirectory, "meta.json");
             var defaultModPath = Path.Combine(workingDirectory, "default_mod.json");
 
+
+            var oldJsons = Directory.EnumerateFiles(workingDirectory, "*.json", SearchOption.TopDirectoryOnly);
+            foreach(var j in oldJsons)
+            {
+                if (Path.GetFileName(j).StartsWith("group_"))
+                {
+                    File.Delete(j);
+                }
+            }
+
+            if (pmp.Meta.ModTags == null)
+            {
+                pmp.Meta.ModTags = new List<string>();
+            }
+
+            // V4 style.
+            if(pmp.Groups != null)
+            {
+                pmp.Meta.Groups = pmp.Groups;
+                pmp.Groups = null;
+            }
+
+            if(pmp.DefaultMod != null)
+            {
+                pmp.Meta.DefaultData = pmp.DefaultMod;
+                pmp.DefaultMod = null;
+            }
+
             var metaString = JsonConvert.SerializeObject(pmp.Meta, Formatting.Indented);
             File.WriteAllText(metapath, metaString);
 
-            var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
-            File.WriteAllText(defaultModPath, defaultModString);
-
+            //var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
+            //File.WriteAllText(defaultModPath, defaultModString);
+            /*
             for(int i = 0; i < pmp.Groups.Count; i++)
             {
-                var gName = IOUtil.MakePathSafe(pmp.Groups[i].Name.ToLower());
-                var groupPath = Path.Combine(workingDirectory, "group_" + i.ToString("D3") + "_" + gName + ".json");
+                var gName = PMP.MakePMPPathSafe(pmp.Groups[i].Name);
+                var groupPath = Path.Combine(workingDirectory, "group_" + (i+1).ToString("D3") + "_" + gName + ".json");
                 var groupString = JsonConvert.SerializeObject(pmp.Groups[i], Formatting.Indented);
                 File.WriteAllText(groupPath, groupString);
-            }
+            }*/
 
             if(zipPath != null)
             {
@@ -685,17 +922,11 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             }
         }
 
-        public static async Task<PmpStandardOptionJson> CreatePmpStandardOption(string workingPath, string name, string description, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, string imagePath = null, int priority = 0)
+        public static async Task PopulatePmpStandardOption(PmpStandardOptionJson opt, string workingPath, IEnumerable<FileIdentifier> files, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null)
         {
-            var opt = new PmpStandardOptionJson()
-            {
-                Name = name,
-                Description = description,
-                Files = new Dictionary<string, string>(),
-                FileSwaps = new Dictionary<string, string>(),
-                Manipulations = new List<PMPManipulationWrapperJson>(),
-                Priority = priority,
-            };
+            opt.Files = new();
+            opt.FileSwaps = new();
+            opt.Manipulations = new();
 
             // TODO - Could paralell this? Unsure how big the gains would really be though,
             // since the primary tasks are already paralelled internally, and there's little else heavy going on.
@@ -748,7 +979,6 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                     opt.Manipulations.Add(manip);
                 }
             }
-            return opt;
         }
 
 
@@ -779,28 +1009,37 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 var defMod = pmp.DefaultMod as PmpStandardOptionJson;
                 PmpStandardOptionJson option = null;
-                if (defMod != null && (defMod.FileSwaps.Count > 0 || defMod.Manipulations.Count > 0 || defMod.Files.Count > 0))
+
+                // Default mod is always present, but may be void of any data
+                if (defMod != null && !defMod.IsEmptyOption)
                 {
                     // Valid Default Mod Option
                     option = defMod;
                 }
-                else
+
+                if (pmp.Groups.Any(x => x.Type == "Combining"))
                 {
-                    if (pmp.Groups.Count == 1)
+                    return null;
+                }
+
+                if (pmp.Groups.Count == 1)
+                {
+                    var group = pmp.Groups[0];
+                    if (group.Options.Count == 1)
                     {
-                        var group = pmp.Groups[0];
-                        if (group.Options.Count == 1)
-                        {
-                            option = group.Options[0] as PmpStandardOptionJson;
-                        }
-                        else if (group.Options.Count > 1)
-                        {
+                        // The default option was already found to be valid, leaving us with two valid options
+                        // Return null so it gets treated as a wizard modpack instead
+                        if (option != null)
                             return null;
-                        }
-                    } else if(pmp.Groups.Count > 1)
+                        option = group.Options[0] as PmpStandardOptionJson;
+                    }
+                    else if (group.Options.Count > 1)
                     {
                         return null;
                     }
+                } else if(pmp.Groups.Count > 1)
+                {
+                    return null;
                 }
 
                 if (option == null)
@@ -898,6 +1137,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 }
 
                 var externalPath = Path.Combine(unzipPath, file.Value);
+
+                // Quick check of tex file headers after unpacking from PMP modpacks
+                // It is safe to rewrite the files here, as they are unzipped to a temporary path
+                if (!alreadyUnzipped && internalPath.EndsWith(".tex"))
+                {
+                    try
+                    {
+                        _ = EndwalkerUpgrade.FastValidateTexFile(externalPath);
+                    }
+                    catch { }
+                }
+
                 var fileInfo = new FileStorageInformation()
                 {
                     StorageType = EFileStorageType.UncompressedIndividual,
@@ -931,6 +1182,10 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
 
                 if (!includeData)
                 {
+                    if (ret.ContainsKey(src))
+                    {
+                        continue;
+                    }
                     ret.Add(src, new FileStorageInformation());
                     continue;
                 }
@@ -1079,6 +1334,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                         metaData = await PMP.GetImportMetadata(imported, root, tx);
                     }
 
+                    if(metaData == null)
+                    {
+                        // Invalid path/root
+                        continue;
+                    }
+
                     seenMetadata.Add(path, metaData);
                 }
                 else
@@ -1111,16 +1372,28 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return (seenMetadata.Values.ToList(), seenRgsps.Values.ToList(), otherManipulations);
         }
 
+        private static string MakePMPPathSafe(string fileName)
+        {
+            // This method enforces the naming scheme that penumbra expects for its json components.
+            if (fileName == ".")
+                return new(_PMPSafeNameReplacement, 1);
+
+            if (fileName == "..")
+                return new(_PMPSafeNameReplacement, 2);
+
+            return IOUtil.MakePathSafe(fileName.Normalize(NormalizationForm.FormKC), _PMPSafeNameReplacement, true);
+        }
     }
-
-
 
     #region Penumbra Simple JSON Classes
     public class PMPJson
     {
         public PMPMetaJson Meta { get; set; }
-        public PMPOptionJson DefaultMod { get; set; }
+        public PmpDefaultMod DefaultMod { get; set; }
         public List<PMPGroupJson> Groups { get; set; }
+
+        [JsonIgnore]
+        public HashSet<string> ExtraFiles { get; set; }
 
         public string GetHeaderImage()
         {
@@ -1155,49 +1428,134 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     public class PMPMetaJson
     {
         public int FileVersion;
-        public string Name;
-        public string Author;
-        public string Description;
-        public string Version;
-        public string Website;
-        public string Image;
+        public string Name = "";
+        public string Author = "";
+        public string Description = "";
+        public string Version = "";
+        public string Website = "";
+        public string Image = "";
 
         // These exist.
-        public List<string> Tags;
+        public List<string> ModTags;
+
+        // Added in Penumbra JSON 4.0 scheme
+        // -- Penumbra moved (back) to storing groups in the main meta file.
+        public List<PMPGroupJson> Groups;
+
+        // Added in Penumbra JSON 4.0 scheme
+        public PmpDefaultMod DefaultData;
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
+    [JsonSubtypes.KnownSubType(typeof(PMPSingleGroupJson), "Single")]
+    [JsonSubtypes.KnownSubType(typeof(PMPMultiGroupJson), "Multi")]
     [JsonSubtypes.KnownSubType(typeof(PMPImcGroupJson), "Imc")]
+    [JsonSubtypes.KnownSubType(typeof(PMPCombiningGroupJson), "Combining")]
     public class PMPGroupJson
     {
-        public string Name;
-        public string Description;
-        public int Priority;
-        public string Image;
+        public int Version = 0;
+        public string Name = "";
+        public string Description = "";
+        public string Image = "";
         public int Page;
+        public int Priority;
 
         // "Multi", "Single", or "Imc"
-        public string Type;
+        public string Type = "";
 
         // Only used internally when the user is selecting options during install/application.
-        [JsonIgnore] public int SelectedSettings = -1;
+        [JsonIgnore] public ulong? SelectedSettings = null;
 
         // Either single Index or Bitflag.
-        public int DefaultSettings;
+        [JsonConverter(typeof(CustomUInt64Converter))]
+        public ulong DefaultSettings;
         
-        public List<PMPOptionJson> Options = new List<PMPOptionJson>();
+        [JsonIgnore]
+        public virtual IReadOnlyList<PMPOptionJson> Options => throw new NotImplementedException($"Unimplemented PMP group type: {Type}");
+    }
+
+    public class PMPSingleGroupJson : PMPGroupJson
+    {
+        [JsonProperty(PropertyName = "Options", Order = 99)]
+        public List<PmpSingleOptionJson> OptionData = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
+    }
+
+    public class PMPMultiGroupJson : PMPGroupJson
+    {
+        [JsonProperty(PropertyName = "Options", Order = 99)]
+        public List<PmpMultiOptionJson> OptionData = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
     }
 
     public class PMPImcGroupJson : PMPGroupJson
     {
-        public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public PmpIdentifierJson Identifier;
+        public PMPImcManipulationJson.PMPImcEntry DefaultEntry;
         public bool AllVariants;
+        public bool OnlyAttributes;
+
+        [JsonProperty(PropertyName = "Options", Order = 99)]
+        public List<PmpImcOptionJson> OptionData = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
 
         public XivDependencyRoot GetRoot()
         {
             var root = PMPExtensions.GetRootFromPenumbraValues(Identifier.ObjectType, Identifier.PrimaryId, Identifier.BodySlot, Identifier.SecondaryId, Identifier.EquipSlot);
             return new XivDependencyRoot(root);
+        }
+    }
+
+    public class PMPCombiningGroupJson : PMPGroupJson
+    {
+        private const int MaxCombiningOptions = 8;
+
+        [JsonProperty(PropertyName = "Options", Order = 98)]
+        public List<PmpCombiningOptionJson> OptionData = new();
+
+        [JsonProperty(PropertyName = "Containers", Order = 99)]
+        public List<PmpCombiningContainerJson> Containers = new();
+
+        public override IReadOnlyList<PMPOptionJson> Options => OptionData;
+
+        [OnDeserialized]
+        internal void OnDeserialized(StreamingContext context)
+        {
+            OptionData ??= new List<PmpCombiningOptionJson>();
+            Containers ??= new List<PmpCombiningContainerJson>();
+
+            if (OptionData.Count > MaxCombiningOptions)
+            {
+                Trace.WriteLine($"Combining group {Name} has more than {MaxCombiningOptions} options; ignoring excessive options.");
+                OptionData = OptionData.Take(MaxCombiningOptions).ToList();
+            }
+
+            var requiredContainers = 1 << OptionData.Count;
+            if (Containers.Count > requiredContainers)
+            {
+                Trace.WriteLine($"Combining group {Name} has more data containers than it can support with {OptionData.Count} options; ignoring excessive containers.");
+                Containers = Containers.Take(requiredContainers).ToList();
+            }
+
+            while (Containers.Count < requiredContainers)
+            {
+                Trace.WriteLine($"Combining group {Name} has not enough data containers for its {OptionData.Count} options; filling with an empty container.");
+                Containers.Add(new PmpCombiningContainerJson());
+            }
+        }
+
+        public PmpCombiningContainerJson GetSelectedContainer(ulong selected)
+        {
+            if (Containers.Count == 0)
+            {
+                return null;
+            }
+
+            var idx = (int)Math.Min(selected, (ulong)(Containers.Count - 1));
+            return Containers[idx];
         }
     }
 
@@ -1240,34 +1598,115 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         }
     }
 
-    [JsonConverter(typeof(JsonSubtypes))]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpStandardOptionJson), "Files")]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpDisableImcOptionJson), "IsDisableSubMod")]
-    [JsonSubtypes.KnownSubTypeWithProperty(typeof(PmpImcOptionJson), "AttributeMask")]
+    // This type will not be deserialized directly, as the correct sub-type will be known in advance
     public class PMPOptionJson
     {
-        public string Name;
-        public string Description;
-        public string Image;
+        // For some reason the default order is that base class fields ordered last instead of first ...
+        // Manually specifying the order of a bunch of option-related fields to fix that
+        [JsonProperty(Order = -10)]
+        public string Name = "";
+        [JsonProperty(Order = -10)]
+        public string Description = "";
+        [JsonProperty(Order = -10)]
+        public string Image = "";
+
+        // TexTools loads/saves default_mod.json as this type, but these fields should not be present in default_mod
+        [JsonIgnore] public virtual bool IsDataContainerOnly => false;
+
+        public bool ShouldSerializeName() { return !IsDataContainerOnly; }
+        public bool ShouldSerializeDescription() { return !IsDataContainerOnly; }
+        public bool ShouldSerializeImage() { return !IsDataContainerOnly; }
     }
 
     public class PmpStandardOptionJson : PMPOptionJson
     {
-        public Dictionary<string, string> Files;
-        public Dictionary<string, string> FileSwaps;
-        public List<PMPManipulationWrapperJson> Manipulations;
-        public int Priority;
+        [JsonProperty(Order = 10)]
+        public Dictionary<string, string> Files = new();
+        [JsonProperty(Order = 10)]
+        public Dictionary<string, string> FileSwaps = new();
+        [JsonProperty(Order = 10)]
+        public List<PMPManipulationWrapperJson> Manipulations = new();
+
+        [JsonIgnore] public bool IsEmptyOption => !(
+            (FileSwaps != null && FileSwaps.Count > 0) ||
+            (Manipulations != null && Manipulations.Count > 0) ||
+            (Files != null && Files.Count > 0)
+        );
+
+        // TODO: Comment this out in the future to mimic Penumbra's behavior
+        /*
+        public bool ShouldSerializeFiles() { return Files != null && Files.Count > 0; }
+        public bool ShouldSerializeFileSwaps() { return FileSwaps != null && FileSwaps.Count > 0; }
+        public bool ShouldSerializeManipulations() { return Manipulations != null && Manipulations.Count > 0; }
+        */
     }
 
-    public class PmpDisableImcOptionJson : PMPOptionJson
+    public class PmpDefaultMod : PmpStandardOptionJson
     {
-        public bool IsDisableSubMod;
+        [JsonProperty(Order = -99)]
+        public int Version = 0;
+        [JsonIgnore] public override bool IsDataContainerOnly => true;
     }
+
+    public class PmpSingleOptionJson : PmpStandardOptionJson
+    {
+    }
+
+    public class PmpMultiOptionJson : PmpStandardOptionJson
+    {
+        [JsonProperty(Order = 2)]
+        public int Priority = 0;
+    }
+
+    public class PmpCombiningOptionJson : PMPOptionJson
+    {
+    }
+
+    public class PmpCombiningContainerJson : PmpStandardOptionJson
+    {
+    }
+
     public class PmpImcOptionJson : PMPOptionJson
     {
-        public ushort AttributeMask;
+        public bool IsDisableSubMod = false;
+        public ushort AttributeMask = 0;
+
+        public bool ShouldSerializeIsDisableSubMod() { return IsDisableSubMod; }
+        public bool ShouldSerializeAttributeMask() { return !IsDisableSubMod; }
     }
 
     #endregion
 
+    #region JSON helper classes
+
+    // Handle negative numbers without crashing
+    internal class CustomUInt64Converter : JsonConverter<ulong>
+    {
+        public override ulong ReadJson(JsonReader reader, Type objectType, ulong existingValue, bool hasExistingValue, JsonSerializer serializer)
+        {
+            var token = JToken.ReadFrom(reader);
+
+            // TexTools was previously of writing -1 instead of 2^32 - 1
+            // Even though we know that was the intended value, we'll interpret it as 2^64 - 1 for bug-compatibility with Penumbra
+            if (token.ToString().StartsWith("-"))
+            {
+                var signedValue = JToken.ReadFrom(reader).Value<long>();
+                return (ulong)signedValue;
+            }
+            else
+            {
+                return JToken.ReadFrom(reader).Value<ulong>();
+            }
+        }
+
+        public override void WriteJson(JsonWriter writer, ulong value, JsonSerializer serializer)
+        {
+            writer.WriteValue(value);
+        }
+
+        public override bool CanRead => true;
+        public override bool CanWrite => true;
+    }
+
+    #endregion
 }

@@ -62,6 +62,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             Unmodified = 0,
             ModifiedFull = 1337,
             ModifiedPartial = 6969,
+            ModifiedOldTT = 9999,
         }
 
         /// <summary>
@@ -113,30 +114,10 @@ namespace xivModdingFramework.SqPack.FileTypes
                     return 2147483647;
                 case "FAT32":
                     return 4294967296;
-                case "NTFS":
+                default:
+                    // Unknown HDD Format, default to the max index limit.
                     // 2 ^35 is the maximum addressable size in the Index files. (28 precision bits, left-shifted 7 bits (increments of 128)
                     return 34359738368;
-                case "exFAT":
-                    return 34359738368;
-                case "ext2":
-                    return 34359738368;
-                case "ext3":
-                    return 34359738368;
-                case "ext4":
-                    return 34359738368;
-                case "XFS":
-                    return 34359738368;
-                case "btrfs":
-                    return 34359738368;
-                case "ZFS":
-                    return 34359738368;
-                case "ReiserFS":
-                    return 34359738368;
-                case "apfs":
-                    return 34359738368;
-                default:
-                    // Unknown HDD Format, default to the basic limit.
-                    return 2000000000;
             }
         }
 
@@ -236,7 +217,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                     // Detection for old TexTools DATs.
                     if (IsOldTTDat(binaryReader))
                     {
-                        return DatType.ModifiedFull;
+                        return DatType.ModifiedOldTT;
                     }
 
                     return DatType.Unmodified;
@@ -260,33 +241,66 @@ namespace xivModdingFramework.SqPack.FileTypes
             var _DataSizeOffset = 1024 + 12;
             br.BaseStream.Seek(_DataSizeOffset, SeekOrigin.Begin);
 
-            var dataSize = br.ReadInt32();
-            if(dataSize != 2048)
-            {
-                // Old TexTools dats always set a Data Size of 2048
-                return false;
-            }
-
-            var datNumber = br.ReadInt32();
-            if (datNumber != 2)
-            {
-                // Old TexTools dats always set a DAT # of 2.
-                return false;
-            }
-
             var _DataHashOffset = 1024 + 32;
             br.BaseStream.Seek(_DataHashOffset, SeekOrigin.Begin);
             var bytes = br.ReadBytes(64);
 
             if(bytes.Any(x => x != 0))
             {
-                // Old TexTools dats never wrote a data hash.
+                // No edition of TexTools anywhere writes this hash.
+                // This is our safest check.
                 return false;
             }
 
             return true;
         }
 
+        public static void AssertOriginalOffsetIsSafe(XivDataFile df, long offset8x)
+        {
+            if(OriginalDats == null)
+            {
+                CacheOriginalDatList();
+            }
+
+            if (!OriginalDats.ContainsKey(df))
+            {
+                throw new InvalidDataException("Original offset pointed to a Data File which did not exist.");
+            }
+
+            if(offset8x == 0)
+            {
+                return;
+            }
+
+            var parts = IOUtil.Offset8xToParts(offset8x);
+            if (!OriginalDats[df].Contains(parts.DatNum))
+            {
+                throw new InvalidDataException("Original offset points to a Modded DAT file, cannot complete unsafe mod file write.");
+            }
+
+        }
+
+        private static Dictionary<XivDataFile, List<int>> OriginalDats;
+        internal static void CacheOriginalDatList()
+        {
+            OriginalDats = new Dictionary<XivDataFile, List<int>>();
+            foreach (XivDataFile f in Enum.GetValues(typeof(XivDataFile)))
+            {
+                var datList = new List<int>();
+                for (var i = 0; i < 8; i++)
+                {
+                    var datFilePath = Dat.GetDatPath(f, i);
+                    if (File.Exists(datFilePath))
+                    {
+                        if (IsOriginalDat(f, i))
+                        {
+                            datList.Add(i);
+                        }
+                    }
+                }
+                OriginalDats.Add(f, datList);
+            }
+        }
 
 
         /// <summary>
@@ -316,7 +330,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// </summary>
         /// <param name="dataFile">The data file to check</param>
         /// <returns>A list of modded dat files</returns>
-        internal static List<string> GetModdedDatList(XivDataFile dataFile)
+        internal static List<string> GetModdedDatList(XivDataFile dataFile, bool includeOldTT = false)
         {
             var datList = new List<string>();
             for (var i = 0; i < 8; i++)
@@ -324,7 +338,11 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var datFilePath = Dat.GetDatPath(dataFile, i);
                 if (File.Exists(datFilePath))
                 {
-                    if (!IsOriginalDat(dataFile, i))
+                    var type = GetDatType(dataFile, i);
+                    if(type == DatType.ModifiedFull || type == DatType.ModifiedPartial)
+                    { 
+                        datList.Add(datFilePath);
+                    } else if(type == DatType.ModifiedOldTT && includeOldTT)
                     {
                         datList.Add(datFilePath);
                     }
@@ -888,7 +906,8 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             // Decompress Mipmap blocks ...
             var decompressedData = new byte[uncompressedFileSize];
-            int decompOffset = 0;
+            Array.Copy(texHeader, 0, decompressedData, 0, texHeader.Length);
+            int decompOffset = texHeader.Length;
 
             var mipData = new List<Task<byte[]>>[mipCount];
 
@@ -924,11 +943,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 decompressedData = res.Buffer;
             }
 
-            byte[] finalbytes = new byte[texHeader.Length + decompressedData.Length];
-            Array.Copy(texHeader, 0, finalbytes, 0, texHeader.Length);
-            Array.Copy(decompressedData, 0, finalbytes, texHeader.Length, decompressedData.Length);
-
-            return finalbytes;
+            return decompressedData;
         }
 
         public static uint GetSqPackType(BinaryReader br, long offset = -1)
@@ -1059,33 +1074,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             var mipCompressedOffset = 80;
             var uncompMipSize = newHeight * newWidth;
 
-            switch (format)
-            {
-                case XivTexFormat.DXT1:
-                    uncompMipSize = (newWidth * newHeight) / 2;
-                    break;
-                case XivTexFormat.DXT5:
-                case XivTexFormat.A8:
-                    uncompMipSize = newWidth * newHeight;
-                    break;
-                case XivTexFormat.A1R5G5B5:
-                case XivTexFormat.A4R4G4B4:
-                    uncompMipSize = (newWidth * newHeight) * 2;
-                    break;
-                case XivTexFormat.L8:
-                case XivTexFormat.A8R8G8B8:
-                case XivTexFormat.X8R8G8B8:
-                case XivTexFormat.R32F:
-                case XivTexFormat.G16R16F:
-                case XivTexFormat.G32R32F:
-                case XivTexFormat.A16B16G16R16F:
-                case XivTexFormat.A32B32G32R32F:
-                case XivTexFormat.DXT3:
-                case XivTexFormat.D16:
-                default:
-                    uncompMipSize = (newWidth * newHeight) * 4;
-                    break;
-            }
+            var mipSizes = DDS.CalculateMipMapSizes(format, newWidth, newHeight);
+
+            if (mipSizes.Count < mipCount)
+                throw new InvalidDataException($"MakeType4DatHeader: mipCount ({mipCount}) is too high for texture ({newWidth}x{newHeight}, format={format})");
 
             for (var i = 0; i < mipCount; i++)
             {
@@ -1097,7 +1089,7 @@ namespace xivModdingFramework.SqPack.FileTypes
                 headerData.AddRange(BitConverter.GetBytes(compressedSize));
                 
                 // Uncompressed Size
-                var uncompressedSize = uncompMipSize > 16 ? uncompMipSize : 16;
+                var uncompressedSize = mipSizes[i];
                 headerData.AddRange(BitConverter.GetBytes(uncompressedSize));
 
                 // Data Block Offset
@@ -1105,10 +1097,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Data Block Size
                 headerData.AddRange(BitConverter.GetBytes(ddsParts[i].Count));
-
-
-                // Every MipMap is 1/4th the net size, so this is a easy way to recalculate it.
-                uncompMipSize = uncompMipSize / 4;
 
                 dataBlockOffset = dataBlockOffset + ddsParts[i].Count;
                 mipCompressedOffset = mipCompressedOffset + compressedSize;
@@ -1209,6 +1197,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         public static async Task<long> WriteModFile(byte[] fileData, string internalFilePath, string sourceApplication, IItem referenceItem = null, ModTransaction tx = null, bool compressed = true)
         {
+            Trace.WriteLine("Writing mod file: " + internalFilePath);
 
             var df = IOUtil.GetDataFileFromPath(internalFilePath);
 
@@ -1272,6 +1261,7 @@ namespace xivModdingFramework.SqPack.FileTypes
 
                 // Write to the Data store and update the index with the temporary offset.
                 var offset8x = await tx.UNSAFE_WriteData(df, fileData, compressed);
+
                 var originalOffset = await tx.Get8xDataOffset(internalFilePath, true);
                 await tx.Set8xDataOffset(internalFilePath, offset8x);
                 
@@ -1319,6 +1309,8 @@ namespace xivModdingFramework.SqPack.FileTypes
                     mod.ItemCategory = category;
                     mod.SourceApplication = sourceApplication;
                 }
+
+                Dat.AssertOriginalOffsetIsSafe(IOUtil.GetDataFileFromPath(internalFilePath), mod.OriginalOffset8x);
 
                 modList.AddOrUpdateMod(mod);
 
@@ -1412,6 +1404,9 @@ namespace xivModdingFramework.SqPack.FileTypes
         /// <returns></returns>
         internal static async Task<long> Unsafe_WriteToDat(byte[] importData, XivDataFile dataFile, Dictionary<long, uint> openSlots)
         {
+
+            Trace.WriteLine("Performing actual DAT file write...");
+
             // Perform basic validation.
             if (importData == null || importData.Length < 8)
             {
@@ -1860,10 +1855,20 @@ namespace xivModdingFramework.SqPack.FileTypes
                 var largestDatNum = GetLargestDatNumber(dataFile) + 1;
                 var emptyList = new List<string>();
 
+                // Never delete dat0.
+                if (largestDatNum == 0) return emptyList;
+
                 for (var i = 0; i < largestDatNum; i++)
                 {
                     var datPath = Dat.GetDatPath(dataFile, i);
                     var fileInfo = new FileInfo(datPath);
+
+                    var list = Dat.GetModdedDatList(dataFile);
+
+                    // Do not allow deleting non-mod-dats.
+                    if (!list.Contains(datPath))
+                        continue;
+
 
                     if (fileInfo.Length == 0)
                     {

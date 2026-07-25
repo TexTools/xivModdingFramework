@@ -108,12 +108,13 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 9, ExcelColumnDataType.String ) },
+                //{ "EquipType", ( 46, ExcelColumnDataType.UInt32 ) },
                 { "PrimaryInfo", ( 47, ExcelColumnDataType.UInt64 ) },
                 { "SecondaryInfo", ( 48, ExcelColumnDataType.UInt64 ) },
-                { "SlotNum", ( 17, ExcelColumnDataType.UInt8 ) },
-                { "Icon", ( 10, ExcelColumnDataType.UInt16 ) },
+                { "SlotNum", ( 17, ExcelColumnDataType.UInt32 ) },
+                { "Icon", ( 10, ExcelColumnDataType.UInt32 ) },
                 { "PictureId", ( 14, ExcelColumnDataType.UInt32) },
-                { "FilterGroup", ( 13, ExcelColumnDataType.UInt8) },
+                { "FilterGroup", ( 13, ExcelColumnDataType.UInt32) },
             };
 
             if (language == XivLanguage.Korean)
@@ -133,8 +134,8 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "ItemId", ( 7, ExcelColumnDataType.UInt32 ) },
-                { "PrimaryId", ( 0, ExcelColumnDataType.UInt16 ) },
-                { "Category", ( 1, ExcelColumnDataType.UInt8 ) },
+                { "PrimaryId", ( 0, ExcelColumnDataType.UInt32 ) },
+                { "Category", ( 1, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -154,7 +155,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "ItemId", ( 6, ExcelColumnDataType.UInt32 ) },
-                { "PrimaryId", ( 0, ExcelColumnDataType.UInt16 ) },
+                { "PrimaryId", ( 0, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -194,8 +195,8 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
-                { "ModelCharaId", ( 8, ExcelColumnDataType.UInt16 ) },
-                { "Icon", ( 26, ExcelColumnDataType.UInt16 ) },
+                { "ModelCharaId", ( 8, ExcelColumnDataType.UInt32 ) },
+                { "Icon", ( 28, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -216,7 +217,7 @@ namespace xivModdingFramework.Exd.FileTypes
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
                 { "ModelCharaId", ( 8, ExcelColumnDataType.Int32 ) },
-                { "Icon", ( 30, ExcelColumnDataType.UInt16 ) },
+                { "Icon", ( 30, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -236,7 +237,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 8, ExcelColumnDataType.String ) },
-                { "ModelCharaId", ( 0, ExcelColumnDataType.UInt16 ) },
+                { "ModelCharaId", ( 0, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -255,10 +256,10 @@ namespace xivModdingFramework.Exd.FileTypes
 
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
-                { "Type", ( 0, ExcelColumnDataType.UInt8 ) },
-                { "PrimaryId", ( 1, ExcelColumnDataType.UInt16 ) },
-                { "SecondaryId", ( 2, ExcelColumnDataType.UInt8) },
-                { "Variant", ( 3, ExcelColumnDataType.UInt8) },
+                { "Type", ( 0, ExcelColumnDataType.UInt32 ) },
+                { "PrimaryId", ( 1, ExcelColumnDataType.UInt32 ) },
+                { "SecondaryId", ( 2, ExcelColumnDataType.UInt32) },
+                { "Variant", ( 3, ExcelColumnDataType.UInt32) },
             };
 
             if (language == XivLanguage.Korean)
@@ -278,9 +279,9 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "MapId", ( 6, ExcelColumnDataType.String) },
-                { "RegionPlaceNameId", ( 10, ExcelColumnDataType.UInt16 ) },
-                { "PrimaryPlaceNameId", ( 11, ExcelColumnDataType.UInt16 ) },
-                { "SubPlaceNameId", ( 12, ExcelColumnDataType.UInt16 ) },
+                { "RegionPlaceNameId", ( 10, ExcelColumnDataType.UInt32 ) },
+                { "PrimaryPlaceNameId", ( 11, ExcelColumnDataType.UInt32 ) },
+                { "SubPlaceNameId", ( 12, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -319,8 +320,8 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
-                { "Icon", ( 2, ExcelColumnDataType.UInt16 ) },
-                { "ActionCategoryId", ( 3, ExcelColumnDataType.UInt8 ) },
+                { "Icon", ( 2, ExcelColumnDataType.UInt32 ) },
+                { "ActionCategoryId", ( 3, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -360,7 +361,7 @@ namespace xivModdingFramework.Exd.FileTypes
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
                 { "Icon", ( 2, ExcelColumnDataType.UInt32 ) },
-                { "Type", ( 6, ExcelColumnDataType.UInt8 ) },
+                { "Type", ( 6, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -460,7 +461,7 @@ namespace xivModdingFramework.Exd.FileTypes
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
                 { "Icon", ( 7, ExcelColumnDataType.Int32 ) },
-                { "ActionId", ( 3, ExcelColumnDataType.UInt16 ) },
+                { "ActionId", ( 3, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -521,7 +522,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
-                { "Icon", ( 4, ExcelColumnDataType.UInt16 ) },
+                { "Icon", ( 4, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -541,7 +542,7 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
-                { "Icon", ( 1, ExcelColumnDataType.UInt16 ) },
+                { "Icon", ( 1, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -561,14 +562,14 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "Name", ( 0, ExcelColumnDataType.String ) },
-                { "Timeline0", ( 1, ExcelColumnDataType.UInt16 ) }, // Default Animation
-                { "Timeline1", ( 2, ExcelColumnDataType.UInt16 ) }, // Chair Animation
-                { "Timeline2", ( 3, ExcelColumnDataType.UInt16 ) }, // Groundsit?
-                { "Timeline3", ( 4, ExcelColumnDataType.UInt16 ) },
-                { "Timeline4", ( 5, ExcelColumnDataType.UInt16 ) },
-                { "Timeline5", ( 6, ExcelColumnDataType.UInt16 ) },
-                { "Timeline6", ( 7, ExcelColumnDataType.UInt16 ) },
-                { "Icon", ( 20, ExcelColumnDataType.UInt16 ) },
+                { "Timeline0", ( 1, ExcelColumnDataType.UInt32 ) }, // Default Animation
+                { "Timeline1", ( 2, ExcelColumnDataType.UInt32 ) }, // Chair Animation
+                { "Timeline2", ( 3, ExcelColumnDataType.UInt32 ) }, // Groundsit?
+                { "Timeline3", ( 4, ExcelColumnDataType.UInt32 ) },
+                { "Timeline4", ( 5, ExcelColumnDataType.UInt32 ) },
+                { "Timeline5", ( 6, ExcelColumnDataType.UInt32 ) },
+                { "Timeline6", ( 7, ExcelColumnDataType.UInt32 ) },
+                { "Icon", ( 20, ExcelColumnDataType.UInt32 ) },
             };
 
             if (language == XivLanguage.Korean)
@@ -578,6 +579,10 @@ namespace xivModdingFramework.Exd.FileTypes
             else if (language == XivLanguage.Chinese)
             {
                 // Set up overrides here if necessary for CN.
+            }
+            else if (language == XivLanguage.TraditionalChinese)
+            {
+                // Set up overrides here if necessary for TC.
             }
 
             return columnExpectations;
@@ -608,8 +613,8 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "VfxId", ( 0, ExcelColumnDataType.Int32) },
-                { "Icon", ( 1, ExcelColumnDataType.UInt16 ) },
-                { "MiniMapIcon", ( 2, ExcelColumnDataType.UInt16 ) },
+                { "Icon", ( 1, ExcelColumnDataType.UInt32 ) },
+                { "MiniMapIcon", ( 2, ExcelColumnDataType.UInt32 ) },
                 { "Name", ( 3, ExcelColumnDataType.String ) },
             };
 
@@ -649,8 +654,8 @@ namespace xivModdingFramework.Exd.FileTypes
             var columnExpectations = new Dictionary<string, (int ColumnIndex, ExcelColumnDataType Type)>()
             {
                 { "ItemId", ( 2, ExcelColumnDataType.UInt32) },
-                { "Size", ( 1, ExcelColumnDataType.UInt8) },
-                { "FishId", ( 3, ExcelColumnDataType.UInt16) },
+                { "Size", ( 1, ExcelColumnDataType.UInt32) },
+                { "FishId", ( 3, ExcelColumnDataType.UInt32) },
             };
 
             if (language == XivLanguage.Korean)

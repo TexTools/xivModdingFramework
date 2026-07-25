@@ -68,6 +68,23 @@ namespace xivModdingFramework.Cache
             };
         }
 
+        public bool IsHumanMaterialVersionException()
+        {
+            if (PrimaryType == XivItemType.human)
+            {
+                if(SecondaryType != null && 
+                    (SecondaryType == XivItemType.tail || SecondaryType == XivItemType.body))
+                {
+                    if(PrimaryId == XivRace.Hrothgar_Female.GetRaceCodeInt()
+                        || PrimaryId == XivRace.Hrothgar_Male.GetRaceCodeInt())
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         /// <summary>
         /// Converts this dependency root into a raw string entry.
         /// </summary>
@@ -245,13 +262,25 @@ namespace xivModdingFramework.Cache
             const string MaterialFolderWithVariant = "{0}material/v{1}/";
             const string MaterialFolderWithoutVariant = "{0}material/";
 
-            var basePath = GetRootFolder();
 
+            var info = this;
             if (PrimaryType == XivItemType.human && SecondaryType == XivItemType.hair)
             {
                 // Stupid hair exception handling.
-                var hairRoot = Mtrl.GetHairMaterialRoot(this);
-                basePath = hairRoot.GetRootFolder();
+                var rt = this;
+                info = Mtrl.GetHairMaterialRoot(rt);
+            }
+
+            var basePath = info.GetRootFolder();
+            if (info.PrimaryType == XivItemType.weapon)
+            {
+                var wType = XivWeaponTypes.GetWeaponType(info.PrimaryId);
+                if (Imc.ImcSharingWeaponTypes.Contains(wType))
+                {
+                    var nInfo = info;
+                    nInfo.PrimaryId -= 50;
+                    basePath = nInfo.GetRootFolder();
+                }
             }
 
             if (UsesMaterialSets())
@@ -263,10 +292,10 @@ namespace xivModdingFramework.Cache
                 basePath = String.Format(MaterialFolderWithoutVariant, basePath);
             }
 
-            var materialName = "mt_" + GetBaseFileName();
+            var materialName = "mt_" + info.GetBaseFileName();
             if (PrimaryType == XivItemType.equipment || PrimaryType == XivItemType.accessory)
             {
-                materialName = "mt_" + GetRacialBaseName(race);
+                materialName = "mt_" + info.GetRacialBaseName(race);
             }
 
             if(PrimaryType == XivItemType.human && SecondaryType == XivItemType.body && Slot != null)
@@ -281,7 +310,10 @@ namespace xivModdingFramework.Cache
             } else if (string.IsNullOrWhiteSpace(fakeSlot) && string.IsNullOrWhiteSpace(Slot))
             {
                 // The base material we're starting from has no slot suffix.
-                materialName = materialName.Replace("_" + Slot, "");
+                if (!string.IsNullOrWhiteSpace(Slot))
+                {
+                    materialName = materialName.Replace("_" + Slot, "");
+                }
             }
 
             if(!string.IsNullOrWhiteSpace(suffix))
@@ -659,7 +691,7 @@ namespace xivModdingFramework.Cache
             // Try to resolve Meta files first.
             if (Info.PrimaryType == XivItemType.equipment || Info.PrimaryType == XivItemType.accessory)
             {
-                var _eqp = new Eqp(XivCache.GameInfo.GameDirectory);
+                var _eqp = new Eqp();
 
                 List<XivRace> races = null;
                 races = await _eqp.GetAvailableRacialModels(Info.PrimaryId, Info.Slot, false, true, tx);
@@ -718,9 +750,28 @@ namespace xivModdingFramework.Cache
 
             index = await tx.GetIndexFile(df);
             modlist = await tx.GetModList();
-
             var materials = new HashSet<string>();
-            if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
+
+            if (Info.IsHumanMaterialVersionException())
+            {
+                // Special Hrothgar Cases.
+                var primary = Info.PrimaryId.ToString("D4");
+                var secondary = Info.SecondaryId.Value.ToString("D4");
+                var path = $"chara/human/c{primary}/obj/body/b{secondary}/material/v0001/mt_c{primary}b{secondary}_a.mtrl";
+                if(Info.SecondaryType == XivItemType.tail)
+                {
+                    path = $"chara/human/c{primary}/obj/tail/t{secondary}/material/v0001/mt_c{primary}t{secondary}_a.mtrl";
+                }
+
+                materials.Add(path);
+                for (int i = 2; i <= 5; i++)
+                {
+                    materials.Add(path.Replace("/v0001/", "/v000" + i + "/"));
+                }
+
+                materialVariant = -1;
+            }
+            else if (Info.PrimaryType == XivItemType.human && Info.SecondaryType == XivItemType.body)
             {
                 // Bleargh.  So here's the exception of exception class.  Because the "models" in human body are 
                 // are so sparse and all over the place, relying on them is impossible.  Thankfully, body types only ever
@@ -730,25 +781,10 @@ namespace xivModdingFramework.Cache
                 var path = $"chara/human/c{primary}/obj/body/b{body}/material/v0001/mt_c{primary}b{body}_a.mtrl";
 
                 // Just validate it exists and call it a day.
-
                 var exists = index.FileExists(path);
                 if (exists)
                 {
                     materials.Add(path);
-                }
-
-                // XXX: I noticed female hrothgar also have patterns so I'm gonna put them here too
-                if (Info.PrimaryId == XivRace.Hrothgar_Male.GetRaceCodeInt()
-                    || Info.PrimaryId == XivRace.Hrothgar_Female.GetRaceCodeInt()
-                    )
-                {
-                    // JK, Hrothgar actually have 5 material sets (that's how their fur pattern stuff is set)
-                    for (int i = 2; i <= 5; i++)
-                    {
-                        var mSet = i.ToString().PadLeft(4, '0');
-                        path = $"chara/human/c{primary}/obj/body/b{body}/material/v{mSet}/mt_c{primary}b{body}_a.mtrl";
-                        materials.Add(path);
-                    }
                 }
 
                 materialVariant = -1;
@@ -918,7 +954,7 @@ namespace xivModdingFramework.Cache
             // Add orphaned modded materials into the root.
             var rootFolder = Info.GetRootFolder();
             var variantRep = "v" + materialVersion.ToString().PadLeft(4, '0');
-            var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl"));
+            var mods = (await tx.GetModList()).GetMods(x => x.FilePath.StartsWith(rootFolder) && x.FilePath.EndsWith(".mtrl")).ToList();
             foreach (var mod in mods)
             {
                 var state = await mod.GetState(tx);
@@ -1073,7 +1109,18 @@ namespace xivModdingFramework.Cache
             {
                 var iPrefix = XivItemTypes.GetSystemPrefix((XivItemType)Info.SecondaryType);
                 var iId = Info.SecondaryId.ToString().PadLeft(4, '0');
-                imcPath = Info.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
+
+                var nInfo = Info;
+                if (Info.PrimaryType == XivItemType.weapon)
+                {
+                    var wType = XivWeaponTypes.GetWeaponType(Info.PrimaryId);
+                    if (Imc.ImcSharingWeaponTypes.Contains(wType))
+                    {
+                        nInfo.PrimaryId -= 50;
+                    }
+                }
+
+                imcPath = nInfo.GetRootFolder() + String.Format(ImcFileFormat, new string[] { iPrefix, iId });
             }
             return imcPath;
 
@@ -1195,6 +1242,7 @@ namespace xivModdingFramework.Cache
         {
             using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
             {
+                db.BusyTimeout = 3000;
                 db.Open();
                 var rootString = Info.ToString();
 
@@ -1272,6 +1320,7 @@ namespace xivModdingFramework.Cache
             var items = new List<IItemModel>();
             using (var db = new SQLiteConnection(XivCache.CacheConnectionString))
             {
+                db.BusyTimeout = 3000;
                 db.Open();
                 var rootString = Info.ToString();
 

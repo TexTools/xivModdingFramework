@@ -69,10 +69,10 @@ namespace xivModdingFramework.General
         {
             var xivModelInfo = new XivMonsterModelInfo();
 
-            var type = (byte)row.GetColumnByName("Type");
-            xivModelInfo.PrimaryID = (ushort) row.GetColumnByName("PrimaryId");
-            xivModelInfo.SecondaryID = (byte)row.GetColumnByName("SecondaryId");
-            xivModelInfo.ImcSubsetID = (byte)row.GetColumnByName("Variant");
+            var type = row.GetColumnByName<int>("Type");
+            xivModelInfo.PrimaryID = row.GetColumnByName<int>("PrimaryId");
+            xivModelInfo.SecondaryID = row.GetColumnByName<int>("SecondaryId");
+            xivModelInfo.ImcSubsetID = row.GetColumnByName<int>("Variant");
 
             if (type == 2)
             {

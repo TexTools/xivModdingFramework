@@ -225,11 +225,6 @@ namespace xivModdingFramework.Textures
             {
                 var originalCset = normalPixelData[offset + 3];
 
-                if (originalCset > 15 && originalCset < 25)
-                {
-                    var a = "A";
-                }
-
                 // We could try to run a blend on this to add more degrees of gradient potentially?
                 var blendRem = originalCset % 34;
                 var originalRow = originalCset / 17;
@@ -250,7 +245,10 @@ namespace xivModdingFramework.Textures
                 }
 
                 var newBlend = (byte)(255 - Math.Round((blendRem / 17.0f) * 255.0f));
-                var newRow = (byte) (((originalRow / 2) * 17) + 8);
+
+                // Slight add here to push the color deeper into the row to ensure BC5 compression doesn't
+                // cause any artifacting.
+                var newRow = (byte) (((originalRow / 2) * 17) + 4);
 
 
                 // RGBA format output.
@@ -284,6 +282,42 @@ namespace xivModdingFramework.Textures
                 maskPixelData[offset + 1] = newGreen;
                 // Mask Blue - SSS Thickness Map
                 maskPixelData[offset + 2] = 49;
+
+            }, width, height);
+        }
+        public static async Task UpgradeGearMask(byte[] maskPixelData, int width, int height, bool legacy = false)
+        {
+            await ModifyPixels((int offset) =>
+            {
+                // Take the old gloss/metalness value and invert it. (GREEN)
+
+                var ao = maskPixelData[offset + 0];
+                var spec = maskPixelData[offset + 2];
+                var gloss = maskPixelData[offset + 1];
+
+                var rough = gloss;
+                if (!legacy)
+                {
+                    rough = (byte)(255 - gloss);
+
+                    // Game does not like Roughness 0.
+                    if(rough == 0)
+                    {
+                        rough = 1;
+                    }
+                }
+
+                // Output is RGBA
+
+
+                // Mask Red - Specular
+                maskPixelData[offset + 0] = spec;
+
+                // Mask Green - Roughness
+                maskPixelData[offset + 1] = rough;
+
+                // Mask Blue - Diffuse
+                maskPixelData[offset + 2] = ao;
 
             }, width, height);
         }

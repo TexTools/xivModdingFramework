@@ -29,6 +29,7 @@ using xivModdingFramework.Items.Enums;
 using xivModdingFramework.Items.Interfaces;
 using xivModdingFramework.Mods;
 using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Resources;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
@@ -43,14 +44,29 @@ namespace xivModdingFramework.Variants.FileTypes
         Set = 31
     }
 
+
     /// <summary>
     /// This class contains the methods that deal with the .imc file type 
     /// </summary>
     public static class Imc
     {
+
+        public static HashSet<XivWeaponType> ImcSharingWeaponTypes = new HashSet<XivWeaponType>()
+        {
+            XivWeaponType.FistsOff,
+            XivWeaponType.TwinfangsOff,
+            XivWeaponType.DaggersOff,
+            XivWeaponType.GlaivesOff,
+        };
+
         private const string ImcExtension = ".imc";
         public static bool UsesImc(IItemModel item)
         {
+            if (item?.SecondaryCategory == XivStrings.Facewear)
+            {
+                return false;
+            }
+
             var root = item.GetRoot();
             if (root == null) return false;
             return UsesImc(root);
@@ -84,6 +100,11 @@ namespace xivModdingFramework.Variants.FileTypes
         /// <returns></returns>
         public static async Task<int> GetMaterialSetId(IItemModel item, bool forceOriginal = false, ModTransaction tx = null)
         {
+            if (item?.SecondaryCategory == XivStrings.Facewear)
+            {
+                return Math.Max(1, item.ModelInfo?.ImcSubsetID ?? 1);
+            }
+
             var root = item.GetRoot();
             if (root == null) return -1;
 
@@ -156,7 +177,6 @@ namespace xivModdingFramework.Variants.FileTypes
 
             var imcPath = await GetImcPath(item, tx);
             var path = imcPath.Folder + "/" + imcPath.File;
-
 
             if(!await tx.FileExists(path, forceOriginal))
             {
@@ -490,6 +510,21 @@ namespace xivModdingFramework.Variants.FileTypes
             var secondaryId = item.ModelInfo.SecondaryID.ToString().PadLeft(4, '0');
             var itemType = item.GetPrimaryItemType();
 
+
+            if (itemType == XivItemType.weapon)
+            {
+                var gear = item as XivGear;
+                if (gear != null)
+                {
+                    var wType = gear.WeaponType;
+                    if (ImcSharingWeaponTypes.Contains(wType))
+                    {
+                        primaryId = (item.ModelInfo.PrimaryID -50).ToString().PadLeft(4, '0');
+                    }
+                }
+            }
+
+
             switch (itemType)
             {
                 case XivItemType.equipment:
@@ -513,17 +548,6 @@ namespace xivModdingFramework.Variants.FileTypes
                     break;
             }
 
-            var exists = await tx.FileExists(imcFolder + "/" + imcFile);
-
-            if (!exists)
-            {
-                // Offhands sometimes use their mainhand's path.
-                var gear = item as XivGear;
-                if (gear != null && gear.PairedItem != null)
-                {
-                    return await GetImcPath(gear.PairedItem, tx);
-                }
-            }
 
             return (imcFolder, imcFile);
         }

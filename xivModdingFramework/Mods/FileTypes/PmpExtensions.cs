@@ -40,6 +40,13 @@ namespace xivModdingFramework.Mods.FileTypes
         Character,
         Weapon,
         Font,
+
+        // HACKHACK: These are wrong and should be their own enum, but hackfix for the moment.
+        Body,
+        Face,
+        Ear,
+        Tail,
+        Hair,
     }
     [JsonConverter(typeof(StringEnumConverter))]
     public enum PMPModelRace : byte
@@ -213,7 +220,7 @@ namespace xivModdingFramework.Mods.FileTypes
             { XivItemType.accessory, PMPObjectType.Accessory },
             { XivItemType.demihuman, PMPObjectType.DemiHuman },
             { XivItemType.monster, PMPObjectType.Monster },
-            { XivItemType.body, PMPObjectType.Unknown },
+            { XivItemType.body, PMPObjectType.Body },
         };
 
         public static PmpIdentifierJson GetPenumbraIdentifierFromRoot(XivDependencyRoot root, int variant = 1)
@@ -296,7 +303,11 @@ namespace xivModdingFramework.Mods.FileTypes
         {
             // We can get a little cheesy here.
             var rGenderSt = race.ToString() + gender.ToString();
-            var rGender = Enum.Parse(typeof(PMPGenderRace), rGenderSt);
+
+            if (race == PMPModelRace.Unknown || !Enum.TryParse<PMPGenderRace>(rGenderSt, out var rGender))
+            {
+                return XivRace.All_Races;
+            }
             var intVal = (int)((ushort)rGender);
 
             // Can just direct cast this now.
@@ -472,7 +483,20 @@ namespace xivModdingFramework.Mods.FileTypes
             // Sha Key => Out File.
             var seenFiles = new Dictionary<TTMPWriter.SHA1HashKey, string>();
 
-            var useCompressed = defaultStorageType == EFileStorageType.CompressedIndividual || defaultStorageType == EFileStorageType.CompressedBlob;
+            int compCount = 0;
+            int uncompCount = 0;
+            foreach(var f in files)
+            {
+                if(f.Value.Info.StorageType == EFileStorageType.UncompressedIndividual || f.Value.Info.StorageType == EFileStorageType.UncompressedBlob)
+                {
+                    uncompCount++;
+                } else
+                {
+                    compCount++;
+                }
+            }
+
+            var useCompressed = compCount > uncompCount;
             var idx = 1;
             var tasks = new List<Task>();
             var _lock = new object();

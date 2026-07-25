@@ -63,6 +63,7 @@ namespace xivModdingFramework.SqPack.FileTypes
         {
             get
             {
+                if (RealPath == null) return false;
                 return RealPath.StartsWith(XivCache.GameInfo.GameDirectory.FullName) && RealPath.EndsWith(Dat.DatExtension) && StorageType == EFileStorageType.CompressedBlob;
             }
         }
@@ -735,7 +736,7 @@ namespace xivModdingFramework.SqPack.FileTypes
             // Use the Transaction's current modpack settings if it has any set.
             Version.TryParse(tx.ModPack == null ? "1.0" : tx.ModPack.Value.Version, out var ver);
 
-            simplePack.Name = tx.ModPack == null ? "Transaction Modpack" : tx.ModPack.Value.Name;
+            simplePack.Name = tx.ModPack == null ? Path.GetFileNameWithoutExtension(settings.TargetPath) : tx.ModPack.Value.Name;
             simplePack.Author = tx.ModPack == null ? "Unknown" : tx.ModPack.Value.Author;
             simplePack.Version = ver == null ? new Version("1.0") : ver;
             simplePack.SimpleModDataList = new List<SimpleModData>();
@@ -832,20 +833,6 @@ namespace xivModdingFramework.SqPack.FileTypes
 
             var di = new DirectoryInfo(dir);
 
-            var i = 0;
-            if (di.EnumerateDirectories().Count() > 10)
-            {
-                // Sus...
-                throw new Exception("Target Penumbra Mod Directory seems invalid.  Please select an individual Penumbra mod folder or create a blank folder.");
-            }
-
-            var files = di.EnumerateFiles();
-            if (!files.Any(x => x.Extension.ToLower() == ".json"))
-            {
-                // Sus...
-                throw new Exception("Target Penumbra Mod Directory seems invalid.  Please select an individual Penumbra mod folder or create a blank folder.");
-            }
-
             var dict = await GetFinalWriteList(tx);
 
             var pathName = di.Name;
@@ -860,7 +847,10 @@ namespace xivModdingFramework.SqPack.FileTypes
             await PMP.CreateSimplePmp(settings.TargetPath, mpack, dict, null, false);
 
             await PenumbraAPI.ReloadMod(di.Name);
-            await PenumbraAPI.Redraw();
+            if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawAll)
+                await PenumbraAPI.Redraw();
+            else if (XivCache.FrameworkSettings.PenumbraRedrawMode == FrameworkSettings.EPenumbraRedrawMode.RedrawSelf)
+                await PenumbraAPI.RedrawSelf();
 
             // Don't have real offsets to update to, since we don't write to game files.
             return null;

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
@@ -329,6 +330,7 @@ namespace xivModdingFramework.Mods
             var zf = new ZipFile();
             zf.UseZip64WhenSaving = Zip64Option.AsNecessary;
             zf.CompressionLevel = Ionic.Zlib.CompressionLevel.None;
+            zf.AlternateEncoding = Encoding.UTF8; // Fix Unicode filename corruption (etc, ____.jpg)
 
             zf.AddFile(tempMPL, "");
             zf.AddFile(tempMPD, "");

@@ -14,20 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-namespace xivModdingFramework.Models.Enums
+namespace xivModdingFramework.Models.DataContainers
 {
-    /// <summary>
-    /// Enum containing the what the data entries in the Vertex Data Block will be used for
-    /// </summary>
-    public enum VertexUsageType
+    public class TerrainShadowMeshData
     {
-        Position          = 0x0,
-        BoneWeight        = 0x1,
-        BoneIndex         = 0x2,
-        Normal            = 0x3,
-        TextureCoordinate = 0x4,
-        Flow           = 0x5,
-        Binormal          = 0x6,
-        Color             = 0x7
+        /// <summary>
+        /// This data block is currently unknown
+        /// </summary>
+        /// <remarks>
+        /// The size of this unknown data block is [ MdlModelData.Unknown3 * 20 ]
+        /// </remarks>
+        public byte[] TerrainShadowMeshHeader { get; set; }
     }
 }

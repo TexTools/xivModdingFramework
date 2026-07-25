@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -58,6 +59,118 @@ namespace xivModdingFramework.Items.Categories
             return await XivCache.GetCachedGearList(substring);
         }
 
+        public static async Task<XivGear> ResolveFacewear(int facewearId, ModTransaction tx = null)
+        {
+            var facewear = await GetFacewearList(tx);
+            return facewear.FirstOrDefault(x => x.ExdID == facewearId);
+        }
+
+        public static async Task<List<XivGear>> GetFacewearList(ModTransaction tx = null)
+        {
+            var ex = new Ex();
+            var facewear = await ex.ReadExData(XivEx.glasses, tx);
+            var styles = await new Ex().ReadExData(XivEx.glassesstyle, tx);
+            var items = new List<XivGear>();
+
+            foreach (var item in facewear)
+            {
+                var row = item.Value;
+                var modelInfo = DecodeFacewearModelInfo(GetUIntColumn(row, 0));
+                if (modelInfo.PrimaryID <= 0)
+                {
+                    continue;
+                }
+
+                var styleId = GetIntColumn(row, 1);
+                if (modelInfo.ImcSubsetID <= 0 && styleId > 0 && styles.TryGetValue(styleId, out var variantStyleRow))
+                {
+                    modelInfo.ImcSubsetID = GetFacewearStyleVariant(variantStyleRow, item.Key);
+                }
+
+                var name = GetStringColumn(row, 13);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    if (styleId > 0 && styles.TryGetValue(styleId, out var styleRow))
+                    {
+                        name = GetStringColumn(styleRow, 23);
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = $"Facewear {item.Key}";
+                }
+
+                var icon = GetIntColumn(row, 2);
+                items.Add(new XivGear
+                {
+                    Name = name,
+                    ExdID = item.Key,
+                    PrimaryCategory = XivStrings.Accessories,
+                    SecondaryCategory = XivStrings.Facewear,
+                    IconId = icon > 0 ? (uint)icon : 0,
+                    ModelInfo = modelInfo
+                });
+            }
+
+            items.Sort();
+            return items;
+        }
+
+        private static string GetStringColumn(Ex.ExdRow row, int column)
+        {
+            return row.Columns != null && row.Columns.Count > column
+                ? row.GetColumn(column) as string
+                : null;
+        }
+
+        private static int GetIntColumn(Ex.ExdRow row, int column)
+        {
+            if (row.Columns == null || row.Columns.Count <= column)
+            {
+                return 0;
+            }
+
+            var value = row.GetColumn(column);
+            return value == null ? 0 : Convert.ToInt32(value);
+        }
+
+        private static uint GetUIntColumn(Ex.ExdRow row, int column)
+        {
+            if (row.Columns == null || row.Columns.Count <= column)
+            {
+                return 0;
+            }
+
+            var value = row.GetColumn(column);
+            return value == null ? 0 : Convert.ToUInt32(value);
+        }
+
+        private static XivModelInfo DecodeFacewearModelInfo(uint packedModel)
+        {
+            return new XivModelInfo
+            {
+                PrimaryID = (int)(packedModel & 0xFFFF),
+                SecondaryID = 0,
+                ImcSubsetID = Math.Max(1, (int)(packedModel >> 16))
+            };
+        }
+
+        private static int GetFacewearStyleVariant(Ex.ExdRow styleRow, int facewearId)
+        {
+            const int firstFacewearColumn = 3;
+            const int facewearCount = 12;
+
+            for (var i = 0; i < facewearCount; i++)
+            {
+                if (GetIntColumn(styleRow, firstFacewearColumn + i) == facewearId)
+                {
+                    return i + 1;
+                }
+            }
+
+            return 1;
+        }
 
         /// <summary>
         /// A getter for available gear in the Item exd files
@@ -73,6 +186,7 @@ namespace xivModdingFramework.Items.Categories
             var xivGearList = new List<XivGear>();
 
             xivGearList.AddRange(GetMissingGear());
+            xivGearList.AddRange(await GetFacewearList(tx));
 
             if (itemDictionary.Count == 0)
                 return xivGearList;
@@ -85,15 +199,15 @@ namespace xivModdingFramework.Items.Categories
                 var row = item.Value;
                 try
                 {
-                    var primaryInfo = (ulong)row.GetColumnByName("PrimaryInfo");
-                    var secondaryInfo = (ulong) row.GetColumnByName("SecondaryInfo");
+                    var primaryInfo = row.GetColumnByName<ulong>("PrimaryInfo");
+                    var secondaryInfo = row.GetColumnByName<ulong>("SecondaryInfo");
 
                     // Check if item can be equipped.
                     if (primaryInfo == 0 && secondaryInfo == 0)
                         return;
 
                     // Belts. No longer exist in game + have no model despite having a setId.
-                    var slotNum = (byte)row.GetColumnByName("SlotNum");
+                    var slotNum = row.GetColumnByName<int>("SlotNum");
                     if (slotNum == 6) return;
 
                     // Has to have a valid name.
@@ -101,10 +215,10 @@ namespace xivModdingFramework.Items.Categories
                     if (String.IsNullOrEmpty(name))
                         return;
 
-                    var icon = (ushort)row.GetColumnByName("Icon");
+                    var icon = row.GetColumnByName<uint>("Icon");
 
-                    var primaryMi = new XivGearModelInfo();
-                    var secondaryMi = new XivGearModelInfo();
+                    var primaryMi = new XivModelInfo();
+                    var secondaryMi = new XivModelInfo();
                     var xivGear = new XivGear
                     {
                         Name = name,
@@ -115,7 +229,6 @@ namespace xivModdingFramework.Items.Categories
                     };
 
 
-                    xivGear.EquipSlotCategory = slotNum;
                     xivGear.SecondaryCategory = _slotNameDictionary.ContainsKey(slotNum) ? _slotNameDictionary[slotNum] : "Unknown";
 
                     // Model information is stored in a short-array format.
@@ -128,8 +241,10 @@ namespace xivModdingFramework.Items.Categories
 
                     primaryMi.PrimaryID = primaryQuad.Values[0];
                     secondaryMi.PrimaryID = secondaryQuad.Values[0];
+
                     if (hasBodyId)
                     {
+                        xivGear.PrimaryCategory = XivStrings.Weapons;
                         primaryMi.SecondaryID = primaryQuad.Values[1];
                         primaryMi.ImcSubsetID = primaryQuad.Values[2];
                         secondaryMi.SecondaryID = secondaryQuad.Values[1];
@@ -139,6 +254,13 @@ namespace xivModdingFramework.Items.Categories
                     {
                         primaryMi.ImcSubsetID = primaryQuad.Values[1];
                         secondaryMi.ImcSubsetID = secondaryQuad.Values[1];
+                        if (xivGear.SecondaryCategory == XivStrings.Earring
+                            || xivGear.SecondaryCategory == XivStrings.Neck
+                            || xivGear.SecondaryCategory == XivStrings.Wrists
+                            || xivGear.SecondaryCategory == XivStrings.Rings)
+                        {
+                            xivGear.PrimaryCategory = XivStrings.Accessories;
+                        }
                     }
 
                     XivGear secondaryItem = null;
@@ -199,7 +321,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Body",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[4],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0}
+                ModelInfo = new XivModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0}
             };
 
             xivGearList.Add(xivGear);
@@ -209,7 +331,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Hands",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[5],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -219,7 +341,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Legs",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[7],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -229,7 +351,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Feet",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[8],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 0, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -239,7 +361,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Body (NPC)",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[4],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -249,7 +371,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Hands (NPC)",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[5],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -259,7 +381,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Legs (NPC)",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[7],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -269,7 +391,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Feet (NPC)",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[8],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 9903, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -279,7 +401,7 @@ namespace xivModdingFramework.Items.Categories
                 Name = "SmallClothes Feet 2 (NPC)",
                 PrimaryCategory = XivStrings.Gear,
                 SecondaryCategory = _slotNameDictionary[8],
-                ModelInfo = new XivGearModelInfo { PrimaryID = 9901, ImcSubsetID = 1, SecondaryID = 0 }
+                ModelInfo = new XivModelInfo { PrimaryID = 9901, ImcSubsetID = 1, SecondaryID = 0 }
             };
 
             xivGearList.Add(xivGear);
@@ -314,96 +436,9 @@ namespace xivModdingFramework.Items.Categories
             {19, XivStrings.All },
             {20, XivStrings.Body_Hands_Legs },
             {21, XivStrings.Body_Legs_Feet },
-            {22, XivStrings.Body_Hands }
+            {22, XivStrings.Body_Hands },
+            {23, XivStrings.Body_Legs }
         };
 
-        /// <summary>
-        /// A dictionary containing race data in the format [Race ID, XivRace]
-        /// </summary>
-        private static readonly Dictionary<string, XivRace> IDRaceDictionary = new Dictionary<string, XivRace>
-        {
-            {"0101", XivRace.Hyur_Midlander_Male},
-            {"0104", XivRace.Hyur_Midlander_Male_NPC},
-            {"0201", XivRace.Hyur_Midlander_Female},
-            {"0204", XivRace.Hyur_Midlander_Female_NPC},
-            {"0301", XivRace.Hyur_Highlander_Male},
-            {"0304", XivRace.Hyur_Highlander_Male_NPC},
-            {"0401", XivRace.Hyur_Highlander_Female},
-            {"0404", XivRace.Hyur_Highlander_Female_NPC},
-            {"0501", XivRace.Elezen_Male},
-            {"0504", XivRace.Elezen_Male_NPC},
-            {"0601", XivRace.Elezen_Female},
-            {"0604", XivRace.Elezen_Female_NPC},
-            {"0701", XivRace.Miqote_Male},
-            {"0704", XivRace.Miqote_Male_NPC},
-            {"0801", XivRace.Miqote_Female},
-            {"0804", XivRace.Miqote_Female_NPC},
-            {"0901", XivRace.Roegadyn_Male},
-            {"0904", XivRace.Roegadyn_Male_NPC},
-            {"1001", XivRace.Roegadyn_Female},
-            {"1004", XivRace.Roegadyn_Female_NPC},
-            {"1101", XivRace.Lalafell_Male},
-            {"1104", XivRace.Lalafell_Male_NPC},
-            {"1201", XivRace.Lalafell_Female},
-            {"1204", XivRace.Lalafell_Female_NPC},
-            {"1301", XivRace.AuRa_Male},
-            {"1304", XivRace.AuRa_Male_NPC},
-            {"1401", XivRace.AuRa_Female},
-            {"1404", XivRace.AuRa_Female_NPC},
-            {"1501", XivRace.Hrothgar_Male},
-            {"1504", XivRace.Hrothgar_Male_NPC},
-            {"1601", XivRace.Hrothgar_Female},
-            {"1604", XivRace.Hrothgar_Female_NPC},
-            {"1701", XivRace.Viera_Male},
-            {"1704", XivRace.Viera_Male_NPC},
-            {"1801", XivRace.Viera_Female},
-            {"1804", XivRace.Viera_Female_NPC},
-            {"9104", XivRace.NPC_Male},
-            {"9204", XivRace.NPC_Female}
-        };
-
-        /// <summary>
-        /// A dictionary containing slot data in the format [Slot Name, Slot abbreviation]
-        /// </summary>
-        private static readonly Dictionary<string, string> SlotAbbreviationDictionary = new Dictionary<string, string>
-        {
-            {XivStrings.Head, "met"},
-            {XivStrings.Hands, "glv"},
-            {XivStrings.Legs, "dwn"},
-            {XivStrings.Feet, "sho"},
-            {XivStrings.Body, "top"},
-            {XivStrings.Earring, "ear"},
-            {XivStrings.Neck, "nek"},
-            {XivStrings.Rings, "rir"},
-            {XivStrings.Wrists, "wrs"},
-            {XivStrings.Head_Body, "top"},
-            {XivStrings.Body_Hands, "top"},
-            {XivStrings.Body_Hands_Legs, "top"},
-            {XivStrings.Body_Legs_Feet, "top"},
-            {XivStrings.Body_Hands_Legs_Feet, "top"},
-            {XivStrings.Legs_Feet, "dwn"},
-            {XivStrings.All, "top"},
-            {XivStrings.Face, "fac"},
-            {XivStrings.Iris, "iri"},
-            {XivStrings.Etc, "etc"},
-            {XivStrings.Accessory, "acc"},
-            {XivStrings.Hair, "hir"}
-        };
-
-        /// <summary>
-        /// A dictionary containing slot data in the format [Slot abbreviation, Slot Name]
-        /// </summary>
-        private static readonly Dictionary<string, string> AbbreviationSlotDictionary = new Dictionary<string, string>
-        {
-            {"met", XivStrings.Head},
-            {"glv", XivStrings.Hands},
-            {"dwn", XivStrings.Legs},
-            {"sho", XivStrings.Feet},
-            {"top", XivStrings.Body},
-            {"ear", XivStrings.Earring},
-            {"nek", XivStrings.Neck},
-            {"rir", XivStrings.Rings},
-            {"wrs", XivStrings.Wrists},
-        };
     }
 }

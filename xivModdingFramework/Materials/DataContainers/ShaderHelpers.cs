@@ -123,6 +123,15 @@ namespace xivModdingFramework.Materials.DataContainers
         // Load our Shader Constants and Shader Keys from JSON.
         static ShaderHelpers()
         {
+            foreach (EShaderPack shpk in Enum.GetValues(typeof(EShaderPack)))
+            {
+                var fieldInfo = typeof(EShaderPack).GetField(shpk.ToString());
+                var descriptionAttributes = (DescriptionAttribute[])fieldInfo.GetCustomAttributes(typeof(DescriptionAttribute), false);
+
+                StringToShpk.Add(descriptionAttributes[0].Description, shpk);
+            }
+
+
             // Kick this off asynchronously so we don't block.
             Task.Run(LoadShaderInfo);
         }
@@ -133,7 +142,11 @@ namespace xivModdingFramework.Materials.DataContainers
             {
                 case EShaderPack.Character:
                 case EShaderPack.CharacterLegacy:
-                case EShaderPack.BgColorChange:
+                case EShaderPack.CharacterGlass:
+                case EShaderPack.CharacterInc:
+                case EShaderPack.CharacterStockings:
+                case EShaderPack.CharacterScroll:
+                case EShaderPack.CharacterReflection:
                     return true;
                 default:
                     return false;
@@ -176,6 +189,7 @@ namespace xivModdingFramework.Materials.DataContainers
                     // Spawn a DB connection to do the raw queries.
                     using (var db = new SQLiteConnection(connectionString))
                     {
+                        db.BusyTimeout = 3000;
                         db.Open();
                         // Using statements help ensure we don't accidentally leave any connections open and lock the file handle.
 
@@ -342,6 +356,7 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateKeyValueName(shKv.Key, 0x380CAED0, 0xF5673524, "PART_FACE");
                 UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x2BDB45F1, "PART_BODY");
                 UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x57FF3B64, "PART_BODY_HRO");
+                UpdateKeyValueName(shKv.Key, 0x380CAED0, 0x72E697CD, "EMISSIVE");
 
                 // Hair Values
                 UpdateKeyValueName(shKv.Key, 0x24826489, 0xF7B8956E, "PART_HAIR");
@@ -356,15 +371,12 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x36080AD0, "Dither?");
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "Reflection Color?");
                 UpdateConstantName(shKv.Key, 0x58DE06E2, "Limbal Color?");
-                UpdateConstantName(shKv.Key, 0x59BDA0B1, "Inverse Metalness?");
                 UpdateConstantName(shKv.Key, 0x141722D5, "Specular Color");
 
                 // Names based on analyzing shader code.
                 UpdateConstantName(shKv.Key, 0x62E44A4F, "Skin Fresnel");
                 UpdateConstantName(shKv.Key, 0x2E60B071, "Skin Tile Multiplier");
-                UpdateConstantName(shKv.Key, 0x2C2A34DD, "Skin Color");
-                UpdateConstantName(shKv.Key, 2569562539, "Skin Wetness Lerp");
-                UpdateConstantName(shKv.Key, 1112929012, "Skin Tile Material");
+                UpdateConstantName(shKv.Key, 0x992869AB, "Skin Wetness Lerp");
                 UpdateConstantName(shKv.Key, 0x59BDA9B1, "Subsurface/Fur Index", true);
 
                 // Brute-Forced CRCs
@@ -372,30 +384,38 @@ namespace xivModdingFramework.Materials.DataContainers
                 UpdateConstantName(shKv.Key, 0x2C2A34DD, "g_DiffuseColor", true);
                 UpdateConstantName(shKv.Key, 0x11C90091, "g_WhiteEyeColor", true);
                 UpdateConstantName(shKv.Key, 0x38A64362, "g_EmissiveColor", true);
-                UpdateConstantName(shKv.Key, 3086627810, "g_SSAOMask", true);
-                UpdateConstantName(shKv.Key, 1112929012, "g_TileIndex", true);
-                UpdateConstantName(shKv.Key, 778088561, "g_TileScale", true);
-                UpdateConstantName(shKv.Key, 315010207, "g_TileAlpha", true);
-                UpdateConstantName(shKv.Key, 3042205627, "g_NormalScale", true);
-                UpdateConstantName(shKv.Key, 2148459359, "g_SheenRate", true);
-                UpdateConstantName(shKv.Key, 522602647, "g_SheenTintRate", true);
-                UpdateConstantName(shKv.Key, 4103141230, "g_SheenAperture", true);
-                UpdateConstantName(shKv.Key, 1357081942, "g_IrisRingColor", true);
-                UpdateConstantName(shKv.Key, 1724464446, "g_IrisThickness", true);
-                UpdateConstantName(shKv.Key, 3593204584, "g_AlphaAperture", true);
-                UpdateConstantName(shKv.Key, 3497683557, "g_AlphaOffset", true);
-                UpdateConstantName(shKv.Key, 1648149758, "g_OutlineColor", true);
-                UpdateConstantName(shKv.Key, 2289092920, "g_OutlineWidth", true);
+                UpdateConstantName(shKv.Key, 0xB7FA33E2, "g_SSAOMask", true);
+                UpdateConstantName(shKv.Key, 0x4255F2F4, "g_TileIndex", true);
+                UpdateConstantName(shKv.Key, 0x2E60B071, "g_TileScale", true);
+                UpdateConstantName(shKv.Key, 0x12C6AC9F, "g_TileAlpha", true);
+                UpdateConstantName(shKv.Key, 0xB5545FBB, "g_NormalScale", true);
+                UpdateConstantName(shKv.Key, 0x800EE35F, "g_SheenRate", true);
+                UpdateConstantName(shKv.Key, 0x1F264897, "g_SheenTintRate", true);
+                UpdateConstantName(shKv.Key, 0xD925FF32, "g_ShadowAlphaThreshold", true);
+                UpdateConstantName(shKv.Key, 0x5351646E, "g_ShadowPosOffset", true);
+                UpdateConstantName(shKv.Key, 0xF490F76E, "g_SheenAperture", true);
+                UpdateConstantName(shKv.Key, 0x50E36D56, "g_IrisRingColor", true);
+                UpdateConstantName(shKv.Key, 0x66C93D3E, "g_IrisThickness", true);
+                UpdateConstantName(shKv.Key, 0xD62BF368, "g_AlphaAperture", true);
+                UpdateConstantName(shKv.Key, 0xD07A6A65, "g_AlphaOffset", true);
+                UpdateConstantName(shKv.Key, 0x623CC4FE, "g_OutlineColor", true);
+                UpdateConstantName(shKv.Key, 0x8870C938, "g_OutlineWidth", true);
                 UpdateConstantName(shKv.Key, 0x39551220, "g_TextureMipBias", true);
                 UpdateConstantName(shKv.Key, 0x7801E004, "g_GlassIOR", true);
                 UpdateConstantName(shKv.Key, 0xDF15112D, "g_ToonIndex", true);
                 UpdateConstantName(shKv.Key, 0x3632401A, "g_LipRoughnessScale", true);
                 UpdateConstantName(shKv.Key, 0x7DABA471, "g_IrisRingEmissiveIntensity", true);
                 UpdateConstantName(shKv.Key, 0xCB0338DC, "g_SpecularColorMask", true);
+                UpdateConstantName(shKv.Key, 0x59BDA0B1, "g_ShaderID", true);
+                UpdateConstantName(shKv.Key, 0x29253809, "g_ShaderID", true);
+                UpdateConstantName(shKv.Key, 0xDF15112D, "g_ToonIndex", true);
+                UpdateConstantName(shKv.Key, 0x00A680BC, "g_ToonSpecIndex", true);
+                UpdateConstantName(shKv.Key, 0x3CCE9E4C, "g_ToonLightScale", true);
+                UpdateConstantName(shKv.Key, 0xD96FAF7A, "g_ToonReflectionScale", true);
 
-
-                UpdateConstantName(shKv.Key, 0xCB0338DC, "g_IrisAPrefersRg", true);
-                UpdateConstantName(shKv.Key, 0xC4647F37, "g_GlassThicknessMax", true);
+                // Brute forced CRCs that may be wrong/hash-collisions.
+                UpdateConstantName(shKv.Key, 0xCB0338DC, "g_IrisAPrefersRg(?)", true);
+                UpdateConstantName(shKv.Key, 0xC4647F37, "g_GlassThicknessMax(?)", true);
             }
 
         }
@@ -498,6 +518,8 @@ namespace xivModdingFramework.Materials.DataContainers
             g_Sampler = 0x88408C04,
             g_Sampler0 = 0x213CB439,
             g_Sampler1 = 0x563B84AF,
+            g_SkySampler = 0xB4C285EF,
+            g_FogWeightLutSampler = 0x6E231669,
 
         };
 
@@ -586,9 +608,17 @@ namespace xivModdingFramework.Materials.DataContainers
 
         };
 
+        private static Dictionary<string, EShaderPack> StringToShpk = new Dictionary<string, EShaderPack>();
+
         public static EShaderPack GetShpkFromString(string s)
         {
-            return GetValueFromDescription<EShaderPack>(s);
+            if(s == null) { return EShaderPack.Unknown; }
+            if(StringToShpk.ContainsKey(s))
+            {
+                return StringToShpk[s];
+            }
+
+            return EShaderPack.Unknown;
         }
 
         public static T GetValueFromDescription<T>(string description) where T : Enum

@@ -19,6 +19,7 @@ using xivModdingFramework.Mods.FileTypes;
 using xivModdingFramework.SqPack.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
 using Index = xivModdingFramework.SqPack.FileTypes.Index;
+using static xivModdingFramework.Cache.FrameworkExceptions;
 
 namespace xivModdingFramework.Mods
 {
@@ -385,13 +386,13 @@ namespace xivModdingFramework.Mods
         {
             while (_LoadingIndexFiles)
             {
-                Thread.Sleep(1);
+                await Task.Delay(10);
             }
-            
-            if(!_IndexFiles.ContainsKey(dataFile))
+
+            _LoadingIndexFiles = true;
+            try
             {
-                _LoadingIndexFiles = true;
-                try
+                if (!_IndexFiles.ContainsKey(dataFile))
                 {
                     if (!_ReadOnly)
                     {
@@ -420,12 +421,12 @@ namespace xivModdingFramework.Mods
 
                     var idx = await Index.INTERNAL_GetIndexFile(dataFile, false, ReadOnly);
                     _IndexFiles.Add(dataFile, idx);
-                }
-                finally
-                {
-                    _LoadingIndexFiles = false;
-                }
 
+                }
+            }
+            finally
+            {
+                _LoadingIndexFiles = false;
             }
             return _IndexFiles[dataFile];
         }
@@ -741,7 +742,7 @@ namespace xivModdingFramework.Mods
                         {
                             _ACTIVE_TX_BLOCKED = true;
                             wasBlocked = true;
-                            ActiveTransactionBlocked.Invoke(null);
+                            ActiveTransactionBlocked?.Invoke(null);
                         }
 
                         if(_CANCEL_BLOCKED_TX)
@@ -1501,7 +1502,7 @@ namespace xivModdingFramework.Mods
                     // Just add to the batching for later.
                     BatchedNotifications.Add(path, offset8x);
                 }
-                else
+                else if(BatchedNotifications == null)
                 {
                     // Notify the followers of /this/ TX that there was a change.
                     FileChanged?.Invoke(path, offset8x);
@@ -1908,7 +1909,25 @@ namespace xivModdingFramework.Mods
         {
             if (state.OriginalOffset_Set)
             {
-                await Set8xDataOffset(state.Path, state.OriginalOffset);
+                try
+                {
+                    await Set8xDataOffset(state.Path, state.OriginalOffset);
+                } catch(HashCollisionException e)
+                {
+                    // If we're hitting a hash collision here, it means
+                    // we're restoring for the same reason, which means
+                    // we don't actually have to do anything index-wise.
+                    Trace.WriteLine("Rollback on hash collision for file: " + state.Path);
+
+                    var dataFile = IOUtil.GetDataFileFromPath(state.Path);
+
+
+                    // Scrub all references to the hash-colliding file.
+                    foreach(var entry in _TemporaryOffsetMapping[dataFile])
+                    {
+                        entry.Value.Remove(state.Path);
+                    }
+                }
             }
 
             if (state.OriginalMod_Set)

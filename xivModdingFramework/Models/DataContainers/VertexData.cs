@@ -67,12 +67,12 @@ namespace xivModdingFramework.Models.DataContainers
         /// <summary>
         /// The vertex Tangent data in Vector3 format (X, Y, Z)
         /// </summary>
-        public Vector3Collection Tangents { get; set; } = new Vector3Collection();
+        public Vector3Collection FlowDirections { get; set; } = new Vector3Collection();
 
         /// <summary>
         /// The vertex BiNormal Handedness data in bytes
         /// </summary>
-        public List<byte> TangentHandedness { get; set; } = new List<byte>();
+        public List<byte> FlowHandedness { get; set; } = new List<byte>();
 
         /// <summary>
         /// The vertex color data in Byte4 format (R, G, B, A)
@@ -94,6 +94,7 @@ namespace xivModdingFramework.Models.DataContainers
         /// The secondary texture coordinates for the mesh in Vector2 format (X, Y)
         /// </summary>
         public Vector2Collection TextureCoordinates1 { get; set; } = new Vector2Collection();
+        public Vector2Collection TextureCoordinates2 { get; set; } = new Vector2Collection();
 
         /// <summary>
         /// The index data for the mesh

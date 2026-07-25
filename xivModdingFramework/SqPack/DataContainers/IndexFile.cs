@@ -20,6 +20,7 @@ using xivModdingFramework.General.Enums;
 using xivModdingFramework.Helpers;
 using xivModdingFramework.Mods.DataContainers;
 using xivModdingFramework.SqPack.FileTypes;
+using static xivModdingFramework.Cache.FrameworkExceptions;
 
 namespace xivModdingFramework.SqPack.DataContainers
 {
@@ -36,7 +37,7 @@ namespace xivModdingFramework.SqPack.DataContainers
     /// </summary>
     public class IndexFile
     {
-        public const bool _BENCHMARK_HACK = true;
+        public const bool _BENCHMARK_HACK = false;
         public bool ReadOnlyMode
         {
             get; private set;
@@ -516,10 +517,10 @@ namespace xivModdingFramework.SqPack.DataContainers
         {
             // Check Index1
             var offset = GetRawDataOffsetIndex1(filePath);
-            if(offset == 0)
+            var offset2 = GetRawDataOffsetIndex2(filePath);
+            if (offset != offset2)
             {
-                // Check Index2.
-                offset = GetRawDataOffsetIndex2(filePath);
+                return 0;
             }
             return offset;
         }
@@ -776,7 +777,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
                     // Doesn't exist in Index 1.
                     // This means we hit a -NEW- Synonym in Index 2.
-                    throw new InvalidDataException("Cannot write new Synonym to Index 2 File: " + filePath + " : " + fullHash);
+                    throw new HashCollisionException("Cannot write new Synonym to Index 2 File: " + filePath + " : " + fullHash);
                 } else if(originalOffsetIndex2 == 0)
                 {
                     if (allowRepair)
@@ -792,7 +793,7 @@ namespace xivModdingFramework.SqPack.DataContainers
 
                     // Doesn't exist in Index 2.
                     // This means we hit a -NEW- Synonym in Index 1.
-                    throw new InvalidDataException("Cannot write new Synonym to Index 1 File: "  + filePath + " : " + fileHash + " : " + folderHash);
+                    throw new HashCollisionException("Cannot write new Synonym to Index 1 File: "  + filePath + " : " + fileHash + " : " + folderHash);
                 } else
                 {
                     if (allowRepair)
@@ -809,7 +810,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                     // While /NOT/ being a synonym in either...
                     // This means either the index is partially corrupt...
                     // ... or we are in a benchmark partial-index situation, where we also have a hash-collision.
-                    throw new InvalidDataException("Cannot Update non-Synonym index with mismatched Index1/Index2 Values: " + filePath);
+                    throw new HashCollisionException("Cannot Update non-Synonym index with mismatched Index1/Index2 Values: " + filePath);
                 }
             } else
             {
@@ -824,7 +825,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                     var synEntry = Index1Synonyms[key].FirstOrDefault(x => x.FilePath == filePath);
                     if(synEntry == null)
                     {
-                        throw new InvalidDataException("Cannot add third Synonym Definition for Index1 Entry: " + filePath);
+                        throw new HashCollisionException("Cannot add third Synonym Definition for Index1 Entry: " + filePath);
                     }
                     synEntry.Offset = newRawOffsetWithDatNumEmbed;
                 }
@@ -838,7 +839,7 @@ namespace xivModdingFramework.SqPack.DataContainers
                     var synEntry = Index2Synonyms[fullHash].FirstOrDefault(x => x.FilePath == filePath);
                     if (synEntry == null)
                     {
-                        throw new InvalidDataException("Cannot add third Synonym Definition for Index2 Entry: " + filePath);
+                        throw new HashCollisionException("Cannot add third Synonym Definition for Index2 Entry: " + filePath);
                     }
                     synEntry.Offset = newRawOffsetWithDatNumEmbed;
                 }
