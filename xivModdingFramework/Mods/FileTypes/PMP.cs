@@ -122,7 +122,40 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return path;
         }
 
-        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false)
+
+        /// <summary>
+        /// Full copies an entire PMP to the destination directory.
+        /// Used as a passthrough primarily for TexTools double click handler, but could be used
+        /// for any time you wanted to copy a PMP type modpack theoretically.
+        /// 
+        /// Does NO validation or file alterations.
+        /// </summary>
+        /// <param name="source">Source path either as a folder path, .pmp, or .json</param>
+        /// <param name="dest">The destination folder path the data should be copied or unzipped to.</param>
+        /// <returns></returns>
+        internal static async Task CopyPmpFiles(string source, string dest)
+        {
+            // Run Zip extract on a new thread.
+            await Task.Run(async () =>
+            {
+                if (source.EndsWith(".pmp"))
+                {
+
+                        // Unzip everything.
+                        await IOUtil.UnzipFiles(source, dest);
+                }
+
+                if (source.EndsWith(".json"))
+                {
+                    // PMP Folder by Json reference at root level.
+                    source = Path.GetDirectoryName(source);
+
+                    IOUtil.CopyFolder(source, dest);
+                }
+            });
+        }
+
+        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false, bool enforceCompatibility = false)
         {
             var originalPath = path;
 
@@ -137,9 +170,12 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 NullValueHandling = NullValueHandling.Ignore
             });
-
             string image = null;
 
+            if(meta.FileVersion > 3 && enforceCompatibility)
+            {
+                throw new NotImplementedException("Cannot ingest PMP File Version in enforced compatibility mode 4+.");
+            }
 
             PmpDefaultMod defaultOption = null;
             if (File.Exists(defModPath))

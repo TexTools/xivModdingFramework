@@ -1,17 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using xivModdingFramework.Helpers;
-using System.IO;
-using System.Diagnostics;
-using xivModdingFramework.Mods;
-using xivModdingFramework.SqPack.FileTypes;
-using xivModdingFramework.Materials.FileTypes;
 using xivModdingFramework.Materials.DataContainers;
+using xivModdingFramework.Materials.FileTypes;
+using xivModdingFramework.Mods;
+using xivModdingFramework.Mods.DataContainers;
+using xivModdingFramework.Mods.FileTypes;
+using xivModdingFramework.Mods.FileTypes.PMP;
+using xivModdingFramework.SqPack.FileTypes;
 using static xivModdingFramework.Mods.EndwalkerUpgrade;
-using System.Text.RegularExpressions;
 
 namespace xivModdingFramework.Mods
 {
@@ -55,7 +58,10 @@ namespace xivModdingFramework.Mods
                 path = Path.GetFullPath(Path.Combine(path, "meta.json"));
             }
 
-            var data = await WizardData.FromModpack(path);
+
+            // Compatibliity must be enforced for PMPs when upgrading, or we end up butchering the result.
+            var data = await WizardData.FromModpack(path, true);
+
             var textureUpgradeTargets = new Dictionary<string, EndwalkerUpgrade.UpgradeInfo>();
 
             var allTextures = new HashSet<string>();
@@ -211,6 +217,28 @@ namespace xivModdingFramework.Mods
 
         public static async Task<bool> UpgradeModpack(string path, string newPath, bool includePartials = true, bool rewriteOnNoChanges = false)
         {
+            var modpackType = TTMP.GetModpackType(path);
+
+            if (modpackType == TTMP.EModpackType.Pmp)
+            {
+                // Need to check the PMP manifest version.
+                var pmp = await PMP.LoadPMP(path, true, false);
+                if (pmp.pmp.Meta.FileVersion > 3)
+                {
+                    if(newPath.EndsWith(".ttmp2") || newPath.EndsWith(".pmp"))
+                    {
+                        // Theoretically we could re-zip the data into a PMP here, but for the moment this isn't supported.
+                        // .TTMP2 can never be supported here.
+                        throw new NotImplementedException("Cannot convert v4+ Penumbra modpack to ttmp/pmp.");
+                    }
+
+                    // This is a newer PMP that TexTools cannot properly ingest for upgrading purposes.
+                    // Copy the raw files to the new path.
+                    await PMP.CopyPmpFiles(path, newPath);
+                    return false;
+                }
+            }
+
             var data = await UpgradeModpack(path, includePartials);
 
             if (data.AnyChanges || rewriteOnNoChanges)
