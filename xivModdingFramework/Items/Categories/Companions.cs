@@ -49,6 +49,37 @@ namespace xivModdingFramework.Items.Categories
         public Companions()
         {
         }
+
+        private static readonly string[] _DeAdjEndings = { "er", "e", "es" };   // masc, fem, neut
+        private static readonly string[] _DeArticles   = { "der", "die", "das" };
+
+        /// <summary>
+        /// Resolves SE's German declension markers to nominative singular.
+        /// 
+        /// The German EX files store an adjective/noun stem plus a positional marker
+        /// which the game engine fills at render time using the row's Pronoun
+        /// (grammatical gender) column, e.g. "emsig[a] Besen" -> "Emsiger Besen".
+        /// Only the German files contain these; every other language returns unchanged.
+        /// </summary>
+        private static string ResolveGermanName(string name, int pronoun)
+        {
+            if (string.IsNullOrEmpty(name) || name.IndexOf('[') < 0) return name;
+
+            var g = (pronoun >= 0 && pronoun < 3) ? pronoun : 0;
+
+            // A definite article ahead of the adjective forces the weak ending:
+            // "Register der Belesene", not "...der Belesener".
+            var weak = name.Contains("[t]");
+
+            name = name.Replace("[p]", "")
+                       .Replace("[t]", _DeArticles[g])
+                       .Replace("[a]", weak ? "e" : _DeAdjEndings[g]);
+
+            return name.Length > 0 && char.IsLower(name[0])
+                ? char.ToUpperInvariant(name[0]) + name.Substring(1)
+                : name;
+        }
+
         public async Task<List<XivMinion>> GetMinionList(string substring = null)
         {
             return await XivCache.GetCachedMinionsList(substring);
@@ -76,7 +107,8 @@ namespace xivModdingFramework.Items.Categories
             await Task.Run(() => Parallel.ForEach(minionEx.Values, (row) =>
             {
 
-                var name = (string) row.GetColumnByName("Name");
+                var name = ResolveGermanName((string) row.GetColumnByName("Name"),
+                                             row.GetColumnByName<int>("Pronoun"));
                 var index = row.GetColumnByName<int>("ModelCharaId");
 
                 if (string.IsNullOrEmpty(name))
