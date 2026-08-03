@@ -19,6 +19,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 using Image = SixLabors.ImageSharp.Image;
+using System.Globalization;
 
 namespace xivModdingFramework.Mods
 {
@@ -1713,7 +1714,7 @@ namespace xivModdingFramework.Mods
         /// </summary>
         /// <param name="modpack"></param>
         /// <returns></returns>
-        public static async Task<WizardData> FromModpack(string modpack)
+        public static async Task<WizardData> FromModpack(string modpack, bool enforceCompatibility = false)
         {
             return await Task.Run(async () =>
             {
@@ -1721,7 +1722,7 @@ namespace xivModdingFramework.Mods
 
                 if (modpackType == TTMP.EModpackType.Pmp)
                 {
-                    var pmp = await PMP.LoadPMP(modpack, false, true);
+                    var pmp = await PMP.LoadPMP(modpack, false, true, enforceCompatibility);
                     return await WizardData.FromPmp(pmp.pmp, pmp.path);
                 }
                 else if (modpackType == TTMP.EModpackType.TtmpWizard)
