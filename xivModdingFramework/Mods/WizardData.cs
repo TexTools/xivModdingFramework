@@ -19,6 +19,7 @@ using xivModdingFramework.SqPack.FileTypes;
 using xivModdingFramework.Variants.DataContainers;
 using xivModdingFramework.Variants.FileTypes;
 using Image = SixLabors.ImageSharp.Image;
+using System.Globalization;
 
 namespace xivModdingFramework.Mods
 {

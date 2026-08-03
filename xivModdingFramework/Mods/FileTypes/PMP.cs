@@ -35,6 +35,7 @@ using JsonSubTypes;
 using SharpDX.Win32;
 using static HelixToolkit.SharpDX.Core.Model.Metadata;
 using xivModdingFramework.Textures.FileTypes;
+using System.Globalization;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -937,6 +938,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 pmp.DefaultMod = null;
             }
 
+            pmp.Meta.LastWrite = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+
             var metaString = JsonConvert.SerializeObject(pmp.Meta, Formatting.Indented);
             File.WriteAllText(metapath, metaString);
 
@@ -1471,6 +1474,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Website = "";
         public string Image = "";
         public Guid Identifier = Guid.NewGuid();
+        public string LastWrite = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
 
         // These exist.
         public List<string> ModTags;
