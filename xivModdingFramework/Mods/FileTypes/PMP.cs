@@ -216,7 +216,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             if((meta.Groups != null && meta.Groups.Count > 0) || meta.DefaultData != null)
             {
                 // Pull v4 style Penumbra data back to v3 style for use internally.
-                pmp.Groups = meta.Groups;
+                pmp.Groups = meta.Groups ?? new List<PMPGroupJson>();
                 pmp.DefaultMod = meta.DefaultData;
 
                 meta.Groups = new List<PMPGroupJson>();
@@ -1470,6 +1470,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Version = "";
         public string Website = "";
         public string Image = "";
+        public Guid Identifier = Guid.NewGuid();
 
         // These exist.
         public List<string> ModTags;
@@ -1505,6 +1506,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         // Either single Index or Bitflag.
         [JsonConverter(typeof(CustomUInt64Converter))]
         public ulong DefaultSettings;
+
+        public Guid Identifier = Guid.NewGuid();
         
         [JsonIgnore]
         public virtual IReadOnlyList<PMPOptionJson> Options => throw new NotImplementedException($"Unimplemented PMP group type: {Type}");
@@ -1669,12 +1672,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             (Files != null && Files.Count > 0)
         );
 
-        // TODO: Comment this out in the future to mimic Penumbra's behavior
-        /*
         public bool ShouldSerializeFiles() { return Files != null && Files.Count > 0; }
         public bool ShouldSerializeFileSwaps() { return FileSwaps != null && FileSwaps.Count > 0; }
         public bool ShouldSerializeManipulations() { return Manipulations != null && Manipulations.Count > 0; }
-        */
     }
 
     public class PmpDefaultMod : PmpStandardOptionJson
