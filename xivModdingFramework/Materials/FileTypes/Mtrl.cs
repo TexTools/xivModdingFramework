@@ -851,7 +851,8 @@ namespace xivModdingFramework.Materials.FileTypes
                         xivTex.FilePath = path;
                         xivTex.TextureFormat = format;
 
-                        var di = Tex.GetDefaultTexturePath(tex.Usage);
+                        bool useDtMasks = xivMtrl.ShaderPack == EShaderPack.Character;
+                        var di = Tex.GetDefaultTexturePath(tex.Usage, useDtMasks);
 
                         await Tex.ImportTex(path, di.FullName, item, source, tx);
                         if(tex.Dx9Path != null)

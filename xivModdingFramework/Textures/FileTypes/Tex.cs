@@ -240,11 +240,11 @@ namespace xivModdingFramework.Textures.FileTypes
         /// </summary>
         /// <param name="format"></param>
         /// <returns></returns>
-        public static DirectoryInfo GetDefaultTexturePath(XivTexType usageType)
+        public static DirectoryInfo GetDefaultTexturePath(XivTexType usageType, bool useDawntrailMasks = true)
         {
             //new DirectoryInfo(Directory.GetFiles("AddNewTexturePartTexTmps", $"{Path.GetFileNameWithoutExtension(oldTexPath)}.dds", SearchOption.AllDirectories)[0]);
             var strings = Directory.GetFiles("Resources\\DefaultTextures", usageType.ToString() + ".dds", SearchOption.AllDirectories);
-            if(strings.Length == 0)
+            if(strings.Length == 0 || (usageType == XivTexType.Mask && useDawntrailMasks == false))
             {
                 strings = Directory.GetFiles("Resources\\DefaultTextures", XivTexType.Other.ToString() + ".dds", SearchOption.AllDirectories);
             }
