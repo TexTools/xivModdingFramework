@@ -109,7 +109,11 @@ namespace xivModdingFramework.Helpers
             var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "Penumbra.json");
             if (!File.Exists(path))
             {
-                return "";
+                path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "Penumbra", "config", "penumbra.json");
+                if (!File.Exists(path))
+                {
+                    return "";
+                }
             }
 
             try
