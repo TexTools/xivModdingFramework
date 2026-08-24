@@ -850,7 +850,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Creates a simple single-option PMP from a given dictionary of file information at the target filepath.
         /// </summary>
-        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, bool zip = true)
+        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, bool zip = true, bool deduplicateFiles = true)
         {
             if (!destination.ToLower().EndsWith(".pmp") && zip)
             {
@@ -874,7 +874,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 };
 
 
-                var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos);
+                var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos, "", deduplicateFiles);
 
                 pmp.Meta.DefaultData = new PmpDefaultMod();
                 pmp.Meta.Groups = new List<PMPGroupJson>();
