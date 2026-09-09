@@ -228,19 +228,25 @@ namespace xivModdingFramework.Helpers
                     return;
                 }
 
+                _WantsGlobalWrite = true;
+
+                // SingleWrite mode removed for now, as SingleWrites may require altering the meta for fixing dedupe issues during Penumbra Attach.
+                // Possible this could return later, but would need more complex analysis of the file being altered to ensure it's already "in place"
+
+                /* 
                 if (!Transaction.ModifiedFiles.Contains(internalFilePath))
                 {
                     // File was reset.  We have to rewrite the penumbra JSON files in this case.
                     _WantsGlobalWrite = true;
                 }
-                // If this file doesn't exist in the penumbra state yet, is a manipulation file, or is deleted, we need to do a full write.
+                    // If this file doesn't exist in the penumbra state yet, is a manipulation file, or is deleted, we need to do a full write.
                 else if (!PmpFilePaths.ContainsKey(internalFilePath) || internalFilePath.EndsWith(".meta") || internalFilePath.EndsWith(".rgsp") || newOffset == 0)
                 {
                     _WantsGlobalWrite = true;
                 } else
                 {
                     _WantsSingleWrite.Add(internalFilePath);
-                }
+                } */
 
                 DebouncedUpdatePenumbra();
             }
@@ -579,7 +585,8 @@ namespace xivModdingFramework.Helpers
 
             if(opt == null)
             {
-                throw new NotImplementedException();
+                // No options/data
+                return;
             }
 
             foreach (var swap in opt.Files)

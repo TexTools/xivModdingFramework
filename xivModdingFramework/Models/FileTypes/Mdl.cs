@@ -1921,13 +1921,9 @@ namespace xivModdingFramework.Models.FileTypes
         /// <exception cref="InvalidDataException"></exception>
         public static async Task<byte[]> FileToUncompressedMdl(string externalPath, string internalPath, ModelImportOptions options = null, ModTransaction tx = null)
         {
-            bool applyOptions = false;
             if (options == null)
             {
                 options = new ModelImportOptions();
-            } else
-            {
-                applyOptions = true;
             }
 
             if (options.LoggingFunction == null)
@@ -2014,7 +2010,7 @@ namespace xivModdingFramework.Models.FileTypes
                 }
                 else
                 {
-                    ttModel = await LoadExternalModel(externalPath, options, applyOptions);
+                    ttModel = await LoadExternalModel(externalPath, options, false);
                 }
                 #endregion
 

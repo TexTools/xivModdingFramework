@@ -466,6 +466,18 @@ namespace xivModdingFramework.Mods.FileTypes
             return ret;
         }
 
+        internal static async Task ResolveSimplePmpPaths(Dictionary<Guid, FileIdentifier> files, EFileStorageType defaultStorageType = EFileStorageType.CompressedIndividual)
+        {
+            // Just assign everything to its most basic path, allowing full file duplication.
+            foreach (var fkv in files)
+            {
+                var f = fkv.Value;
+                var path = f.Path;
+                var info = f.Info;
+                var pmpPath = f.OptionPrefix + path;
+                files[fkv.Key].PmpPath = pmpPath;
+            }
+        }
 
         /// <summary>
         /// Resolves duplicate files and assigns PMP zip paths to all of the file Identifiers.
@@ -624,7 +636,7 @@ namespace xivModdingFramework.Mods.FileTypes
 
             return l2;
         }
-        public static async Task<List<FileIdentifier>> IdentifierListFromDictionary(Dictionary<string, FileStorageInformation> files, string optionPrefix = "")
+        public static async Task<List<FileIdentifier>> IdentifierListFromDictionary(Dictionary<string, FileStorageInformation> files, string optionPrefix = "", bool deduplicateFiles = true)
         {
             var dict = new Dictionary<Guid, FileIdentifier>(files.Count);
             foreach (var f in files)
@@ -638,7 +650,13 @@ namespace xivModdingFramework.Mods.FileTypes
                 dict.Add(fi.Id, fi);
             }
 
-            await PMPExtensions.ResolveDuplicates(dict);
+            if (deduplicateFiles)
+            {
+                await PMPExtensions.ResolveDuplicates(dict);
+            } else
+            {
+                await PMPExtensions.ResolveSimplePmpPaths(dict);
+            }
             return dict.Values.ToList();
         }
     }

@@ -35,6 +35,7 @@ using JsonSubTypes;
 using SharpDX.Win32;
 using static HelixToolkit.SharpDX.Core.Model.Metadata;
 using xivModdingFramework.Textures.FileTypes;
+using System.Globalization;
 
 namespace xivModdingFramework.Mods.FileTypes.PMP
 {
@@ -43,7 +44,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
     /// </summary>
     public static class PMP
     {
-        public const int _WriteFileVersion = 3;
+        public const int _WriteFileVersion = 4;
 
         private const char _PMPSafeNameReplacement = '_';
 
@@ -122,7 +123,40 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             return path;
         }
 
-        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false)
+
+        /// <summary>
+        /// Full copies an entire PMP to the destination directory.
+        /// Used as a passthrough primarily for TexTools double click handler, but could be used
+        /// for any time you wanted to copy a PMP type modpack theoretically.
+        /// 
+        /// Does NO validation or file alterations.
+        /// </summary>
+        /// <param name="source">Source path either as a folder path, .pmp, or .json</param>
+        /// <param name="dest">The destination folder path the data should be copied or unzipped to.</param>
+        /// <returns></returns>
+        internal static async Task CopyPmpFiles(string source, string dest)
+        {
+            // Run Zip extract on a new thread.
+            await Task.Run(async () =>
+            {
+                if (source.EndsWith(".pmp"))
+                {
+
+                        // Unzip everything.
+                        await IOUtil.UnzipFiles(source, dest);
+                }
+
+                if (source.EndsWith(".json"))
+                {
+                    // PMP Folder by Json reference at root level.
+                    source = Path.GetDirectoryName(source);
+
+                    IOUtil.CopyFolder(source, dest);
+                }
+            });
+        }
+
+        public static async Task<(PMPJson pmp, string path, string headerImage)> LoadPMP(string path, bool jsonOnly = false, bool includeImages = false, bool enforceCompatibility = false)
         {
             var originalPath = path;
 
@@ -137,16 +171,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             {
                 NullValueHandling = NullValueHandling.Ignore
             });
-
             string image = null;
 
-
-
-            var defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+            if(meta.FileVersion > 3 && enforceCompatibility)
             {
-                NullValueHandling = NullValueHandling.Ignore
-            });
-            defaultOption.Name = "Default";
+                throw new NotImplementedException("Cannot ingest PMP File Version in enforced compatibility mode 4+.");
+            }
+
+            PmpDefaultMod defaultOption = null;
+            if (File.Exists(defModPath))
+            {
+                defaultOption = JsonConvert.DeserializeObject<PmpDefaultMod>(File.ReadAllText(defModPath), new JsonSerializerSettings
+                {
+                    NullValueHandling = NullValueHandling.Ignore
+                });
+                defaultOption.Name = "Default";
+            }
 
             var groups = new List<PMPGroupJson>();
 
@@ -173,6 +213,16 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 DefaultMod = defaultOption,
                 Groups = groups
             };
+
+            if((meta.Groups != null && meta.Groups.Count > 0) || meta.DefaultData != null)
+            {
+                // Pull v4 style Penumbra data back to v3 style for use internally.
+                pmp.Groups = meta.Groups ?? new List<PMPGroupJson>();
+                pmp.DefaultMod = meta.DefaultData;
+
+                meta.Groups = new List<PMPGroupJson>();
+                meta.DefaultData = null;
+            }
 
             var img = pmp.GetHeaderImage();
             if (img != null) {
@@ -800,7 +850,7 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         /// <summary>
         /// Creates a simple single-option PMP from a given dictionary of file information at the target filepath.
         /// </summary>
-        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, bool zip = true)
+        public static async Task CreateSimplePmp(string destination, BaseModpackData modpackMeta, Dictionary<string, FileStorageInformation> fileInfos, IEnumerable<PMPManipulationWrapperJson> otherManipulations = null, bool zip = true, bool deduplicateFiles = true)
         {
             if (!destination.ToLower().EndsWith(".pmp") && zip)
             {
@@ -819,20 +869,22 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 var pmp = new PMPJson()
                 {
                     Meta = new PMPMetaJson(),
-                    Groups = new List<PMPGroupJson>(),
-                    DefaultMod = new PmpDefaultMod(),
+                    //Groups = new List<PMPGroupJson>(),
+                    //DefaultMod = new PmpDefaultMod(),
                 };
 
 
-                var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos);
+                var files = await FileIdentifier.IdentifierListFromDictionary(fileInfos, "", deduplicateFiles);
 
-                pmp.DefaultMod = new PmpDefaultMod();
-                await PopulatePmpStandardOption(pmp.DefaultMod, workingPath, files, otherManipulations);
+                pmp.Meta.DefaultData = new PmpDefaultMod();
+                pmp.Meta.Groups = new List<PMPGroupJson>();
+                
+                await PopulatePmpStandardOption(pmp.Meta.DefaultData, workingPath, files, otherManipulations);
 
                 pmp.Meta.Author = modpackMeta.Author;
                 pmp.Meta.Name = modpackMeta.Name;
                 pmp.Meta.Description = modpackMeta.Description;
-                pmp.Meta.FileVersion = 3;
+                pmp.Meta.FileVersion = PMP._WriteFileVersion;
                 pmp.Meta.Version = modpackMeta.Version.ToString();
                 pmp.Meta.Website = modpackMeta.Url;
                 pmp.Meta.ModTags = pmp.Meta.ModTags ?? new List<string>();
@@ -873,19 +925,34 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
                 pmp.Meta.ModTags = new List<string>();
             }
 
+            // V4 style.
+            if(pmp.Groups != null)
+            {
+                pmp.Meta.Groups = pmp.Groups;
+                pmp.Groups = null;
+            }
+
+            if(pmp.DefaultMod != null)
+            {
+                pmp.Meta.DefaultData = pmp.DefaultMod;
+                pmp.DefaultMod = null;
+            }
+
+            pmp.Meta.LastWrite = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
+
             var metaString = JsonConvert.SerializeObject(pmp.Meta, Formatting.Indented);
             File.WriteAllText(metapath, metaString);
 
-            var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
-            File.WriteAllText(defaultModPath, defaultModString);
-
+            //var defaultModString = JsonConvert.SerializeObject(pmp.DefaultMod, Formatting.Indented);
+            //File.WriteAllText(defaultModPath, defaultModString);
+            /*
             for(int i = 0; i < pmp.Groups.Count; i++)
             {
                 var gName = PMP.MakePMPPathSafe(pmp.Groups[i].Name);
                 var groupPath = Path.Combine(workingDirectory, "group_" + (i+1).ToString("D3") + "_" + gName + ".json");
                 var groupString = JsonConvert.SerializeObject(pmp.Groups[i], Formatting.Indented);
                 File.WriteAllText(groupPath, groupString);
-            }
+            }*/
 
             if(zipPath != null)
             {
@@ -1406,9 +1473,18 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         public string Version = "";
         public string Website = "";
         public string Image = "";
+        public Guid Identifier = Guid.NewGuid();
+        public string LastWrite = DateTime.Now.ToString("O", CultureInfo.InvariantCulture);
 
         // These exist.
         public List<string> ModTags;
+
+        // Added in Penumbra JSON 4.0 scheme
+        // -- Penumbra moved (back) to storing groups in the main meta file.
+        public List<PMPGroupJson> Groups;
+
+        // Added in Penumbra JSON 4.0 scheme
+        public PmpDefaultMod DefaultData;
     }
 
     [JsonConverter(typeof(JsonSubtypes), "Type")]
@@ -1434,6 +1510,8 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
         // Either single Index or Bitflag.
         [JsonConverter(typeof(CustomUInt64Converter))]
         public ulong DefaultSettings;
+
+        public Guid Identifier = Guid.NewGuid();
         
         [JsonIgnore]
         public virtual IReadOnlyList<PMPOptionJson> Options => throw new NotImplementedException($"Unimplemented PMP group type: {Type}");
@@ -1598,12 +1676,9 @@ namespace xivModdingFramework.Mods.FileTypes.PMP
             (Files != null && Files.Count > 0)
         );
 
-        // TODO: Comment this out in the future to mimic Penumbra's behavior
-        /*
         public bool ShouldSerializeFiles() { return Files != null && Files.Count > 0; }
         public bool ShouldSerializeFileSwaps() { return FileSwaps != null && FileSwaps.Count > 0; }
         public bool ShouldSerializeManipulations() { return Manipulations != null && Manipulations.Count > 0; }
-        */
     }
 
     public class PmpDefaultMod : PmpStandardOptionJson
